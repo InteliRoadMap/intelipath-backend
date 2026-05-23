@@ -1,33 +1,68 @@
 package com.inteliroadmap.backend.services;
 
+import com.inteliroadmap.backend.domain.dto.request.LoginRequest;
 import com.inteliroadmap.backend.domain.dto.request.RegisterRequest;
+import com.inteliroadmap.backend.domain.dto.response.ApiResponse;
+import com.inteliroadmap.backend.domain.dto.response.AuthResponse;
 import com.inteliroadmap.backend.domain.entity.User;
+import com.inteliroadmap.backend.domain.enums.UserRole;
+import com.inteliroadmap.backend.domain.enums.UserStatus;
 import com.inteliroadmap.backend.repositories.UserRepository;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import com.inteliroadmap.backend.security.JwtUtil;
+import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service
+@RequiredArgsConstructor
 public class AuthService {
 
     private final UserRepository userRepository;
-    private final BCryptPasswordEncoder passwordEncoder;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtUtil jwtUtil;
 
-    public AuthService(UserRepository userRepository) {
-        this.userRepository = userRepository;
-        this.passwordEncoder = new BCryptPasswordEncoder();
-    }
-
-    // Registers a new user into the database.
-    public User registerUser(RegisterRequest request) {
-        if (userRepository.findByEmail(request.getEmail()).isPresent()) {
-            throw new IllegalArgumentException("Email already exists");
+    public ApiResponse<AuthResponse> register(RegisterRequest request) {
+        if (userRepository.existsByEmail(request.getEmail())) {
+            return ApiResponse.error(400, "Email already exists");
         }
 
-        User user = new User();
-        user.setEmail(request.getEmail());
-        user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setFullName(request.getFullName());
+        User user = buildUser(request);
+        userRepository.save(user);
 
-        return userRepository.save(user);
+        return ApiResponse.success(201, "Register successful", buildAuthResponse(user));
+    }
+
+    public ApiResponse<AuthResponse> login(LoginRequest request) {
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new RuntimeException("Email not found"));
+
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            throw new RuntimeException("Wrong password");
+        }
+
+        if (user.getUserStatus() == UserStatus.SUSPENDED) {
+            throw new RuntimeException("Account is suspended");
+        }
+
+        return ApiResponse.success(200, "Login successful", buildAuthResponse(user));
+    }
+
+    private User buildUser(RegisterRequest request) {
+        return User.builder()
+                .email(request.getEmail())
+                .password(passwordEncoder.encode(request.getPassword()))
+                .fullName(request.getFullName())
+                .role(UserRole.STUDENT)
+                .build();
+    }
+
+    private AuthResponse buildAuthResponse(User user) {
+        return AuthResponse.builder()
+                .accessToken(jwtUtil.generateToken(user.getEmail()))
+                .userId(user.getUserId().toString())
+                .email(user.getEmail())
+                .fullName(user.getFullName())
+                .role(user.getRole().name())
+                .build();
     }
 }
