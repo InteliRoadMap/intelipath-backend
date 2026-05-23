@@ -1,6 +1,6 @@
 package com.inteliroadmap.backend.middlewares;
 
-
+import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -18,39 +18,32 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
 @EnableWebSecurity
+@RequiredArgsConstructor
 public class SecurityConfig {
 
-
+    private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http)
             throws Exception {
 
         http
-                // Tắt CSRF vì dùng JWT (không dùng session)
                 .csrf(csrf -> csrf.disable())
-
-                // Cấu hình CORS
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-
-                // Cấu hình phân quyền
                 .authorizeHttpRequests(auth -> auth
-                        // Cho phép truy cập không cần login
                         .requestMatchers(
-                                "/api/v1/auth/**",      // Login, Register
-                                "/swagger-ui.html",  // Swagger redirect page
-                                "/swagger-ui/**",    // Swagger UI
-                                "/v3/api-docs/**",   // Swagger docs
-                                "/p/**"              // Public portfolio
+                                "/auth/**",
+                                "/swagger-ui.html",
+                                "/swagger-ui/**",
+                                "/v3/api-docs/**",
+                                "/p/**"
                         ).permitAll()
-                        // Tất cả còn lại phải login
                         .anyRequest().authenticated()
                 )
-
-                // Không dùng session (dùng JWT)
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                );
+                )
+                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
@@ -60,9 +53,8 @@ public class SecurityConfig {
         CorsConfiguration config = new CorsConfiguration();
 
         config.addAllowedOrigin("http://localhost:5173");
-        config.addAllowedOrigin("https://intelipath-frontend.onrender.com"); // Vite FE
-        config.addAllowedMethod("*"); // GET, POST, PUT, DELETE
-        config.addAllowedHeader("*"); // Authorization, Content-Type
+        config.addAllowedMethod("*");
+        config.addAllowedHeader("*");
         config.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source =
@@ -72,13 +64,11 @@ public class SecurityConfig {
         return source;
     }
 
-    // Mã hóa password bằng BCrypt
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    // Authentication Manager để xác thực user
     @Bean
     public AuthenticationManager authenticationManager(
             AuthenticationConfiguration config) throws Exception {
