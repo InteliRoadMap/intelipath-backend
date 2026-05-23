@@ -1,5 +1,26 @@
+package com.inteliroadmap.backend.domain.entity;//import com.inteliroadmap.backend.domain.entity.Assessment;
+//import com.inteliroadmap.backend.domain.entity.CareerRole;
+
+
+import com.inteliroadmap.backend.domain.enums.UserRole;
+import com.inteliroadmap.backend.domain.enums.UserStatus;
+import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.List;
+import java.util.UUID;
+
+
+//ORM - MAPPING CLASS INTO DATABASE
 @Entity
 @Table(name = "users")
+
+//LOMBOK TO AVOID BOILER-PLATE
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
@@ -10,14 +31,6 @@ public class User {
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "user_id")
     private UUID userId;
-
-    @ManyToOne
-    @JoinColumn(name = "career_id") // FK trỏ tới career_roles.career_id
-    private CareerRole careerRole;
-
-    @ManyToOne
-    @JoinColumn(name = "assessment_id") // FK trỏ tới assessment.assessment_id
-    private Assessment assessment;
 
     @Column(nullable = false)
     private String password;
@@ -30,7 +43,7 @@ public class User {
 
     private LocalDate yob;
 
-    @Column(columnDefinition = "TEXT") // TEXT = không giới hạn ký tự
+    @Column(columnDefinition = "TEXT")
     private String bio;
 
     private String university;
@@ -49,24 +62,33 @@ public class User {
     @Column(name = "account_status")
     private Boolean accountStatus;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "role")
-    private String role;
+    private UserRole role = UserRole.STUDENT;
 
-    // 1 User có nhiều records ở bảng con
-    // mappedBy = tên field trong class con trỏ ngược lại User
-    // cascade = ALL: thao tác trên User sẽ ảnh hưởng luôn các bảng con
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
-    private List<OauthAccount> oauthAccounts;
-
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
-    private List<RefreshToken> refreshTokens;
+    @Enumerated(EnumType.STRING)
+    @Column(name = "status")
+    private UserStatus userStatus = UserStatus.ACTIVE;
+//    // 1 User có nhiều records ở bảng con
+//    // mappedBy = tên field trong class con trỏ ngược lại User
+//    // cascade = ALL: thao tác trên User sẽ ảnh hưởng luôn các bảng con
+//    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+//    private List<OauthAccount> oauthAccounts;
+//
+//    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+//    private List<RefreshToken> refreshTokens;
 
     @PrePersist // Tự động chạy trước khi INSERT
     public void prePersist() {
         createAt = LocalDateTime.now();
         updateAt = LocalDateTime.now();
-        accountStatus = true;
-        role = "ST";
+        if (this.userStatus == null) {
+            this.userStatus = UserStatus.ACTIVE;
+        }
+
+        if (this.role == null) {
+            this.role = UserRole.STUDENT    ;
+        }
     }
 
     @PreUpdate // Tự động chạy trước khi UPDATE
