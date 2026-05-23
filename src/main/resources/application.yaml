@@ -1,7 +1,11 @@
 server:
   port: ${PORT:8080}
+  servlet:
+    context-path: /api/v1
 
 spring:
+  config:
+    import: optional:file:.env[.properties]
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}
@@ -23,3 +27,7 @@ spring:
     multipart:
       max-file-size: 5MB
       max-request-size: 10MB
+
+jwt:
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION:86400000} # milliseconds
