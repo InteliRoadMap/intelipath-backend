@@ -10,9 +10,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class RegisterRequest {
-    //thông báo khi đăng kí
-    @NotBlank(message = "Username is required")
-    private String username;
+
+    @NotBlank(message = "Full name is required")
+    private String fullName;
 
     @NotBlank(message = "Email is required")
     @Email(message = "Email should be valid")
@@ -20,5 +20,4 @@ public class RegisterRequest {
 
     @NotBlank(message = "Password is required")
     private String password;
-
 }
