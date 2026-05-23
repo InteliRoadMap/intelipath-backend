@@ -1,5 +1,6 @@
 package com.inteliroadmap.backend.controllers;
 
+import com.inteliroadmap.backend.domain.dto.request.LoginRequest;
 import com.inteliroadmap.backend.domain.dto.request.RegisterRequest;
 import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.repositories.UserRepository;
@@ -48,7 +49,7 @@ public class AuthController {
 
     // Handles the user login process and issues a JWT.
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody User loginRequest) {
+    public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
         Optional<User> userOptional = userRepository.findByEmail(loginRequest.getEmail());
 
         if (userOptional.isPresent() && passwordEncoder.matches(loginRequest.getPassword(), userOptional.get().getPassword())) {

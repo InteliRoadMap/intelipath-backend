@@ -1,6 +1,6 @@
 package com.inteliroadmap.backend.middlewares;
 
-import com.inteliroadmap.backend.security.ApiKeyFilter;
+
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -20,11 +20,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 @EnableWebSecurity
 public class SecurityConfig {
 
-    private final ApiKeyFilter apiKeyFilter;
 
-    public SecurityConfig(ApiKeyFilter apiKeyFilter) {
-        this.apiKeyFilter = apiKeyFilter;
-    }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http)
@@ -54,10 +50,7 @@ public class SecurityConfig {
                 // Không dùng session (dùng JWT)
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                )
-
-                // Add API Key Filter
-                .addFilterBefore(apiKeyFilter, UsernamePasswordAuthenticationFilter.class);
+                );
 
         return http.build();
     }
@@ -66,7 +59,8 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
 
-        config.addAllowedOrigin("http://localhost:5173"); // Vite FE
+        config.addAllowedOrigin("http://localhost:5173");
+        config.addAllowedOrigin("https://intelipath-frontend.onrender.com"); // Vite FE
         config.addAllowedMethod("*"); // GET, POST, PUT, DELETE
         config.addAllowedHeader("*"); // Authorization, Content-Type
         config.setAllowCredentials(true);
