@@ -41,7 +41,7 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // Cho phép truy cập không cần login
                         .requestMatchers(
-                                "/api/auth/**",      // Login, Register
+                                "/api/v1/auth/**",      // Login, Register
                                 "/swagger-ui.html",  // Swagger redirect page
                                 "/swagger-ui/**",    // Swagger UI
                                 "/v3/api-docs/**",   // Swagger docs

@@ -19,14 +19,14 @@ import java.util.Map;
 import java.util.Optional;
 
 @RestController
-@RequestMapping("/api/auth/")
+@RequestMapping("/api/v1/auth")
 public class AuthController {
 
     private final UserRepository userRepository;
     private final BCryptPasswordEncoder passwordEncoder;
     private final AuthService authService;
 
-    @Value("${JWT_SECRET}")
+    @Value("${JWT_SECRET:8e24c2d3a7b6f9a0c1e8d4f5g6h7j8k9l0m1n2o3p4q5r6s7t8u9v0w1x2y3z4a5}")
     private String jwtSecret;
 
     public AuthController(UserRepository userRepository, AuthService authService) {
