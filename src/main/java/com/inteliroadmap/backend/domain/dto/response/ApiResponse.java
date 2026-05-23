@@ -10,12 +10,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class AuthResponse {
+public class ApiResponse<T> {
 
-    private String accessToken;
-    private String refreshToken;
-    private String userId;
-    private String email;
-    private String fullName;
-    private String role;
+    private int status;
+    private String message;
+    private T data; // Generic - chứa bất kỳ data nào
 }

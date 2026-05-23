@@ -1,4 +1,4 @@
 package com.inteliroadmap.backend.config;
 
-public class SecurityConfig {
+public class CorsConfig {
 }
