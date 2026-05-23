@@ -59,15 +59,12 @@ public class User {
     @Column(name = "update_at")
     private LocalDateTime updateAt;
 
-    @Column(name = "account_status")
-    private Boolean accountStatus;
-
     @Enumerated(EnumType.STRING)
     @Column(name = "role")
     private UserRole role = UserRole.STUDENT;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "status")
+    @Column(name = "account_status")
     private UserStatus userStatus = UserStatus.ACTIVE;
 //    // 1 User có nhiều records ở bảng con
 //    // mappedBy = tên field trong class con trỏ ngược lại User
