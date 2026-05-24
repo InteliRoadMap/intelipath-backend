@@ -1,34 +1,37 @@
 package com.inteliroadmap.backend.config;
 
+import io.swagger.v3.oas.annotations.OpenAPIDefinition;
+import io.swagger.v3.oas.annotations.enums.SecuritySchemeIn;
+import io.swagger.v3.oas.annotations.enums.SecuritySchemeType;
+import io.swagger.v3.oas.annotations.info.Contact;
+import io.swagger.v3.oas.annotations.info.Info;
+import io.swagger.v3.oas.annotations.security.SecurityScheme;
+import io.swagger.v3.oas.annotations.security.SecuritySchemes;
+import io.swagger.v3.oas.annotations.servers.Server;
 import io.swagger.v3.oas.models.Components;
 import io.swagger.v3.oas.models.OpenAPI;
-import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
-import io.swagger.v3.oas.models.security.SecurityScheme;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 @Configuration
-public class SwaggerConfig {
-
-    @Bean
-    public OpenAPI openAPI() {
-        return new OpenAPI()
-                // Thông tin chung của API
-                .info(new Info()
-                        .title("InteliPath API")
-                        .version("1.0")
-                        .description("Personalized Career Orientation Platform")
+@OpenAPIDefinition(
+        info = @Info(
+                title = "InteliPath System API",
+                version = "8386",
+                description = "Backend API",
+                contact = @Contact(
+                        name = "InteliPath",
+                        email = "0909@6767.com"
                 )
-                // Thêm nút Authorize trên Swagger UI để nhập JWT token
-                .addSecurityItem(new SecurityRequirement()
-                        .addList("Bearer Auth"))
-                .components(new Components()
-                        .addSecuritySchemes("Bearer Auth",
-                                new SecurityScheme()
-                                        .type(SecurityScheme.Type.HTTP)
-                                        .scheme("bearer")
-                                        .bearerFormat("JWT")
-                        ));
-    }
-}
+        )
+)
+@SecurityScheme(
+        name = "Bearer Authentication",
+        description = "JWT authentication token. Login to get your token.",
+        scheme = "bearer",
+        type = SecuritySchemeType.HTTP,
+        bearerFormat = "JWT",
+        in = SecuritySchemeIn.HEADER
+)
+public class SwaggerConfig {}
