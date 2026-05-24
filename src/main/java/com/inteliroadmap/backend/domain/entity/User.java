@@ -32,31 +32,34 @@ public class User {
     @Column(name = "user_id")
     private UUID userId;
 
-    @Column(nullable = false)
+    @Column(name = "password", nullable = false)
     private String password;
 
     @Column(name = "full_name")
     private String fullName;
 
-    @Column(nullable = false, unique = true)
+    @Column(name = "email", nullable = false, unique = true)
     private String email;
 
+    @Column(name = "yob")
     private LocalDate yob;
 
-    @Column(columnDefinition = "TEXT")
+    @Column(name = "bio", columnDefinition = "TEXT")
     private String bio;
 
+    @Column(name = "university")
     private String university;
 
     @Column(name = "year_of_admission")
     private LocalDate yearOfAdmission;
 
+    @Column(name = "major")
     private String major;
 
-    @Column(name = "create_at")
+    @Column(name = "create_at", nullable = false)
     private LocalDateTime createAt;
 
-    @Column(name = "update_at")
+    @Column(name = "update_at", nullable = false)
     private LocalDateTime updateAt;
 
     @Enumerated(EnumType.STRING)
@@ -66,14 +69,31 @@ public class User {
     @Enumerated(EnumType.STRING)
     @Column(name = "account_status")
     private UserStatus userStatus = UserStatus.ACTIVE;
-//    // 1 User có nhiều records ở bảng con
-//    // mappedBy = tên field trong class con trỏ ngược lại User
-//    // cascade = ALL: thao tác trên User sẽ ảnh hưởng luôn các bảng con
-//    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
-//    private List<OauthAccount> oauthAccounts;
-//
-//    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
-//    private List<RefreshToken> refreshTokens;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "career_id", foreignKey = @ForeignKey(name = "fk_users_career"))
+    @org.hibernate.annotations.OnDelete(action = org.hibernate.annotations.OnDeleteAction.SET_NULL)
+    private CareerRole careerRole;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "assessment_id", foreignKey = @ForeignKey(name = "fk_users_assessment"))
+    @org.hibernate.annotations.OnDelete(action = org.hibernate.annotations.OnDeleteAction.SET_NULL)
+    private Assessment assessment;
+
+    // 1 User có nhiều records ở bảng con
+    // mappedBy = tên field trong class con trỏ ngược lại User
+    // cascade = ALL: thao tác trên User sẽ ảnh hưởng luôn các bảng con
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    private List<OauthAccount> oauthAccounts;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    private List<RefreshToken> refreshTokens;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    private List<PortfolioProject> portfolioProjects;
+
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    private List<ChatSession> chatSessions;
 
     @PrePersist // Tự động chạy trước khi INSERT
     public void prePersist() {

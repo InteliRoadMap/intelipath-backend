@@ -8,7 +8,7 @@ import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.domain.enums.UserRole;
 import com.inteliroadmap.backend.domain.enums.UserStatus;
 import com.inteliroadmap.backend.repositories.UserRepository;
-import com.inteliroadmap.backend.security.JwtUtil;
+import com.inteliroadmap.backend.utils.JwtUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
