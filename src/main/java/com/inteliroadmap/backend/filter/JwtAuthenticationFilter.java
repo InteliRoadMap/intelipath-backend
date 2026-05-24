@@ -1,7 +1,7 @@
-package com.inteliroadmap.backend.middlewares;
+package com.inteliroadmap.backend.filter;
 
 import com.inteliroadmap.backend.repositories.UserRepository;
-import com.inteliroadmap.backend.security.JwtUtil;
+import com.inteliroadmap.backend.utils.JwtUtil;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,20 +23,33 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtUtil jwtUtil;
     private final UserRepository userRepository;
-
+    /**
+     * @param request incoming HTTP request
+     * @param response outgoing HTTP response
+     * @param filterChain Spring Security filter chain
+     */
     @Override
     protected void doFilterInternal(
             HttpServletRequest request,
             HttpServletResponse response,
             FilterChain filterChain
     ) throws ServletException, IOException {
+
+        // Get Authorization header
         String authHeader = request.getHeader("Authorization");
 
+        /*
+         * Skip authentication
+         * if (...)
+         * Example valid header:
+         * Authorization: Bearer eyJhbGciOiJIUzI1Ni...
+         */
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             filterChain.doFilter(request, response);
             return;
         }
 
+        // Extract JWT token by removing "Bearer "
         String token = authHeader.substring(7);
 
         try {
@@ -45,9 +58,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             if (email != null
                     && SecurityContextHolder.getContext().getAuthentication() == null
                     && jwtUtil.isTokenValid(token)) {
+
                 userRepository.findByEmail(email).ifPresent(user -> {
+
                     List<SimpleGrantedAuthority> authorities = List.of(
-                            new SimpleGrantedAuthority("ROLE_" + user.getRole().name())
+                            new SimpleGrantedAuthority(
+                                    "ROLE_" + user.getRole().name()
+                            )
                     );
 
                     UsernamePasswordAuthenticationToken authToken =
@@ -56,22 +73,33 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                                     null,
                                     authorities
                             );
+
                     authToken.setDetails(
-                            new WebAuthenticationDetailsSource().buildDetails(request)
-                    );
-                    SecurityContextHolder.getContext().setAuthentication(authToken);
+                            new WebAuthenticationDetailsSource()
+                                    .buildDetails(request));
+
+                    SecurityContextHolder.getContext()
+                            .setAuthentication(authToken);
                 });
             }
+
         } catch (Exception e) {
             SecurityContextHolder.clearContext();
         }
-
         filterChain.doFilter(request, response);
     }
 
+    /**
+     * Skip JWT filter for public endpoints.
+     *
+     * @param request incoming HTTP request
+     * @return true if request should bypass JWT filter
+     */
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
+
         String path = request.getServletPath();
+
         return path.startsWith("/auth")
                 || path.startsWith("/p/")
                 || path.startsWith("/swagger-ui")

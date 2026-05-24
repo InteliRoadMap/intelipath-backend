@@ -1,4 +1,4 @@
 package com.inteliroadmap.backend.utils;
 
-public class EmailUtils {
+public class EmailUtil {
 }
