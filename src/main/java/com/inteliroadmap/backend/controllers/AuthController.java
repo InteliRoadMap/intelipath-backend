@@ -4,7 +4,7 @@ import com.inteliroadmap.backend.domain.dto.request.LoginRequest;
 import com.inteliroadmap.backend.domain.dto.request.RegisterRequest;
 import com.inteliroadmap.backend.domain.dto.response.ApiResponse;
 import com.inteliroadmap.backend.domain.dto.response.UserResponse;
-import com.inteliroadmap.backend.services.UserService;
+import com.inteliroadmap.backend.services.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -19,9 +19,9 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/auth")
 @RequiredArgsConstructor
 @Tag(name = "Authentication", description = "Login, Register")
-public class UserController {
+public class AuthController {
 
-    private final UserService authService;
+    private final AuthService authService;
 
     @PostMapping("/register")
     @Operation(summary = "Register new account")

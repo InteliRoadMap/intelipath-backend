@@ -6,9 +6,6 @@ spring:
   application:
     name: InteliRoadmap
 
-  config:
-    import: optional:file:.env[.properties]
-
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}
@@ -47,3 +44,7 @@ springdoc:
 
   api-docs:
     path: /v3/api-docs
+
+logging:
+  level:
+    org.springframework.security: DEBUG
