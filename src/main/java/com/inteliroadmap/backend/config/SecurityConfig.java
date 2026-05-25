@@ -1,6 +1,6 @@
 package com.inteliroadmap.backend.config;
 
-import com.inteliroadmap.backend.filter.JwtAuthenticationFilter;
+//import com.inteliroadmap.backend.filter.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -18,32 +18,33 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final JwtAuthenticationFilter jwtAuthenticationFilter;
+//    private final JwtAuthenticationFilter jwtAuthenticationFilter;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http)
             throws Exception {
 
         http
-                .cors(cors -> {})
+//                .cors(cors -> {})
                 .csrf(csrf -> csrf.disable())
 
-                .sessionManagement(session -> session
-                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-                )
+//                .sessionManagement(session -> session
+//                        .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+//                )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers(
-                                "/auth/**",
-                                "/swagger-ui.html",
-                                "/swagger-ui/**",
-                                "/v3/api-docs/**",
-                                "/p/**"
-                        ).permitAll()
-                        .anyRequest().authenticated()
-                )
+//                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
+//                        .requestMatchers(
+//                                "/auth/**",
+//                                "/swagger-ui.html",
+//                                "/swagger-ui/**",
+//                                "/v3/api-docs/**",
+//                                "/p/**"
+//                        )
+                                .anyRequest().permitAll()
+//                        .anyRequest().authenticated()
+                );
 
-                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+//                .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
