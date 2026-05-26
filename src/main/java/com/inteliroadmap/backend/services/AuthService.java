@@ -1,8 +1,7 @@
 package com.inteliroadmap.backend.services;
 
-import com.inteliroadmap.backend.domain.dto.request.LoginRequest;
-import com.inteliroadmap.backend.domain.dto.request.RefreshRequest;
-import com.inteliroadmap.backend.domain.dto.request.RegisterRequest;
+import com.inteliroadmap.backend.domain.dto.request.*;
+import com.inteliroadmap.backend.domain.dto.response.ForgotPasswordResponse;
 import com.inteliroadmap.backend.domain.dto.response.RefreshResponse;
 import com.inteliroadmap.backend.domain.dto.response.RegisterResponse;
 import com.inteliroadmap.backend.domain.dto.response.UserResponse;
@@ -14,6 +13,7 @@ import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.repositories.RefreshTokenRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.security.JwtService;
+import com.inteliroadmap.backend.utils.EmailUtil;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +32,7 @@ public class AuthService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final EmailService emailService;
 
     /**
      * Register new student account
@@ -154,6 +155,106 @@ public class AuthService {
 
         return refreshResponse(newAccessToken, jwtService.getAccessExpiration());
 
+    }
+
+    /**
+     * Initiate the forgot password flow.
+     *
+     * Flow:
+     * - Find user by email
+     * - Generate a new OTP
+     * - Save the OTP and set its expiration (5 minutes)
+     * - Send the OTP to the user's email
+     *
+     * @param request forgot password request payload (contains email)
+     * @return ForgotPasswordResponse with success message
+     * @throws ResourceNotFoundException if email not found
+     */
+    @Transactional
+    public ForgotPasswordResponse forgotPassword(ForgotPasswordRequest request) {
+        log.info("Auth Module: Forgot password request received for email: {}", request.getEmail());
+
+        // Find user by email
+        User user = userRepository.findByEmail(request.getEmail());
+        if (user == null) {
+            log.warn("Auth Module: User not found: {}", request.getEmail());
+            throw new ResourceNotFoundException("User not found");
+        }
+
+        // Generate OTP
+        String otp = EmailUtil.generateOtp();
+
+        // Save OTP
+        user.setOtp(otp);
+        user.setOtpExpiry(LocalDateTime.now().plusMinutes(5));
+        userRepository.save(user);
+        log.info("Auth Module: OTP generated and saved for user: {}", request.getEmail());
+
+        // Send email
+        emailService.sendOtpEmail(user.getEmail(), otp);
+
+        return ForgotPasswordResponse.builder()
+                .message("OTP sent to email: " + user.getEmail())
+                .email(user.getEmail())
+                .build();
+    }
+
+    /**
+     * Complete the password reset process.
+     *
+     * Flow:
+     * - Verify user exists
+     * - Check if the provided OTP matches the one saved in the database
+     * - Check if the OTP has expired
+     * - Encode and save the new password
+     * - Invalidate the OTP to prevent reuse
+     *
+     * @param request reset password request payload (contains email, OTP, and new password)
+     * @return UserResponse containing authenticated user info
+     * @throws ResourceNotFoundException if email not found, OTP invalid or expired
+     */
+    @Transactional
+    public UserResponse resetPassword(ResetPasswordRequest request) {
+        log.info("Auth Module: Reset password request received for email: {}", request.getEmail());
+
+        // Find user by email
+        User user = userRepository.findByEmail(request.getEmail());
+        if (user == null) {
+            log.warn("Auth Module: User not found: {}", request.getEmail());
+            throw new ResourceNotFoundException("User not found");
+        }
+
+        // Check OTP code
+        if (user.getOtp() == null || !user.getOtp().equals(request.getOtp())) {
+            log.warn("Auth Module: Invalid OTP code provided for user: {}", request.getEmail());
+            throw new ResourceNotFoundException("Invalid OTP code");
+        }
+
+        // Check OTP expiry
+        if (user.getOtpExpiry().isBefore(LocalDateTime.now())) {
+            log.warn("Auth Module: OTP code expired for user: {}", request.getEmail());
+            throw new ResourceNotFoundException("OTP expired");
+        }
+
+        // Update account with new password
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+
+        // Remove OTP
+        user.setOtp(null);
+        user.setOtpExpiry(null);
+        userRepository.save(user);
+        log.info("Auth Module: Password successfully reset for user: {}", request.getEmail());
+
+        // Generate fresh tokens
+        String refreshToken = jwtService.generateRefreshToken(user.getEmail());
+        RefreshToken token = RefreshToken.builder()
+                .token(refreshToken)
+                .user(user)
+                .expireAt(LocalDateTime.now().plus(Duration.ofMillis(jwtService.getRefreshExpiration())))
+                .build();
+        refreshTokenRepository.save(token);
+
+        return buildAuthResponse(user, refreshToken);
     }
 
     /**

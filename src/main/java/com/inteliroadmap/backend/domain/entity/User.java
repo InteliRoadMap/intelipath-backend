@@ -66,6 +66,13 @@ public class User {
     @Enumerated(EnumType.STRING)
     @Column(name = "account_status")
     private UserStatus userStatus = UserStatus.ACTIVE;
+
+    @Column(name = "otp")
+    private String otp;
+
+    @Column(name = "otp_expiry")
+    private LocalDateTime otpExpiry;
+
 //    // 1 User có nhiều records ở bảng con
 //    // mappedBy = tên field trong class con trỏ ngược lại User
 //    // cascade = ALL: thao tác trên User sẽ ảnh hưởng luôn các bảng con
