@@ -17,7 +17,9 @@ public enum ErrorCode {
 
     UNAUTHORIZED(401, "Unauthorized"),
 
-    INTERNAL_SERVER_ERROR(500, "Internal server error");
+    INTERNAL_SERVER_ERROR(500, "Internal server error"),
+
+    INVALID_OTP_CODE(401, "Unauthorized");
 
     private final int status;
     private final String message;

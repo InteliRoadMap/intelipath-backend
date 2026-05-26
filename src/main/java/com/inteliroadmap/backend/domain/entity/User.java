@@ -1,6 +1,4 @@
-package com.inteliroadmap.backend.domain.entity;//import com.inteliroadmap.backend.domain.entity.Assessment;
-//import com.inteliroadmap.backend.domain.entity.CareerRole;
-
+package com.inteliroadmap.backend.domain.entity;
 
 import com.inteliroadmap.backend.domain.enums.UserRole;
 import com.inteliroadmap.backend.domain.enums.UserStatus;
@@ -69,6 +67,12 @@ public class User {
     @Enumerated(EnumType.STRING)
     @Column(name = "account_status")
     private UserStatus userStatus = UserStatus.ACTIVE;
+
+    @Column(name = "otp")
+    private String otp;
+
+    @Column(name = "otp_expiry")
+    private LocalDateTime otpExpiry;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "career_id", foreignKey = @ForeignKey(name = "fk_users_career"))

@@ -1,7 +1,9 @@
 package com.inteliroadmap.backend.controllers;
 
+import com.inteliroadmap.backend.domain.dto.request.ForgotPasswordRequest;
 import com.inteliroadmap.backend.domain.dto.request.LoginRequest;
 import com.inteliroadmap.backend.domain.dto.request.RegisterRequest;
+import com.inteliroadmap.backend.domain.dto.request.ResetPasswordRequest;
 import com.inteliroadmap.backend.domain.dto.response.ApiResponse;
 import com.inteliroadmap.backend.domain.dto.response.UserResponse;
 import com.inteliroadmap.backend.services.AuthService;
@@ -18,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/auth")
 @RequiredArgsConstructor
-@Tag(name = "Authentication", description = "Login, Register")
+@Tag(name = "Authentication", description = "Login, Register, Reset Password")
 public class AuthController {
 
     private final AuthService authService;
@@ -33,5 +35,17 @@ public class AuthController {
     @Operation(summary = "Login with Email/Password")
     public ResponseEntity<ApiResponse<UserResponse>> login(@RequestBody @Valid LoginRequest request) {
         return ResponseEntity.ok(authService.loginAccount(request));
+    }
+
+    @PostMapping("/forgot-password")
+    @Operation(summary = "Forgot password")
+    public ResponseEntity<ApiResponse<String>> forgotPassword(@RequestBody @Valid ForgotPasswordRequest request) {
+        return ResponseEntity.ok(authService.forgotPassword(request));
+    }
+
+    @PostMapping("/reset-password")
+    @Operation(summary = "Reset password")
+    public ResponseEntity<ApiResponse<UserResponse>> resetPassword(@RequestBody @Valid ResetPasswordRequest request) {
+        return ResponseEntity.ok(authService.resetPassword(request));
     }
 }
