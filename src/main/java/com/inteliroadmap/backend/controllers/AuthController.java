@@ -1,7 +1,9 @@
 package com.inteliroadmap.backend.controllers;
 
 import com.inteliroadmap.backend.domain.dto.request.LoginRequest;
+import com.inteliroadmap.backend.domain.dto.request.RefreshRequest;
 import com.inteliroadmap.backend.domain.dto.request.RegisterRequest;
+import com.inteliroadmap.backend.domain.dto.response.RefreshResponse;
 import com.inteliroadmap.backend.domain.dto.response.RegisterResponse;
 import com.inteliroadmap.backend.domain.dto.response.UserResponse;
 import com.inteliroadmap.backend.domain.entity.User;
@@ -23,7 +25,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Controller - Authentication API Endpoints
- *
  * Provides endpoints:
  * - POST /auth/register - Register new student account
  * - POST /auth/login    - Login with email and password
@@ -39,8 +40,7 @@ public class AuthController {
 
     /**
      * POST /auth/register - Register new student account
-     *
-     * @param request RegisterRequest containing email, password, fullName
+     * @param registerRequest RegisterRequest containing email, password, fullName
      * @return ResponseEntity containing ApiResponse with UserResponse
      */
     @PostMapping("/register")
@@ -71,16 +71,15 @@ public class AuthController {
                             schema = @Schema(implementation = RegisterRequest.class)
                     )
             )
-            @RequestBody @Valid RegisterRequest request
+            @RequestBody @Valid RegisterRequest registerRequest
     ) {
-        log.info("Register request received for email: {}", request.getEmail());
-        return ResponseEntity.ok(authService.registerAccount(request));
+        log.info("Register request received for email: {}", registerRequest.getEmail());
+        return ResponseEntity.ok(authService.registerAccount(registerRequest));
     }
 
     /**
      * POST /auth/login - Login with email and password
-     *
-     * @param request LoginRequest containing email and password
+     * @param loginRequest LoginRequest containing email and password
      * @return ResponseEntity containing ApiResponse with UserResponse
      */
     @PostMapping("/login")
@@ -119,9 +118,54 @@ public class AuthController {
                             schema = @Schema(implementation = LoginRequest.class)
                     )
             )
-            @RequestBody @Valid LoginRequest request
+            @RequestBody @Valid LoginRequest loginRequest
     ) {
-        log.info("Login request received for email: {}", request.getEmail());
-        return ResponseEntity.ok(authService.loginAccount(request));
+        log.info("Login request received for email: {}", loginRequest.getEmail());
+        return ResponseEntity.ok(authService.loginAccount(loginRequest));
+    }
+
+    /**
+     * POST /auth/refresh - Refresh access token using refresh token
+     * @param refreshRequest RefreshRequest containing refresh token
+     * @return ResponseEntity containing new access token
+     */
+    @PostMapping("/refresh")
+    @Operation(
+            summary = "Refresh access token",
+            description = "Generate new JWT access token using refresh token"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Access token refreshed successfully",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = RefreshResponse.class)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Invalid or expired refresh token"
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Refresh token or user not found"
+            )
+    })
+    public ResponseEntity<RefreshResponse> refreshAccount(
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Refresh token payload",
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = RefreshRequest.class)
+                    )
+            )
+            @RequestBody @Valid RefreshRequest refreshRequest
+    ) {
+        log.info("Refresh token request received");
+        return ResponseEntity.ok(
+                authService.refreshAccount(refreshRequest)
+        );
     }
 }
