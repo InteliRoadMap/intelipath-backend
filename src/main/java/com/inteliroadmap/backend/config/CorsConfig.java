@@ -17,10 +17,11 @@ public class CorsConfig {
         CorsConfiguration configuration = new CorsConfiguration();
 
         configuration.setAllowedOrigins(List.of(
-                "https://intelipath-frontend.onrender.com"
+                "http://localhost:5173",  // Vite dev server
+                "http://localhost:3000"   // React dev server
         ));
         configuration.setAllowedMethods(List.of(
-                "GET", "POST", "PUT", "DELETE"
+                "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"
         ));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);
