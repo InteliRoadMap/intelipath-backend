@@ -15,7 +15,6 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 
 import java.io.IOException;
-import java.util.LinkedList;
 import java.util.List;
 
 @Component
@@ -76,7 +75,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             }
             log.debug("Email extracted: {}", email);
 
-            String role  = jwtService.extractRole(email);
+            String role  = jwtService.extractRole(token);
             if (role == null) {
                 log.warn("Failed to extract role from token");
                 filterChain.doFilter(request, response);

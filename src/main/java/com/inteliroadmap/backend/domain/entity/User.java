@@ -72,10 +72,10 @@ public class User {
 //    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
 //    private List<OauthAccount> oauthAccounts;
 //
-//    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
-//    private List<RefreshToken> refreshTokens;
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    private List<RefreshToken> refreshTokens;
 
-    @PrePersist // Tự động chạy trước khi INSERT
+    @PrePersist
     public void prePersist() {
         createAt = LocalDateTime.now();
         updateAt = LocalDateTime.now();
@@ -88,7 +88,7 @@ public class User {
         }
     }
 
-    @PreUpdate // Tự động chạy trước khi UPDATE
+    @PreUpdate
     public void preUpdate() {
         updateAt = LocalDateTime.now();
     }
