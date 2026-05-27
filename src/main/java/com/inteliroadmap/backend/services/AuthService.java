@@ -190,12 +190,13 @@ public class AuthService {
         user.setOtpExpiry(LocalDateTime.now().plusMinutes(2));
         userRepository.save(user);
         log.info("Forgot Password Module: OTP generated and saved for user: {}", request.getEmail());
+        log.info("OTP: {}", otp);
 
         // Send email
         emailService.sendOtpEmail(user.getEmail(), otp);
 
         return ForgotPasswordResponse.builder()
-                .message("OTP sent to email: " + user.getEmail())
+                .message("OTP sent to email: ")
                 .email(user.getEmail())
                 .build();
     }
@@ -230,6 +231,8 @@ public class AuthService {
             log.warn("Reset Password Module: Invalid OTP code provided for user: {}", request.getEmail());
             throw new ResourceNotFoundException("Invalid OTP code");
         }
+
+        log.info("OTP: {}", request.getOtp());
 
         //3. Check OTP expiry
         if (user.getOtpExpiry().isBefore(LocalDateTime.now())) {
