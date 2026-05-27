@@ -186,7 +186,7 @@ public class AuthService {
 
         // Save OTP
         user.setOtp(otp);
-        user.setOtpExpiry(LocalDateTime.now().plusMinutes(5));
+        user.setOtpExpiry(LocalDateTime.now().plusMinutes(2));
         userRepository.save(user);
         log.info("Auth Module: OTP generated and saved for user: {}", request.getEmail());
 
@@ -217,35 +217,35 @@ public class AuthService {
     public UserResponse resetPassword(ResetPasswordRequest request) {
         log.info("Auth Module: Reset password request received for email: {}", request.getEmail());
 
-        // Find user by email
+        //1. Find user by email
         User user = userRepository.findByEmail(request.getEmail());
         if (user == null) {
             log.warn("Auth Module: User not found: {}", request.getEmail());
             throw new ResourceNotFoundException("User not found");
         }
 
-        // Check OTP code
+        //2. Check OTP code
         if (user.getOtp() == null || !user.getOtp().equals(request.getOtp())) {
             log.warn("Auth Module: Invalid OTP code provided for user: {}", request.getEmail());
             throw new ResourceNotFoundException("Invalid OTP code");
         }
 
-        // Check OTP expiry
+        //3. Check OTP expiry
         if (user.getOtpExpiry().isBefore(LocalDateTime.now())) {
             log.warn("Auth Module: OTP code expired for user: {}", request.getEmail());
             throw new ResourceNotFoundException("OTP expired");
         }
 
-        // Update account with new password
+        //4. Update account with new password
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
 
-        // Remove OTP
+        //5. Remove OTP
         user.setOtp(null);
         user.setOtpExpiry(null);
         userRepository.save(user);
         log.info("Auth Module: Password successfully reset for user: {}", request.getEmail());
 
-        // Generate fresh tokens
+        //6. Generate fresh tokens
         String refreshToken = jwtService.generateRefreshToken(user.getEmail());
         RefreshToken token = RefreshToken.builder()
                 .token(refreshToken)
