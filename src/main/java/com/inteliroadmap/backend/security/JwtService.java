@@ -32,6 +32,7 @@ public class JwtService {
      */
     public String generateAccessToken(String email, String role) {
         log.debug("Generating access token for: {}", email);
+
         try {
             return Jwts.builder()
                     .subject(email)
