@@ -6,42 +6,54 @@ spring:
   application:
     name: InteliPath
 
+  profiles:
+    active: prod
+
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
-
-    #HikariCP : Connection Pool help managing conn DB
+    # HikariCP: Connection Pool giúp quản lý kết nối DB
     hikari:
       # 5 connection idle
       minimum-idle: 5
-
       # 10 * 60 * 1000 = 10M : If idle over 10m Hikari will close connection
       idle-timeout: 600000
-
       # 18 * 60 * 1000 = 30M : Hikari will replace by new connection
       max-lifetime: 1800000
-
       # 3 * 1000 = 30ML : Time to give new connection for app
       connection-timeout: 30000
+
+  #  Email config
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${GOOGLE_EMAIL_USERNAME}
+    password: ${GOOGLE_EMAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
 
   jpa:
     hibernate:
       ddl-auto: update
-
-    show-sql: true
-
     properties:
       hibernate:
         format_sql: true
 
-  web:
-    #Cross-Origin Resource Sharing
-    cors:
-      allowed-origins: http://localhost:3000,http://localhost:8080
-      allowed-methods: GET,POST,PUT,DELETE,OPTIONS
-      allowed-headers: "*"
-      allow-credentials: true
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${CLIENT_ID_GOOGLE}
+            client-secret: ${CLIENT_SECRET_GOOGLE}
+            scope:
+              - email
+              - profile
 
 jwt:
   secret: ${JWT_SECRET}
@@ -50,10 +62,5 @@ jwt:
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
-
   api-docs:
     path: /v3/api-docs
-
-logging:
-  level:
-    org.springframework.security: DEBUG

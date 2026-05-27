@@ -1,0 +1,12 @@
+spring:
+  config:
+    activate:
+      on-profile: dev
+  jpa:
+    show-sql: true
+
+
+logging:
+  level:
+    org.springframework.security: DEBUG  # Log security chi tiết
+    com.inteliroadmap: DEBUG             # Log toàn bộ project
