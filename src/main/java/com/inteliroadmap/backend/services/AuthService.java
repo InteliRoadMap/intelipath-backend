@@ -153,8 +153,9 @@ public class AuthService {
                 user.getRole().name()
         );
         log.info("New access token generated for : {}", user.getFullName());
+        LocalDateTime expiresIn = LocalDateTime.now().plus(Duration.ofMillis(jwtService.getRefreshExpiration()));
 
-        return refreshResponse(newAccessToken, jwtService.getAccessExpiration());
+        return refreshResponse(newAccessToken, expiresIn);
 
     }
 
@@ -303,7 +304,7 @@ public class AuthService {
                 .build();
    }
 
-   private RefreshResponse refreshResponse(String accessToken, long expiresIn) {
+   private RefreshResponse refreshResponse(String accessToken, LocalDateTime expiresIn) {
         log.info("Refresh access token");
         return RefreshResponse.builder()
                 .accessToken(accessToken)
