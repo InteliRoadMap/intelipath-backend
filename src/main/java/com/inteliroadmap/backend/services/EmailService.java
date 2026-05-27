@@ -119,16 +119,6 @@ public class EmailService {
                                 font-size: 15px;
                             }
 
-                            .countdown-text {
-                                margin-top: 22px;
-                                font-size: 16px;
-                                color: #374151;
-                            }
-
-                            .countdown-text strong {
-                                color: #008FFF;
-                            }
-
                             .warning {
                                 margin-top: 28px;
                                 font-size: 14px;
@@ -172,13 +162,9 @@ public class EmailService {
                                 </div>
 
                                 <div class="info-box">
-                                    Your verification code is active for the next 2 minutes.<br/>
+                                    Your verification code is active for the next <strong>2 minutes</strong>.<br/>
                                     Enter it on the secure page to finish resetting your password.
                                 </div>
-
-                                <p class="countdown-text">
-                                    This OTP will expire in <strong>02:00</strong>.
-                                </p>
 
                                 <div class="warning">
                                     If you did not request a password reset, you can safely ignore this message.
