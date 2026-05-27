@@ -9,24 +9,21 @@ import lombok.NoArgsConstructor;
 import java.util.UUID;
 
 @Entity
-@Table(name = "assessment")
+@Table(name = "skills")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class Assessment {
+public class Skill {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "assessment_id")
-    private UUID assessmentId;
+    @Column(name = "skill_id")
+    private UUID skillId;
 
-    @Column(name = "career")
-    private String career;
+    @Column(name = "name", nullable = false)
+    private String name;
 
-    @Column(name = "question_answers", columnDefinition = "jsonb")
-    private String questionAnswers;
-
-    @Column(name = "grade")
-    private Integer grade;
+    @Column(name = "category")
+    private String category;
 }

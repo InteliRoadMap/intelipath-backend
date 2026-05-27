@@ -12,19 +12,19 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class RegisterRequest {
+public class ResetPasswordRequest {
 
-    // The user's email. Must not be blank and must follow standard email formatting.
+    //User's email for targeting the right account
     @NotBlank(message = "Email is required")
     @Email(message = "Email is invalid")
     private String email;
 
-    // The user's plain-text password (which will be hashed later in AuthService).
+    //OPT code to confirm the right user
+    @NotBlank(message = "OTP is required")
+    private String otp;
+
+    //User's new password
     @NotBlank(message = "Password is required")
     @Size(min = 4, max = 20, message = "Password must be 4-20 characters")
-    private String password;
-
-    @NotBlank(message = "Full name is required")
-    private String fullName;
-
+    private String newPassword;
 }
