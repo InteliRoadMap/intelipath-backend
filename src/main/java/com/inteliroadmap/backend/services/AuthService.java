@@ -193,7 +193,7 @@ public class AuthService {
         log.info("OTP: {}", otp);
 
         // Send email
-        emailService.sendOtpEmail(user.getEmail(), otp);
+        emailService.sendOtpEmail(user.getEmail(), user.getFullName(), otp);
 
         return ForgotPasswordResponse.builder()
                 .message("OTP sent to email: ")

@@ -15,7 +15,7 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
 
-    public void sendOtpEmail(String email, String otp) {
+    public void sendOtpEmail(String email, String fullName, String otp) {
 
         log.info("Preparing OTP email for {}", email);
 
@@ -145,12 +145,11 @@ public class EmailService {
 
                             <div class="header">
                                 <h1>InteliPath</h1>
-                                <p>Password Reset Request</p>
                             </div>
 
                             <div class="content">
 
-                                <h2>Hello 👋</h2>
+                                <h2>Hello %s</h2>
 
                                 <p>
                                     We received a request to reset your password.<br/>
@@ -180,7 +179,7 @@ public class EmailService {
 
                     </body>
                     </html>
-                    """.formatted(otp);
+                    """.formatted(fullName, otp);
 
             helper.setText(htmlContent, true);
 
