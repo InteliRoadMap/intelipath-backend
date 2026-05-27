@@ -10,19 +10,20 @@ import java.util.UUID;
 
 @Entity
 @Table(name = "oauth_accounts")
+
 @Data
-@NoArgsConstructor
 @AllArgsConstructor
+@NoArgsConstructor
 @Builder
 public class OauthAccount {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     @Column(name = "oauth_acc_id")
-    private UUID oauthAccId;
+    private UUID oauthAccountId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false, foreignKey = @ForeignKey(name = "fk_oa_user"))
+    @ManyToOne
+    @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
     @Column(name = "provider_id", nullable = false)

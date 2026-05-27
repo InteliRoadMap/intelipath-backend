@@ -88,7 +88,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             UsernamePasswordAuthenticationToken authentication
                     = new UsernamePasswordAuthenticationToken(email, null, authorityList);
 
-
             // Gửi authentication vào SecurityContext để Spring Security biết user đã authenticated
             SecurityContextHolder.getContext().setAuthentication(authentication);
             log.info("Authentication set for user: {}", email);

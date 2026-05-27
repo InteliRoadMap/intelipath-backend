@@ -67,6 +67,10 @@ public class User {
     @Column(name = "account_status")
     private UserStatus userStatus = UserStatus.ACTIVE;
 
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    private List<OauthAccount> oauthAccounts;
+
+
     @Column(name = "otp")
     private String otp;
 

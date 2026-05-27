@@ -99,15 +99,16 @@ public class AuthService {
         }
 
         log.info("Login Module: User prepare to create Refresh token");
+        LocalDateTime expiresIn = LocalDateTime.now().plus(Duration.ofMillis(jwtService.getRefreshExpiration()));
         String refreshToken = jwtService.generateRefreshToken(user.getEmail());
         RefreshToken token = RefreshToken.builder()
                 .token(refreshToken)
                 .user(user)
-                .expireAt(LocalDateTime.now().plus(Duration.ofMillis(jwtService.getRefreshExpiration())))
+                .expireAt(expiresIn)
                 .build();
         refreshTokenRepository.save(token);
         log.info("Login Module: User logged in successfully: {}", loginRequest.getEmail());
-        return buildAuthResponse(user, refreshToken);
+        return buildAuthResponse(user, refreshToken, expiresIn);
 
     }
 
@@ -262,7 +263,7 @@ public class AuthService {
      * @param user Authenticated User entity
      * @return UserResponse containing JWT token and user info
      */
-    public UserResponse buildAuthResponse(User user, String refreshToken) {
+    public UserResponse buildAuthResponse(User user, String refreshToken, LocalDateTime expiresIn) {
         log.info("Build Auth Response for email: {}", user.getEmail());
         return UserResponse.builder()
                 .accessToken(
@@ -276,6 +277,7 @@ public class AuthService {
                                 user.getEmail()
                         )
                 )
+                .expiresIn(String.valueOf(expiresIn))
                 .id(user.getUserId().toString())
                 .fullName(user.getFullName())
                 .role(user.getRole().name())
@@ -303,5 +305,6 @@ public class AuthService {
                 .accessToken(accessToken)
                 .expiresIn(String.valueOf(expiresIn))
                 .build();
+
    }
 }
