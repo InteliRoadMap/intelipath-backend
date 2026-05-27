@@ -173,12 +173,12 @@ public class AuthService {
      */
     @Transactional
     public ForgotPasswordResponse forgotPassword(ForgotPasswordRequest request) {
-        log.info("Auth Module: Forgot password request received for email: {}", request.getEmail());
+        log.info("Forgot Password Module: Forgot password request received for email: {}", request.getEmail());
 
         // Find user by email
         User user = userRepository.findByEmail(request.getEmail());
         if (user == null) {
-            log.warn("Auth Module: User not found: {}", request.getEmail());
+            log.warn("Forgot Password Module: User not found: {}", request.getEmail());
             throw new ResourceNotFoundException("User not found");
         }
 
@@ -189,7 +189,7 @@ public class AuthService {
         user.setOtp(otp);
         user.setOtpExpiry(LocalDateTime.now().plusMinutes(2));
         userRepository.save(user);
-        log.info("Auth Module: OTP generated and saved for user: {}", request.getEmail());
+        log.info("Forgot Password Module: OTP generated and saved for user: {}", request.getEmail());
 
         // Send email
         emailService.sendOtpEmail(user.getEmail(), otp);
@@ -216,24 +216,24 @@ public class AuthService {
      */
     @Transactional
     public UserResponse resetPassword(ResetPasswordRequest request) {
-        log.info("Auth Module: Reset password request received for email: {}", request.getEmail());
+        log.info("Reset Password Module: Reset password request received for email: {}", request.getEmail());
 
         //1. Find user by email
         User user = userRepository.findByEmail(request.getEmail());
         if (user == null) {
-            log.warn("Auth Module: User not found: {}", request.getEmail());
+            log.warn("Reset Password Module: User not found: {}", request.getEmail());
             throw new ResourceNotFoundException("User not found");
         }
 
         //2. Check OTP code
         if (user.getOtp() == null || !user.getOtp().equals(request.getOtp())) {
-            log.warn("Auth Module: Invalid OTP code provided for user: {}", request.getEmail());
+            log.warn("Reset Password Module: Invalid OTP code provided for user: {}", request.getEmail());
             throw new ResourceNotFoundException("Invalid OTP code");
         }
 
         //3. Check OTP expiry
         if (user.getOtpExpiry().isBefore(LocalDateTime.now())) {
-            log.warn("Auth Module: OTP code expired for user: {}", request.getEmail());
+            log.warn("Reset Password Module: OTP code expired for user: {}", request.getEmail());
             throw new ResourceNotFoundException("OTP expired");
         }
 
@@ -244,9 +244,10 @@ public class AuthService {
         user.setOtp(null);
         user.setOtpExpiry(null);
         userRepository.save(user);
-        log.info("Auth Module: Password successfully reset for user: {}", request.getEmail());
+        log.info("Reset Password Module: Password successfully reset for user: {}", request.getEmail());
 
         //6. Generate fresh tokens
+        LocalDateTime expiresIn = LocalDateTime.now().plus(Duration.ofMillis(jwtService.getRefreshExpiration()));
         String refreshToken = jwtService.generateRefreshToken(user.getEmail());
         RefreshToken token = RefreshToken.builder()
                 .token(refreshToken)
@@ -254,8 +255,8 @@ public class AuthService {
                 .expireAt(LocalDateTime.now().plus(Duration.ofMillis(jwtService.getRefreshExpiration())))
                 .build();
         refreshTokenRepository.save(token);
+        return buildAuthResponse(user, refreshToken, expiresIn);
 
-        return buildAuthResponse(user, refreshToken);
     }
 
     /**
