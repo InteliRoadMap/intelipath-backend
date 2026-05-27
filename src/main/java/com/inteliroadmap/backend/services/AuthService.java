@@ -1,93 +1,160 @@
 package com.inteliroadmap.backend.services;
 
-import com.inteliroadmap.backend.domain.dto.request.ForgotPasswordRequest;
-import com.inteliroadmap.backend.domain.dto.request.LoginRequest;
-import com.inteliroadmap.backend.domain.dto.request.RegisterRequest;
-import com.inteliroadmap.backend.domain.dto.request.ResetPasswordRequest;
-import com.inteliroadmap.backend.domain.dto.response.ApiResponse;
+import com.inteliroadmap.backend.domain.dto.request.*;
+import com.inteliroadmap.backend.domain.dto.response.ForgotPasswordResponse;
+import com.inteliroadmap.backend.domain.dto.response.RefreshResponse;
+import com.inteliroadmap.backend.domain.dto.response.RegisterResponse;
 import com.inteliroadmap.backend.domain.dto.response.UserResponse;
+import com.inteliroadmap.backend.domain.entity.RefreshToken;
 import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.domain.enums.UserRole;
 import com.inteliroadmap.backend.domain.enums.UserStatus;
-import com.inteliroadmap.backend.exceptions.AppException;
-import com.inteliroadmap.backend.exceptions.enums.ErrorCode;
+import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
+import com.inteliroadmap.backend.repositories.RefreshTokenRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
+import com.inteliroadmap.backend.security.JwtService;
 import com.inteliroadmap.backend.utils.EmailUtil;
-import com.inteliroadmap.backend.utils.JwtUtil;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class AuthService {
 
     private final UserRepository userRepository;
+    private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
-    private final JwtUtil jwtUtil;
+    private final JwtService jwtService;
     private final EmailService emailService;
 
     /**
-     * Register new user account.
+     * Register new student account
      *
-     * Flow:
-     * - Check email already exists
-     * - Encode password
-     * - Save user into database
-     * - Generate JWT token
-     *
-     * @param request register request payload
-     * @return API response containing authenticated user info
+     * @param registerRequest RegisterRequest containing email, password, fullName
+     * @return UserResponse containing JWT token and user info
+     * @throws ResourceNotFoundException if email already exists
      */
-    public ApiResponse<UserResponse> registerAccount(RegisterRequest request) {
+    @Transactional
+    public RegisterResponse registerAccount(RegisterRequest registerRequest) {
+        log.info("Register Module: Register request received for email: {}", registerRequest.getEmail());
 
-        // Prevent duplicate email registration
-        if (userRepository.existsByEmail(request.getEmail())) {
-            return ApiResponse.error(400, "Email already exists");
+        //B1: Check duplicate email registration
+        if (userRepository.existsByEmail(registerRequest.getEmail())) {
+            log.warn("Register Module: Email already in use: {}", registerRequest.getEmail());
+            throw new ResourceNotFoundException("Email already in use");
         }
 
-        // Build new user entity
-        User user = buildUser(request);
-
-        // Save user into database
+        //B2: Build User entity from request
+        User user = buildUser(registerRequest);
         userRepository.save(user);
+        log.info("Register Module: User registered successfully: {}", registerRequest.getEmail());
 
-        return ApiResponse.success(
-                201, "Register successful", buildAuthResponse(user)
-        );
+        return RegisterResponse.builder()
+                .message("Welcome to InteliPath," + user.getFullName())
+                .email(user.getEmail())
+                .fullName(user.getFullName())
+                .build();
     }
 
     /**
-     * Authenticate user using email and password.
+     * Authenticate user using email and password
      *
      * Validation:
-     * - Email exists
-     * - Password matches
-     * - Account is active
+     * 1. Verify email exists in database
+     * 2. Verify password matches encoded password
+     * 3. Verify account is not suspended
      *
-     * @param request login request payload
-     * @return API response containing JWT token and user info
+     * @param loginRequest LoginRequest containing email and password
+     * @return UserResponse containing JWT token and user info
+     * @throws ResourceNotFoundException if email not found, wrong password, or account suspended
      */
-    public ApiResponse<UserResponse> loginAccount(LoginRequest request) {
+    @Transactional
+    public UserResponse loginAccount(LoginRequest loginRequest) {
+        log.info("Login Module: Login request received for email: {}", loginRequest.getEmail());
 
-        // Find user by email
-        User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new AppException(ErrorCode.EMAIL_NOT_FOUND));
+        //B1: Find user bt email
+        User user = userRepository.findByEmail(loginRequest.getEmail());
+        if  (user == null) {
+            log.warn("Login Module: User not found: {}", loginRequest.getEmail());
+            throw new ResourceNotFoundException("User not found");
+        }
 
-        // Verify User Password
-        if (!passwordEncoder.matches(
-                request.getPassword(),
-                user.getPassword()
-        )) {throw new AppException(ErrorCode.WRONG_PASSWORD);}
+        //B2: Verify password against BCrypt encoded
+        if (!passwordEncoder.matches(loginRequest.getPassword(), user.getPassword())) {
+            log.warn("Login Module: Passwords don't match");
+            throw new ResourceNotFoundException("Passwords don't match");
+        }
 
-        // Prevent suspended users from logging in
-        if (user.getUserStatus() == UserStatus.SUSPENDED) {throw new AppException(ErrorCode.ACCOUNT_SUSPENDED);}
+        //B3: Prevent suspended account
+        if (user.getUserStatus() == UserStatus.SUSPENDED) {
+            log.warn("Login Module: User is Suspended");
+            throw new ResourceNotFoundException("User is Suspended");
+        }
 
-        return ApiResponse.success(
-                200, "Login successful", buildAuthResponse(user)
+        log.info("Login Module: User prepare to create Refresh token");
+        String refreshToken = jwtService.generateRefreshToken(user.getEmail());
+        RefreshToken token = RefreshToken.builder()
+                .token(refreshToken)
+                .user(user)
+                .expireAt(LocalDateTime.now().plus(Duration.ofMillis(jwtService.getRefreshExpiration())))
+                .build();
+        refreshTokenRepository.save(token);
+        log.info("Login Module: User logged in successfully: {}", loginRequest.getEmail());
+        return buildAuthResponse(user, refreshToken);
+
+    }
+
+    @Transactional
+    public RefreshResponse  refreshAccount(RefreshRequest refreshRequest) {
+        log.info("Refresh access token");
+        String refreshToken = refreshRequest.getRefreshToken();
+        //B1: Check refresh token exists in DB
+        RefreshToken storedToken = refreshTokenRepository.findByToken(refreshToken);
+        if (storedToken == null) {
+            log.warn("Refresh token not found");
+            throw new ResourceNotFoundException("Refresh token not found");
+        }
+
+        //B2: Check expired in DB
+        if (storedToken.getExpireAt().isBefore(LocalDateTime.now())){
+            log.warn("Refresh token expired");
+            if (refreshTokenRepository.deleteByToken(refreshToken)){
+                log.warn("Refresh token deleted successfully");
+            }
+            throw new ResourceNotFoundException("Refresh token expired");
+        }
+
+        //B3: Check JWT token is valid
+        if (!jwtService.isTokenValid(refreshToken)) {
+            log.warn("Refresh token invalid");
+            throw new ResourceNotFoundException("Refresh token invalid");
+        }
+
+        //B4: Check user from refresh token
+        String email = jwtService.extractEmail(refreshToken);
+
+        User user = userRepository.findByEmail(email);
+        if (user == null) {
+            log.warn("Refresh Module: User not found: {}", email);
+            throw new ResourceNotFoundException("User not found");
+        }
+
+        //B5: Generate new access token
+        String newAccessToken = jwtService.generateAccessToken(
+                user.getEmail(),
+                user.getRole().name()
         );
+        log.info("New access token generated for : {}", user.getFullName());
+
+        return refreshResponse(newAccessToken, jwtService.getAccessExpiration());
+
     }
 
     /**
@@ -100,28 +167,36 @@ public class AuthService {
      * - Send the OTP to the user's email
      *
      * @param request forgot password request payload (contains email)
-     * @return API response with success message
+     * @return ForgotPasswordResponse with success message
+     * @throws ResourceNotFoundException if email not found
      */
-    public ApiResponse<String> forgotPassword(ForgotPasswordRequest request) {
+    @Transactional
+    public ForgotPasswordResponse forgotPassword(ForgotPasswordRequest request) {
+        log.info("Auth Module: Forgot password request received for email: {}", request.getEmail());
 
         // Find user by email
-        User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new AppException(ErrorCode.EMAIL_NOT_FOUND));
+        User user = userRepository.findByEmail(request.getEmail());
+        if (user == null) {
+            log.warn("Auth Module: User not found: {}", request.getEmail());
+            throw new ResourceNotFoundException("User not found");
+        }
 
-        //Generate OTP
+        // Generate OTP
         String otp = EmailUtil.generateOtp();
 
-        //Save OTP
+        // Save OTP
         user.setOtp(otp);
-        user.setOtpExpiry(LocalDateTime.now().plusMinutes(5));
+        user.setOtpExpiry(LocalDateTime.now().plusMinutes(2));
         userRepository.save(user);
+        log.info("Auth Module: OTP generated and saved for user: {}", request.getEmail());
 
-        //Send email
+        // Send email
         emailService.sendOtpEmail(user.getEmail(), otp);
 
-        return ApiResponse.success(
-                200, "OTP sent to email: " + user.getEmail(), null
-        );
+        return ForgotPasswordResponse.builder()
+                .message("OTP sent to email: " + user.getEmail())
+                .email(user.getEmail())
+                .build();
     }
 
     /**
@@ -135,72 +210,98 @@ public class AuthService {
      * - Invalidate the OTP to prevent reuse
      *
      * @param request reset password request payload (contains email, OTP, and new password)
-     * @return API response containing authenticated user info
+     * @return UserResponse containing authenticated user info
+     * @throws ResourceNotFoundException if email not found, OTP invalid or expired
      */
-    public ApiResponse<UserResponse> resetPassword(ResetPasswordRequest request) {
-        User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new AppException(ErrorCode.EMAIL_NOT_FOUND));
+    @Transactional
+    public UserResponse resetPassword(ResetPasswordRequest request) {
+        log.info("Auth Module: Reset password request received for email: {}", request.getEmail());
 
-        //Check OTP code
-        if(user.getOtp() == null || !user.getOtp().equals(request.getOtp())) {
-            throw new AppException(ErrorCode.INVALID_OTP_CODE);
+        //1. Find user by email
+        User user = userRepository.findByEmail(request.getEmail());
+        if (user == null) {
+            log.warn("Auth Module: User not found: {}", request.getEmail());
+            throw new ResourceNotFoundException("User not found");
         }
 
-        //Check OTP expiry
-        if(user.getOtpExpiry().isBefore(LocalDateTime.now())) {
-            return ApiResponse.error(400, "OTP expired");
+        //2. Check OTP code
+        if (user.getOtp() == null || !user.getOtp().equals(request.getOtp())) {
+            log.warn("Auth Module: Invalid OTP code provided for user: {}", request.getEmail());
+            throw new ResourceNotFoundException("Invalid OTP code");
         }
 
-        //Update account with new password
+        //3. Check OTP expiry
+        if (user.getOtpExpiry().isBefore(LocalDateTime.now())) {
+            log.warn("Auth Module: OTP code expired for user: {}", request.getEmail());
+            throw new ResourceNotFoundException("OTP expired");
+        }
+
+        //4. Update account with new password
         user.setPassword(passwordEncoder.encode(request.getNewPassword()));
 
-        //Remove OTP
+        //5. Remove OTP
         user.setOtp(null);
         user.setOtpExpiry(null);
         userRepository.save(user);
+        log.info("Auth Module: Password successfully reset for user: {}", request.getEmail());
 
-        return ApiResponse.success(
-                200, "Reset Password successful", buildAuthResponse(user)
-        );
-    }
-
-    /**
-     * Build new User entity from register request.
-     * @param request register request payload
-     * @return new User entity
-     */
-    private User buildUser(RegisterRequest request) {
-
-        return User.builder()
-
-                .email(request.getEmail())
-                .password(
-                        passwordEncoder.encode(request.getPassword())
-                )
-                .fullName(request.getFullName())
-                .role(UserRole.STUDENT)
-
+        //6. Generate fresh tokens
+        String refreshToken = jwtService.generateRefreshToken(user.getEmail());
+        RefreshToken token = RefreshToken.builder()
+                .token(refreshToken)
+                .user(user)
+                .expireAt(LocalDateTime.now().plus(Duration.ofMillis(jwtService.getRefreshExpiration())))
                 .build();
+        refreshTokenRepository.save(token);
+
+        return buildAuthResponse(user, refreshToken);
     }
 
     /**
-     * Build authenticated user response.
-     * @param user authenticated user
-     * @return user response DTO
+     * Build UserResponse DTO from authenticated User entity
+     * @param user Authenticated User entity
+     * @return UserResponse containing JWT token and user info
      */
-    private UserResponse buildAuthResponse(User user) {
-
+    public UserResponse buildAuthResponse(User user, String refreshToken) {
+        log.info("Build Auth Response for email: {}", user.getEmail());
         return UserResponse.builder()
-
                 .accessToken(
-                        jwtUtil.generateToken(user.getEmail())
+                        jwtService.generateAccessToken(
+                                user.getEmail(),
+                                user.getRole().name()
+                        )
                 )
-
-                .userId(user.getUserId().toString())
-                .email(user.getEmail())
+                .refreshToken(
+                        jwtService.generateRefreshToken(
+                                user.getEmail()
+                        )
+                )
+                .id(user.getUserId().toString())
                 .fullName(user.getFullName())
                 .role(user.getRole().name())
-
                 .build();
     }
+
+    /**
+     * Build new User entity from RegisterRequest
+     * @param registerRequest RegisterRequest payload
+     * @return User entity ready to be persisted
+     */
+   private User buildUser(RegisterRequest registerRequest) {
+        log.debug("Build User with email: {}", registerRequest.getEmail());
+        return User.builder()
+                .email(registerRequest.getEmail())
+                .password(passwordEncoder.encode(registerRequest.getPassword()))
+                .fullName(registerRequest.getFullName())
+                .role(UserRole.STUDENT)
+                .build();
+   }
+
+   private RefreshResponse refreshResponse(String accessToken, long expiresIn) {
+        log.info("Refresh access token");
+        return RefreshResponse.builder()
+                .accessToken(accessToken)
+                .expiresIn(String.valueOf(expiresIn))
+                .build();
+   }
 }
