@@ -99,16 +99,11 @@ public class AuthService {
         }
 
         log.info("Login Module: User prepare to create Refresh token");
-        LocalDateTime expiresIn = LocalDateTime.now().plus(Duration.ofMillis(jwtService.getRefreshExpiration()));
-        String refreshToken = jwtService.generateRefreshToken(user.getEmail());
-        RefreshToken token = RefreshToken.builder()
-                .token(refreshToken)
-                .user(user)
-                .expireAt(expiresIn)
-                .build();
-        refreshTokenRepository.save(token);
-        log.info("Login Module: User logged in successfully: {}", loginRequest.getEmail());
-        return buildAuthResponse(user, refreshToken, expiresIn);
+        LocalDateTime accessExpiresIn = LocalDateTime.now()
+                .plus(Duration.ofMillis(jwtService.getAccessExpiration()));
+
+        String refreshToken = createAndSaveRefreshToken(user);
+        return buildAuthResponse(user, refreshToken, accessExpiresIn);
 
     }
 
@@ -153,8 +148,9 @@ public class AuthService {
                 user.getRole().name()
         );
         log.info("New access token generated for : {}", user.getFullName());
+        LocalDateTime expiresIn = LocalDateTime.now().plus(Duration.ofMillis(jwtService.getAccessExpiration()));
 
-        return refreshResponse(newAccessToken, jwtService.getAccessExpiration());
+        return refreshResponse(newAccessToken, expiresIn);
 
     }
 
@@ -190,12 +186,13 @@ public class AuthService {
         user.setOtpExpiry(LocalDateTime.now().plusMinutes(2));
         userRepository.save(user);
         log.info("Forgot Password Module: OTP generated and saved for user: {}", request.getEmail());
+        log.info("OTP: {}", otp);
 
         // Send email
-        emailService.sendOtpEmail(user.getEmail(), otp);
+        emailService.sendOtpEmail(user.getEmail(), user.getFullName(), otp);
 
         return ForgotPasswordResponse.builder()
-                .message("OTP sent to email: " + user.getEmail())
+                .message("OTP sent to email: ")
                 .email(user.getEmail())
                 .build();
     }
@@ -231,6 +228,8 @@ public class AuthService {
             throw new ResourceNotFoundException("Invalid OTP code");
         }
 
+        log.info("OTP: {}", request.getOtp());
+
         //3. Check OTP expiry
         if (user.getOtpExpiry().isBefore(LocalDateTime.now())) {
             log.warn("Reset Password Module: OTP code expired for user: {}", request.getEmail());
@@ -247,14 +246,8 @@ public class AuthService {
         log.info("Reset Password Module: Password successfully reset for user: {}", request.getEmail());
 
         //6. Generate fresh tokens
-        LocalDateTime expiresIn = LocalDateTime.now().plus(Duration.ofMillis(jwtService.getRefreshExpiration()));
-        String refreshToken = jwtService.generateRefreshToken(user.getEmail());
-        RefreshToken token = RefreshToken.builder()
-                .token(refreshToken)
-                .user(user)
-                .expireAt(LocalDateTime.now().plus(Duration.ofMillis(jwtService.getRefreshExpiration())))
-                .build();
-        refreshTokenRepository.save(token);
+        LocalDateTime expiresIn = LocalDateTime.now().plus(Duration.ofMillis(jwtService.getAccessExpiration()));
+        String refreshToken = createAndSaveRefreshToken(user);
         return buildAuthResponse(user, refreshToken, expiresIn);
 
     }
@@ -273,11 +266,7 @@ public class AuthService {
                                 user.getRole().name()
                         )
                 )
-                .refreshToken(
-                        jwtService.generateRefreshToken(
-                                user.getEmail()
-                        )
-                )
+                .refreshToken(refreshToken)
                 .expiresIn(String.valueOf(expiresIn))
                 .id(user.getUserId().toString())
                 .fullName(user.getFullName())
@@ -300,7 +289,7 @@ public class AuthService {
                 .build();
    }
 
-   private RefreshResponse refreshResponse(String accessToken, long expiresIn) {
+   private RefreshResponse refreshResponse(String accessToken, LocalDateTime expiresIn) {
         log.info("Refresh access token");
         return RefreshResponse.builder()
                 .accessToken(accessToken)
@@ -308,4 +297,19 @@ public class AuthService {
                 .build();
 
    }
+
+    private String createAndSaveRefreshToken(User user) {
+        log.info("Create and Save Refresh token for user: {}", user.getEmail());
+        String refreshToken = jwtService.generateRefreshToken(user.getEmail());
+        RefreshToken token = RefreshToken.builder()
+                .token(refreshToken)
+                .user(user)
+                .expireAt(
+                        LocalDateTime.now()
+                                .plus(Duration.ofMillis(jwtService.getRefreshExpiration()))
+                )
+                .build();
+        refreshTokenRepository.save(token);
+        return refreshToken;
+    }
 }

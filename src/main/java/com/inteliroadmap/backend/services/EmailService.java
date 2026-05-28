@@ -15,7 +15,7 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
 
-    public void sendOtpEmail(String email, String otp) {
+    public void sendOtpEmail(String email, String fullName, String otp) {
 
         log.info("Preparing OTP email for {}", email);
 
@@ -119,16 +119,6 @@ public class EmailService {
                                 font-size: 15px;
                             }
 
-                            .countdown-text {
-                                margin-top: 22px;
-                                font-size: 16px;
-                                color: #374151;
-                            }
-
-                            .countdown-text strong {
-                                color: #008FFF;
-                            }
-
                             .warning {
                                 margin-top: 28px;
                                 font-size: 14px;
@@ -155,12 +145,11 @@ public class EmailService {
 
                             <div class="header">
                                 <h1>InteliPath</h1>
-                                <p>Password Reset Request</p>
                             </div>
 
                             <div class="content">
 
-                                <h2>Hello 👋</h2>
+                                <h2>Hello %s</h2>
 
                                 <p>
                                     We received a request to reset your password.<br/>
@@ -172,13 +161,9 @@ public class EmailService {
                                 </div>
 
                                 <div class="info-box">
-                                    Your verification code is active for the next 2 minutes.<br/>
+                                    Your verification code is active for the next <strong>2 minutes</strong>.<br/>
                                     Enter it on the secure page to finish resetting your password.
                                 </div>
-
-                                <p class="countdown-text">
-                                    This OTP will expire in <strong>02:00</strong>.
-                                </p>
 
                                 <div class="warning">
                                     If you did not request a password reset, you can safely ignore this message.
@@ -194,7 +179,7 @@ public class EmailService {
 
                     </body>
                     </html>
-                    """.formatted(otp);
+                    """.formatted(fullName, otp);
 
             helper.setText(htmlContent, true);
 
