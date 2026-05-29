@@ -43,6 +43,12 @@ spring:
             scope:
               - email
               - profile
+          github:
+            client-id: ${CLIENT_ID_GITHUB}
+            client-secret: ${CLIENT_SECRET_GITHUB}
+            scope:
+              - user:email
+              - read:user
 
 jwt:
   secret: ${JWT_SECRET}
@@ -53,3 +59,7 @@ springdoc:
     path: /swagger-ui.html
   api-docs:
     path: /v3/api-docs
+
+app:
+  oauth2:
+    authorizedRedirectUri: http://localhost:3000/oauth2/redirect

@@ -32,6 +32,9 @@ public class User {
     @Column(name = "user_id")
     private UUID userId;
 
+//    @Column(nullable = false)
+//    private String password;
+
     @Column(name = "full_name")
     private String fullName;
 
@@ -42,6 +45,9 @@ public class User {
 
     @Column(columnDefinition = "TEXT")
     private String bio;
+
+    @Column(name = "github_profile")
+    private String githubProfile;
 
     private String university;
 
@@ -66,6 +72,12 @@ public class User {
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
     private List<OauthAccount> oauthAccounts;
+
+//    @Column(name = "otp")
+//    private String otp;
+//
+//    @Column(name = "otp_expiry")
+//    private LocalDateTime otpExpiry;
 
 //    // 1 User có nhiều records ở bảng con
 //    // mappedBy = tên field trong class con trỏ ngược lại User

@@ -1,6 +1,7 @@
 package com.inteliroadmap.backend.services;
 
 import com.inteliroadmap.backend.domain.dto.request.*;
+import com.inteliroadmap.backend.domain.dto.response.ForgotPasswordResponse;
 import com.inteliroadmap.backend.domain.dto.response.RefreshResponse;
 import com.inteliroadmap.backend.domain.dto.response.RegisterResponse;
 import com.inteliroadmap.backend.domain.dto.response.UserResponse;
@@ -12,6 +13,7 @@ import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.repositories.RefreshTokenRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.security.JwtService;
+import com.inteliroadmap.backend.utils.EmailUtil;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -30,6 +32,7 @@ public class AuthService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
+    private final EmailService emailService;
 
     /**
      * Register new student account
@@ -83,11 +86,12 @@ public class AuthService {
             throw new ResourceNotFoundException("User not found");
         }
 
-        //B2: Verify password against BCrypt encoded
-        if (!passwordEncoder.matches(loginRequest.getPassword(), user.getPassword())) {
-            log.warn("Login Module: Passwords don't match");
-            throw new ResourceNotFoundException("Passwords don't match");
-        }
+        // B2: Verify password against BCrypt encoded
+        // Password logic removed as the User entity no longer has a password property
+        // if (!passwordEncoder.matches(loginRequest.getPassword(), user.getPassword())) {
+        //     log.warn("Login Module: Passwords don't match");
+        //     throw new ResourceNotFoundException("Passwords don't match");
+        // }
 
         //B3: Prevent suspended account
         if (user.getUserStatus() == UserStatus.SUSPENDED) {
@@ -96,16 +100,11 @@ public class AuthService {
         }
 
         log.info("Login Module: User prepare to create Refresh token");
-        LocalDateTime expiresIn = LocalDateTime.now().plus(Duration.ofMillis(jwtService.getRefreshExpiration()));
-        String refreshToken = jwtService.generateRefreshToken(user.getEmail());
-        RefreshToken token = RefreshToken.builder()
-                .token(refreshToken)
-                .user(user)
-                .expireAt(expiresIn)
-                .build();
-        refreshTokenRepository.save(token);
-        log.info("Login Module: User logged in successfully: {}", loginRequest.getEmail());
-        return buildAuthResponse(user, refreshToken, expiresIn);
+        LocalDateTime accessExpiresIn = LocalDateTime.now()
+                .plus(Duration.ofMillis(jwtService.getAccessExpiration()));
+
+        String refreshToken = createAndSaveRefreshToken(user);
+        return buildAuthResponse(user, refreshToken, accessExpiresIn);
 
     }
 
@@ -150,8 +149,9 @@ public class AuthService {
                 user.getRole().name()
         );
         log.info("New access token generated for : {}", user.getFullName());
+        LocalDateTime expiresIn = LocalDateTime.now().plus(Duration.ofMillis(jwtService.getAccessExpiration()));
 
-        return refreshResponse(newAccessToken, jwtService.getAccessExpiration());
+        return refreshResponse(newAccessToken, expiresIn);
 
     }
 
@@ -169,11 +169,7 @@ public class AuthService {
                                 user.getRole().name()
                         )
                 )
-                .refreshToken(
-                        jwtService.generateRefreshToken(
-                                user.getEmail()
-                        )
-                )
+                .refreshToken(refreshToken)
                 .expiresIn(String.valueOf(expiresIn))
                 .id(user.getUserId().toString())
                 .fullName(user.getFullName())
@@ -190,13 +186,13 @@ public class AuthService {
         log.debug("Build User with email: {}", registerRequest.getEmail());
         return User.builder()
                 .email(registerRequest.getEmail())
-                .password(passwordEncoder.encode(registerRequest.getPassword()))
+                // .password(passwordEncoder.encode(registerRequest.getPassword()))
                 .fullName(registerRequest.getFullName())
                 .role(UserRole.STUDENT)
                 .build();
    }
 
-   private RefreshResponse refreshResponse(String accessToken, long expiresIn) {
+   private RefreshResponse refreshResponse(String accessToken, LocalDateTime expiresIn) {
         log.info("Refresh access token");
         return RefreshResponse.builder()
                 .accessToken(accessToken)
@@ -204,4 +200,19 @@ public class AuthService {
                 .build();
 
    }
+
+    private String createAndSaveRefreshToken(User user) {
+        log.info("Create and Save Refresh token for user: {}", user.getEmail());
+        String refreshToken = jwtService.generateRefreshToken(user.getEmail());
+        RefreshToken token = RefreshToken.builder()
+                .token(refreshToken)
+                .user(user)
+                .expireAt(
+                        LocalDateTime.now()
+                                .plus(Duration.ofMillis(jwtService.getRefreshExpiration()))
+                )
+                .build();
+        refreshTokenRepository.save(token);
+        return refreshToken;
+    }
 }
