@@ -14,5 +14,8 @@ public abstract class OAuth2UserInfoInternal {
     public abstract String getProviderId();
     public abstract String getEmail();
     public abstract String getFullName();
+    
+    public String getBio() { return null; }
+    public String getHtmlUrl() { return null; }
 
 }

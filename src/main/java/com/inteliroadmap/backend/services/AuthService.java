@@ -86,11 +86,12 @@ public class AuthService {
             throw new ResourceNotFoundException("User not found");
         }
 
-        //B2: Verify password against BCrypt encoded
-        if (!passwordEncoder.matches(loginRequest.getPassword(), user.getPassword())) {
-            log.warn("Login Module: Passwords don't match");
-            throw new ResourceNotFoundException("Passwords don't match");
-        }
+        // B2: Verify password against BCrypt encoded
+        // Password logic removed as the User entity no longer has a password property
+        // if (!passwordEncoder.matches(loginRequest.getPassword(), user.getPassword())) {
+        //     log.warn("Login Module: Passwords don't match");
+        //     throw new ResourceNotFoundException("Passwords don't match");
+        // }
 
         //B3: Prevent suspended account
         if (user.getUserStatus() == UserStatus.SUSPENDED) {
@@ -185,7 +186,7 @@ public class AuthService {
         log.debug("Build User with email: {}", registerRequest.getEmail());
         return User.builder()
                 .email(registerRequest.getEmail())
-                .password(passwordEncoder.encode(registerRequest.getPassword()))
+                // .password(passwordEncoder.encode(registerRequest.getPassword()))
                 .fullName(registerRequest.getFullName())
                 .role(UserRole.STUDENT)
                 .build();

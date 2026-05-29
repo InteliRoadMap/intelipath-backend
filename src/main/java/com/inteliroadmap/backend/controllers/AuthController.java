@@ -11,6 +11,7 @@ import com.inteliroadmap.backend.domain.dto.response.ForgotPasswordResponse;
 import com.inteliroadmap.backend.domain.dto.response.UserResponse;
 import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.services.AuthService;
+import com.inteliroadmap.backend.services.OAuth2UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -37,6 +38,7 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final OAuth2UserService oAuth2UserService;
 
     /**
      * POST /auth/register - Register new student account

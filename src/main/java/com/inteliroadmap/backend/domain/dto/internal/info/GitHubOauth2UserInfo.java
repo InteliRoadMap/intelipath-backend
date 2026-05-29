@@ -12,7 +12,7 @@ public class GitHubOauth2UserInfo extends OAuth2UserInfoInternal {
 
     @Override
     public String getProviderId() {
-        return (String) attributes.get("sub");
+        return attributes.get("id") != null ? String.valueOf(attributes.get("id")) : null;
     }
 
     @Override
@@ -22,6 +22,17 @@ public class GitHubOauth2UserInfo extends OAuth2UserInfoInternal {
 
     @Override
     public String getFullName() {
-        return (String) attributes.get("name");
+        String name = (String) attributes.get("name");
+        return name != null ? name : (String) attributes.get("login");
+    }
+
+    @Override
+    public String getBio() {
+        return (String) attributes.get("bio");
+    }
+
+    @Override
+    public String getHtmlUrl() {
+        return (String) attributes.get("html_url");
     }
 }

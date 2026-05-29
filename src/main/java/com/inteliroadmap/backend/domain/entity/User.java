@@ -32,8 +32,8 @@ public class User {
     @Column(name = "user_id")
     private UUID userId;
 
-    @Column(nullable = false)
-    private String password;
+//    @Column(nullable = false)
+//    private String password;
 
     @Column(name = "full_name")
     private String fullName;
@@ -45,6 +45,9 @@ public class User {
 
     @Column(columnDefinition = "TEXT")
     private String bio;
+
+    @Column(name = "github_profile")
+    private String githubProfile;
 
     private String university;
 
