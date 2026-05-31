@@ -42,7 +42,7 @@ public class SecurityConfig {
                         // PUBLIC ENDPOINTS - No authentication required
                         // ============================================================
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/auth/**", "/p/**").permitAll()
+                        .requestMatchers("/api/v1/auth/**", "/api/v1/p/**").permitAll()
 
                         // ============================================================
                         // SWAGGER - No authentication required
