@@ -7,6 +7,7 @@ import java.util.Map;
 public class GoogleOAuth2UserInfo extends OAuth2UserInfoInternal {
 
     public GoogleOAuth2UserInfo(Map<String, Object> attributes) {super(attributes);}
+
     @Override
     public String getProviderId() {
         return (String) attributes.get("sub");
