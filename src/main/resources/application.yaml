@@ -54,6 +54,3 @@ springdoc:
   api-docs:
     path: /v3/api-docs
 
-app:
-  oauth2:
-    authorizedRedirectUri: http://localhost:3000/oauth2/redirect

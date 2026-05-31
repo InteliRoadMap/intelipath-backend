@@ -20,7 +20,7 @@ import java.io.IOException;
 @Slf4j
 public class OAuth2AuthenticationFailureHandler extends SimpleUrlAuthenticationFailureHandler {
 
-    @Value("${app.oauth2.authorizedRedirectUri}")
+    @Value("${AUTHORIZED_REDIRECT_URI}")
     private String authorizedRedirectUri;
 
     @Override

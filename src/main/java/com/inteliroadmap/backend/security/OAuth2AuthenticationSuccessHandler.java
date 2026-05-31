@@ -33,7 +33,7 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
     private final RefreshTokenRepository refreshTokenRepository;
     private final UserRepository userRepository;
 
-    @Value("${app.oauth2.authorizedRedirectUri}")
+    @Value("${AUTHORIZED_REDIRECT_URI}")
     private String authorizedRedirectUri;
 
     @Override
