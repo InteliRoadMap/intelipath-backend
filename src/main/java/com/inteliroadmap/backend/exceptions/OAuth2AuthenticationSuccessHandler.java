@@ -1,9 +1,11 @@
-package com.inteliroadmap.backend.security;
+package com.inteliroadmap.backend.exceptions;
 
 import com.inteliroadmap.backend.domain.entity.RefreshToken;
 import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.repositories.RefreshTokenRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
+import com.inteliroadmap.backend.security.CustomOAuth2User;
+import com.inteliroadmap.backend.security.JwtService;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -33,7 +35,7 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
     private final RefreshTokenRepository refreshTokenRepository;
     private final UserRepository userRepository;
 
-    @Value("${app.oauth2.authorizedRedirectUri}")
+    @Value("${AUTHORIZED_REDIRECT_URI}")
     private String authorizedRedirectUri;
 
     @Override

@@ -9,6 +9,8 @@ import com.inteliroadmap.backend.domain.enums.UserRole;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.repositories.OauthAccountRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
+import com.inteliroadmap.backend.repositories.StudentRepository;
+import com.inteliroadmap.backend.domain.entity.Student;
 import com.inteliroadmap.backend.security.CustomOAuth2User;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,6 +34,7 @@ public class OAuth2UserService extends DefaultOAuth2UserService {
 
     private final UserRepository userRepository;
     private final OauthAccountRepository oauthAccountRepository;
+    private final StudentRepository studentRepository;
 
     /**
      * Loads user info from OAuth2 provider and processes it (creates/updates DB records).
@@ -70,12 +73,18 @@ public class OAuth2UserService extends DefaultOAuth2UserService {
                 user.setBio(oAuth2UserInfoInternal.getBio());
                 updated = true;
             }
-            if (user.getGithubProfile() == null && oAuth2UserInfoInternal.getHtmlUrl() != null) {
-                user.setGithubProfile(oAuth2UserInfoInternal.getHtmlUrl());
-                updated = true;
-            }
             if (updated) {
                 userRepository.save(user);
+            }
+            if (oAuth2UserInfoInternal.getHtmlUrl() != null) {
+                Student student = studentRepository.findByUser_UserId(user.getUserId());
+                if (student == null) {
+                    student = Student.builder().user(user).githubProfile(oAuth2UserInfoInternal.getHtmlUrl()).build();
+                    studentRepository.save(student);
+                } else if (student.getGithubProfile() == null) {
+                    student.setGithubProfile(oAuth2UserInfoInternal.getHtmlUrl());
+                    studentRepository.save(student);
+                }
             }
         } else {
             log.info("Registering new user via OAuth2 for email: {}", oAuth2UserInfoInternal.getEmail());
@@ -109,10 +118,15 @@ public class OAuth2UserService extends DefaultOAuth2UserService {
                 .email(oAuth2UserInfoInternal.getEmail())
                 .fullName(oAuth2UserInfoInternal.getFullName())
                 .bio(oAuth2UserInfoInternal.getBio())
-                .githubProfile(oAuth2UserInfoInternal.getHtmlUrl())
                 .role(UserRole.STUDENT)
                 .build();
-        return userRepository.save(user);
+        User savedUser = userRepository.save(user);
+        Student student = Student.builder()
+                .user(savedUser)
+                .githubProfile(oAuth2UserInfoInternal.getHtmlUrl())
+                .build();
+        studentRepository.save(student);
+        return savedUser;
     }
 
     /**

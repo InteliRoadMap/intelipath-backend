@@ -1,7 +1,6 @@
 package com.inteliroadmap.backend.services;
 
 import com.inteliroadmap.backend.domain.dto.request.*;
-import com.inteliroadmap.backend.domain.dto.response.ForgotPasswordResponse;
 import com.inteliroadmap.backend.domain.dto.response.RefreshResponse;
 import com.inteliroadmap.backend.domain.dto.response.RegisterResponse;
 import com.inteliroadmap.backend.domain.dto.response.UserResponse;
@@ -13,7 +12,6 @@ import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.repositories.RefreshTokenRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.security.JwtService;
-import com.inteliroadmap.backend.utils.EmailUtil;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -32,7 +30,6 @@ public class AuthService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
-    private final EmailService emailService;
 
     /**
      * Register new student account
@@ -41,27 +38,27 @@ public class AuthService {
      * @return UserResponse containing JWT token and user info
      * @throws ResourceNotFoundException if email already exists
      */
-    @Transactional
-    public RegisterResponse registerAccount(RegisterRequest registerRequest) {
-        log.info("Register Module: Register request received for email: {}", registerRequest.getEmail());
-
-        //B1: Check duplicate email registration
-        if (userRepository.existsByEmail(registerRequest.getEmail())) {
-            log.warn("Register Module: Email already in use: {}", registerRequest.getEmail());
-            throw new ResourceNotFoundException("Email already in use");
-        }
-
-        //B2: Build User entity from request
-        User user = buildUser(registerRequest);
-        userRepository.save(user);
-        log.info("Register Module: User registered successfully: {}", registerRequest.getEmail());
-
-        return RegisterResponse.builder()
-                .message("Welcome to InteliPath," + user.getFullName())
-                .email(user.getEmail())
-                .fullName(user.getFullName())
-                .build();
-    }
+//    @Transactional
+//    public RegisterResponse registerAccount(RegisterRequest registerRequest) {
+//        log.info("Register Module: Register request received for email: {}", registerRequest.getEmail());
+//
+//        //B1: Check duplicate email registration
+//        if (userRepository.existsByEmail(registerRequest.getEmail())) {
+//            log.warn("Register Module: Email already in use: {}", registerRequest.getEmail());
+//            throw new ResourceNotFoundException("Email already in use");
+//        }
+//
+//        //B2: Build User entity from request
+//        User user = buildUser(registerRequest);
+//        userRepository.save(user);
+//        log.info("Register Module: User registered successfully: {}", registerRequest.getEmail());
+//
+//        return RegisterResponse.builder()
+//                .message("Welcome to InteliPath," + user.getFullName())
+//                .email(user.getEmail())
+//                .fullName(user.getFullName())
+//                .build();
+//    }
 
     /**
      * Authenticate user using email and password
@@ -75,38 +72,38 @@ public class AuthService {
      * @return UserResponse containing JWT token and user info
      * @throws ResourceNotFoundException if email not found, wrong password, or account suspended
      */
-    @Transactional
-    public UserResponse loginAccount(LoginRequest loginRequest) {
-        log.info("Login Module: Login request received for email: {}", loginRequest.getEmail());
-
-        //B1: Find user bt email
-        User user = userRepository.findByEmail(loginRequest.getEmail());
-        if  (user == null) {
-            log.warn("Login Module: User not found: {}", loginRequest.getEmail());
-            throw new ResourceNotFoundException("User not found");
-        }
-
-        // B2: Verify password against BCrypt encoded
-        // Password logic removed as the User entity no longer has a password property
-        // if (!passwordEncoder.matches(loginRequest.getPassword(), user.getPassword())) {
-        //     log.warn("Login Module: Passwords don't match");
-        //     throw new ResourceNotFoundException("Passwords don't match");
-        // }
-
-        //B3: Prevent suspended account
-        if (user.getUserStatus() == UserStatus.SUSPENDED) {
-            log.warn("Login Module: User is Suspended");
-            throw new ResourceNotFoundException("User is Suspended");
-        }
-
-        log.info("Login Module: User prepare to create Refresh token");
-        LocalDateTime accessExpiresIn = LocalDateTime.now()
-                .plus(Duration.ofMillis(jwtService.getAccessExpiration()));
-
-        String refreshToken = createAndSaveRefreshToken(user);
-        return buildAuthResponse(user, refreshToken, accessExpiresIn);
-
-    }
+//    @Transactional
+//    public UserResponse loginAccount(LoginRequest loginRequest) {
+//        log.info("Login Module: Login request received for email: {}", loginRequest.getEmail());
+//
+//        //B1: Find user bt email
+//        User user = userRepository.findByEmail(loginRequest.getEmail());
+//        if  (user == null) {
+//            log.warn("Login Module: User not found: {}", loginRequest.getEmail());
+//            throw new ResourceNotFoundException("User not found");
+//        }
+//
+//        // B2: Verify password against BCrypt encoded
+//        // Password logic removed as the User entity no longer has a password property
+//        // if (!passwordEncoder.matches(loginRequest.getPassword(), user.getPassword())) {
+//        //     log.warn("Login Module: Passwords don't match");
+//        //     throw new ResourceNotFoundException("Passwords don't match");
+//        // }
+//
+//        //B3: Prevent suspended account
+//        if (user.getUserStatus() == UserStatus.SUSPENDED) {
+//            log.warn("Login Module: User is Suspended");
+//            throw new ResourceNotFoundException("User is Suspended");
+//        }
+//
+//        log.info("Login Module: User prepare to create Refresh token");
+//        LocalDateTime accessExpiresIn = LocalDateTime.now()
+//                .plus(Duration.ofMillis(jwtService.getAccessExpiration()));
+//
+//        String refreshToken = createAndSaveRefreshToken(user);
+//        return buildAuthResponse(user, refreshToken, accessExpiresIn);
+//
+//    }
 
     @Transactional
     public RefreshResponse  refreshAccount(RefreshRequest refreshRequest) {

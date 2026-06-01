@@ -46,16 +46,6 @@ public class User {
     @Column(columnDefinition = "TEXT")
     private String bio;
 
-    @Column(name = "github_profile")
-    private String githubProfile;
-
-    private String university;
-
-    @Column(name = "year_of_admission")
-    private LocalDate yearOfAdmission;
-
-    private String major;
-
     @Column(name = "create_at")
     private LocalDateTime createAt;
 

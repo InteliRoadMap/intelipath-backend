@@ -1,4 +1,4 @@
-package com.inteliroadmap.backend.security;
+package com.inteliroadmap.backend.exceptions;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -20,7 +20,7 @@ import java.io.IOException;
 @Slf4j
 public class OAuth2AuthenticationFailureHandler extends SimpleUrlAuthenticationFailureHandler {
 
-    @Value("${app.oauth2.authorizedRedirectUri}")
+    @Value("${AUTHORIZED_REDIRECT_URI}")
     private String authorizedRedirectUri;
 
     @Override
