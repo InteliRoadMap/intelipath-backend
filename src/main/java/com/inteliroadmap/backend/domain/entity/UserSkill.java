@@ -22,13 +22,10 @@ public class UserSkill {
     private UUID userSkillId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "skill_id", nullable = false, foreignKey = @ForeignKey(name = "fk_us_skill"))
-    private Skill skill;
-
-    @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false, foreignKey = @ForeignKey(name = "fk_us_user"))
     private User user;
 
-    @Column(name = "level")
-    private Integer level;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "skill_id", nullable = false, foreignKey = @ForeignKey(name = "fk_us_skill"))
+    private Skill skill;
 }
