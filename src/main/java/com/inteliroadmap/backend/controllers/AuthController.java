@@ -1,10 +1,7 @@
 package com.inteliroadmap.backend.controllers;
 
-import com.inteliroadmap.backend.domain.dto.request.LoginRequest;
 import com.inteliroadmap.backend.domain.dto.request.RefreshRequest;
-import com.inteliroadmap.backend.domain.dto.request.RegisterRequest;
 import com.inteliroadmap.backend.domain.dto.response.RefreshResponse;
-import com.inteliroadmap.backend.domain.dto.response.RegisterResponse;
 import com.inteliroadmap.backend.domain.dto.response.UserResponse;
 import com.inteliroadmap.backend.services.AuthService;
 import com.inteliroadmap.backend.services.OAuth2UserService;

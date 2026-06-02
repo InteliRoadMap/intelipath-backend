@@ -2,7 +2,6 @@ package com.inteliroadmap.backend.services;
 
 import com.inteliroadmap.backend.domain.dto.request.*;
 import com.inteliroadmap.backend.domain.dto.response.RefreshResponse;
-import com.inteliroadmap.backend.domain.dto.response.RegisterResponse;
 import com.inteliroadmap.backend.domain.dto.response.UserResponse;
 import com.inteliroadmap.backend.domain.entity.RefreshToken;
 import com.inteliroadmap.backend.domain.entity.User;
@@ -179,15 +178,15 @@ public class AuthService {
      * @param registerRequest RegisterRequest payload
      * @return User entity ready to be persisted
      */
-   private User buildUser(RegisterRequest registerRequest) {
-        log.debug("Build User with email: {}", registerRequest.getEmail());
-        return User.builder()
-                .email(registerRequest.getEmail())
-                // .password(passwordEncoder.encode(registerRequest.getPassword()))
-                .fullName(registerRequest.getFullName())
-                .role(UserRole.STUDENT)
-                .build();
-   }
+//    private User buildUser(RegisterRequest registerRequest) {
+//         log.debug("Build User with email: {}", registerRequest.getEmail());
+//         return User.builder()
+//                 .email(registerRequest.getEmail())
+//                 // .password(passwordEncoder.encode(registerRequest.getPassword()))
+//                 .fullName(registerRequest.getFullName())
+//                 .role(UserRole.STUDENT)
+//                 .build();
+//    }
 
    private RefreshResponse refreshResponse(String accessToken, LocalDateTime expiresIn) {
         log.info("Refresh access token");
