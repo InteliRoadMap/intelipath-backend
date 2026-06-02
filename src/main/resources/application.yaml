@@ -3,8 +3,6 @@ server:
     context-path: /api/v1
 
 spring:
-  config:
-    import: optional:file:.env[.properties]
   application:
     name: InteliPath
 
@@ -60,6 +58,3 @@ springdoc:
   api-docs:
     path: /v3/api-docs
 
-app:
-  oauth2:
-    authorizedRedirectUri: http://localhost:3000/oauth2/redirect
