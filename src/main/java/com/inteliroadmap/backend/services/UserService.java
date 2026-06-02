@@ -36,7 +36,7 @@ public class UserService {
      */
     @Transactional
     public UserResponse setupUserProfile(SetupUserProfileRequest request) {
-        log.info("Profile Module: Setup User Profile Request received");
+        log.info("User Module: Setup User Profile Request received");
 
         String email = jwtService.extractEmail(request.getToken());
         if (email == null) {

@@ -32,7 +32,7 @@ public class StudentProgress {
 
     @Column(name = "status", nullable = false)
     @Builder.Default
-    private String status = "in_progress";
+    private String status = "IN_PROGRESS";
 
     @Column(name = "create_at", nullable = false)
     private LocalDateTime createAt;

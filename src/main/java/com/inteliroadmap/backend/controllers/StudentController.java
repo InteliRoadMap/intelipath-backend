@@ -1,9 +1,12 @@
-﻿package com.inteliroadmap.backend.controllers;
+package com.inteliroadmap.backend.controllers;
 
+import com.inteliroadmap.backend.domain.dto.request.ImportSkillsRequest;
 import com.inteliroadmap.backend.domain.dto.request.SetupStudentProfileRequest;
 import com.inteliroadmap.backend.domain.dto.request.SetupUserProfileRequest;
+import com.inteliroadmap.backend.domain.dto.response.SkillResponse;
 import com.inteliroadmap.backend.domain.dto.response.StudentResponse;
 import com.inteliroadmap.backend.domain.dto.response.UserResponse;
+import com.inteliroadmap.backend.services.SkillService;
 import com.inteliroadmap.backend.services.StudentService;
 import com.inteliroadmap.backend.services.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -18,6 +21,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.UUID;
+
+/**
+ * Controller responsible for handling student-related API endpoints.
+ * Provides functionality for profile setup and skill management.
+ */
 @RestController
 @RequestMapping("/student")
 @RequiredArgsConstructor
@@ -26,7 +35,14 @@ import org.springframework.web.bind.annotation.*;
 public class StudentController {
 
     private final StudentService studentService;
+    private final SkillService skillService;
 
+    /**
+     * Sets up or updates the profile information for a student.
+     *
+     * @param setupStudentProfileRequest The payload containing student profile details
+     * @return ResponseEntity containing the updated user information
+     */
     @PatchMapping("/profile")
     @Operation(
             summary = "Setup student profile",
@@ -52,36 +68,116 @@ public class StudentController {
                     required = true,
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = SetupUserProfileRequest.class)
+                            schema = @Schema(implementation = SetupStudentProfileRequest.class)
                     )
             )
             @RequestBody @Valid SetupStudentProfileRequest setupStudentProfileRequest
     ) {
-        log.info("Student profile setup successfully");
+        log.info("Student profile setup request received");
+        // Delegate to StudentService to setup or update the student profile
         return ResponseEntity.ok(studentService.setupStudentProfile(setupStudentProfileRequest));
     }
 
-//    @GetMapping("/{student_id}/skills")
-//    @Operation(
-//            summary = "Get student skills",
-//            description = "Get student skills"
-//    )
-//    @ApiResponses(value = {
-//            @ApiResponse(
-//                    responseCode = "200",
-//                    description = "Setup profile successful",
-//                    content = @Content(
-//                            mediaType = "application/json",
-//                            schema = @Schema(implementation = StudentResponse.class)
-//                    )
-//            ),
-//            @ApiResponse(
-//                    responseCode = "404",
-//                    description = "Student skills not found"
-//            )
-//    })
-//    public ResponseEntity<StudentResponse> getStudentSkills(@PathVariable String student_id) {
-//        log.info("Student skills fetched successfully");
-//        return ResponseEntity.ok(studentService.getStudentSkills(student_id));
-//    }
+    /**
+     * Retrieves the skills currently associated with a specific student.
+     *
+     * @param student_id The unique identifier of the student
+     * @return ResponseEntity containing a list of the student's skills
+     */
+    @GetMapping("/{student_id}/skills")
+    @Operation(
+            summary = "Get student skills",
+            description = "Get student skills"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Get student skills successful",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = SkillResponse.class)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Student skills not found"
+            )
+    })
+    public ResponseEntity<SkillResponse> getStudentSkills(@PathVariable UUID student_id) {
+        log.info("Fetching student skills for student ID: {}", student_id);
+        // Delegate to SkillService to fetch skills associated with the student
+        return ResponseEntity.ok(skillService.getStudentSkills(student_id));
+    }
+
+    /**
+     * Retrieves a list of available skills filtered by category.
+     *
+     * @param category The skill category to filter by
+     * @return ResponseEntity containing a list of skills in the specified category
+     */
+    @GetMapping("/skills/{category}")
+    @Operation(
+            summary = "Get skills by category",
+            description = "Get skills by category"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Get skills by category successful",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = SkillResponse.class)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "{category} skills not found"
+            )
+    })
+    public ResponseEntity<SkillResponse> getSkillsByCategory(@PathVariable String category) {
+        log.info("Fetching skills for category: {}", category);
+        // Delegate to SkillService to fetch generic skills by category
+        return ResponseEntity.ok(skillService.getSkillsByCategory(category));
+    }
+
+    /**
+     * Imports a list of selected skills and associates them with the student.
+     *
+     * @param importSkillsRequest The payload containing the student ID and selected skills
+     * @return ResponseEntity containing the updated list of the student's skills
+     */
+    @PostMapping("/skills/select")
+    @Operation(
+            summary = "Selected student skills",
+            description = "Student selects their current skills"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Skills imported successful",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = SkillResponse.class)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "User not found"
+            )
+    })
+    public ResponseEntity<SkillResponse> importStudentSkills(
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Imported Student Skills payload",
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ImportSkillsRequest.class)
+                    )
+            )
+            @RequestBody @Valid ImportSkillsRequest importSkillsRequest
+    ) {
+        log.info("Importing selected skills for student ID: {}", importSkillsRequest.getStudentId());
+        // Delegate to SkillService to process and save the selected skills
+        return ResponseEntity.ok(skillService.importStudentSkills(importSkillsRequest));
+    }
 }

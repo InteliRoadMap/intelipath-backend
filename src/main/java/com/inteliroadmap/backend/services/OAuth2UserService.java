@@ -77,7 +77,7 @@ public class OAuth2UserService extends DefaultOAuth2UserService {
                 userRepository.save(user);
             }
             if (oAuth2UserInfoInternal.getHtmlUrl() != null) {
-                Student student = studentRepository.findByUser_UserId(user.getUserId());
+                Student student = studentRepository.findByUser(user);
                 if (student == null) {
                     student = Student.builder().user(user).githubProfile(oAuth2UserInfoInternal.getHtmlUrl()).build();
                     studentRepository.save(student);

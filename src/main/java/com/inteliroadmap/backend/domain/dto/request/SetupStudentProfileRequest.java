@@ -9,9 +9,6 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDate;
 
 @Data
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
 public class SetupStudentProfileRequest {
 
     @NotBlank(message = "Token is required")

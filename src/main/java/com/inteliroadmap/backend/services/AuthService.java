@@ -27,16 +27,15 @@ public class AuthService {
 
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
-    private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
 
-    /**
-     * Register new student account
-     *
-     * @param registerRequest RegisterRequest containing email, password, fullName
-     * @return UserResponse containing JWT token and user info
-     * @throws ResourceNotFoundException if email already exists
-     */
+//    /**
+//     * Register new student account
+//     *
+//     * @param registerRequest RegisterRequest containing email, password, fullName
+//     * @return UserResponse containing JWT token and user info
+//     * @throws ResourceNotFoundException if email already exists
+//     */
 //    @Transactional
 //    public RegisterResponse registerAccount(RegisterRequest registerRequest) {
 //        log.info("Register Module: Register request received for email: {}", registerRequest.getEmail());
@@ -59,18 +58,18 @@ public class AuthService {
 //                .build();
 //    }
 
-    /**
-     * Authenticate user using email and password
-     *
-     * Validation:
-     * 1. Verify email exists in database
-     * 2. Verify password matches encoded password
-     * 3. Verify account is not suspended
-     *
-     * @param loginRequest LoginRequest containing email and password
-     * @return UserResponse containing JWT token and user info
-     * @throws ResourceNotFoundException if email not found, wrong password, or account suspended
-     */
+//    /**
+//     * Authenticate user using email and password
+//     *
+//     * Validation:
+//     * 1. Verify email exists in database
+//     * 2. Verify password matches encoded password
+//     * 3. Verify account is not suspended
+//     *
+//     * @param loginRequest LoginRequest containing email and password
+//     * @return UserResponse containing JWT token and user info
+//     * @throws ResourceNotFoundException if email not found, wrong password, or account suspended
+//     */
 //    @Transactional
 //    public UserResponse loginAccount(LoginRequest loginRequest) {
 //        log.info("Login Module: Login request received for email: {}", loginRequest.getEmail());
@@ -151,33 +150,33 @@ public class AuthService {
 
     }
 
-    /**
-     * Build UserResponse DTO from authenticated User entity
-     * @param user Authenticated User entity
-     * @return UserResponse containing JWT token and user info
-     */
-    public UserResponse buildAuthResponse(User user, String refreshToken, LocalDateTime expiresIn) {
-        log.info("Build Auth Response for email: {}", user.getEmail());
-        return UserResponse.builder()
-                .accessToken(
-                        jwtService.generateAccessToken(
-                                user.getEmail(),
-                                user.getRole().name()
-                        )
-                )
-                .refreshToken(refreshToken)
-                .expiresIn(String.valueOf(expiresIn))
-                .id(user.getUserId().toString())
-                .fullName(user.getFullName())
-                .role(user.getRole().name())
-                .build();
-    }
+//    /**
+//     * Build UserResponse DTO from authenticated User entity
+//     * @param user Authenticated User entity
+//     * @return UserResponse containing JWT token and user info
+//     */
+//    public UserResponse buildAuthResponse(User user, String refreshToken, LocalDateTime expiresIn) {
+//        log.info("Build Auth Response for email: {}", user.getEmail());
+//        return UserResponse.builder()
+//                .accessToken(
+//                        jwtService.generateAccessToken(
+//                                user.getEmail(),
+//                                user.getRole().name()
+//                        )
+//                )
+//                .refreshToken(refreshToken)
+//                .expiresIn(String.valueOf(expiresIn))
+//                .id(user.getUserId().toString())
+//                .fullName(user.getFullName())
+//                .role(user.getRole().name())
+//                .build();
+//    }
 
-    /**
-     * Build new User entity from RegisterRequest
-     * @param registerRequest RegisterRequest payload
-     * @return User entity ready to be persisted
-     */
+//    /**
+//     * Build new User entity from RegisterRequest
+//     * @param registerRequest RegisterRequest payload
+//     * @return User entity ready to be persisted
+//     */
 //    private User buildUser(RegisterRequest registerRequest) {
 //         log.debug("Build User with email: {}", registerRequest.getEmail());
 //         return User.builder()

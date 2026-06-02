@@ -57,13 +57,13 @@ public class DatabaseSeeder implements CommandLineRunner {
                 if (line.length < 7) continue;
 
                 String career = line[0];
-                Optional<CareerRole> optRole = careerRoleRepository.findByCareerName(career);
+                CareerRole existingRole = careerRoleRepository.findByCareerName(career);
                 CareerRole careerRole;
-                if (optRole.isEmpty()) {
+                if (existingRole == null) {
                     careerRole = CareerRole.builder().careerName(career).build();
                     careerRole = careerRoleRepository.save(careerRole);
                 } else {
-                    careerRole = optRole.get();
+                    careerRole = existingRole;
                 }
 
                 String prerequisite = line[1];

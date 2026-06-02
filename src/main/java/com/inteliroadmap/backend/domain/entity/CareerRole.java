@@ -25,6 +25,6 @@ public class CareerRole {
     @Column(name = "career_name", nullable = false)
     private String careerName;
 
-    @Column(name = "description")
+    @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 }

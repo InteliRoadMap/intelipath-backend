@@ -1,12 +1,15 @@
-﻿package com.inteliroadmap.backend.services;
+package com.inteliroadmap.backend.services;
 
 import com.inteliroadmap.backend.domain.dto.request.SetupStudentProfileRequest;
+import com.inteliroadmap.backend.domain.dto.response.SkillResponse;
+import com.inteliroadmap.backend.domain.dto.response.StudentResponse;
 import com.inteliroadmap.backend.domain.dto.response.UserResponse;
 import com.inteliroadmap.backend.domain.entity.Student;
 import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.repositories.StudentRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
+import com.inteliroadmap.backend.repositories.StudentSkillRepository;
 import com.inteliroadmap.backend.security.JwtService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +17,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
+import java.util.List;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -22,6 +27,7 @@ public class StudentService {
 
     private final UserRepository userRepository;
     private final StudentRepository studentRepository;
+    private final StudentSkillRepository studentSkillRepository;
     private final JwtService jwtService;
 
     /**
@@ -35,7 +41,7 @@ public class StudentService {
      */
     @Transactional
     public UserResponse setupStudentProfile(SetupStudentProfileRequest request) {
-        log.info("Profile Module: Setup Student Profile Request received");
+        log.info("Student Module: Setup Student Profile Request received");
 
         String email = jwtService.extractEmail(request.getToken());
         if (email == null) {
@@ -47,7 +53,7 @@ public class StudentService {
             throw new ResourceNotFoundException("User not found");
         }
 
-        Student student = studentRepository.findByUser_UserId(user.getUserId());
+        Student student = studentRepository.findByStudentId(user.getUserId());
         if (student == null) {
             student = Student.builder().user(user).build();
         }
@@ -62,6 +68,4 @@ public class StudentService {
                 .role(user.getRole().name())
                 .build();
     }
-
-
 }

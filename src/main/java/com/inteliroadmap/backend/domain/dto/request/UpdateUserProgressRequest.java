@@ -1,22 +1,22 @@
 package com.inteliroadmap.backend.domain.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.UUID;
+
 @Data
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
 public class UpdateUserProgressRequest {
 
-    @NotBlank(message = "Token is required")
-    private String token;
+    @NotNull(message = "Student ID is required")
+    private UUID studentId;
 
-    @NotBlank(message = "Node ID is required")
-    private String nodeId;
+    @NotNull(message = "Node ID is required")
+    private UUID nodeId;
 
     @NotBlank(message = "Node status is required")
     private String status;

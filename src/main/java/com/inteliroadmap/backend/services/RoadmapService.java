@@ -1,5 +1,6 @@
 package com.inteliroadmap.backend.services;
 
+import com.inteliroadmap.backend.domain.dto.request.UpdateUserProgressRequest;
 import com.inteliroadmap.backend.domain.dto.response.RoadmapResponse;
 import com.inteliroadmap.backend.domain.entity.*;
 import com.inteliroadmap.backend.repositories.*;
@@ -56,18 +57,22 @@ public class RoadmapService {
     }
 
     @Transactional
-    public RoadmapResponse updateNodeProgress(UUID nodeId) {
+    public RoadmapResponse updateNodeProgress(UpdateUserProgressRequest request) {
         log.info("Roadmap Module: Updating Node progress");
 
-        Student student = getAuthenticatedStudent();
-        SkillNode node = skillNodeRepository.findById(nodeId)
+        Student student = studentRepository.findByStudentId(request.getStudentId());
+        if(student == null) {
+            throw new ResourceNotFoundException("Student not found");
+        }
+
+        SkillNode node = skillNodeRepository.findById(request.getNodeId())
                 .orElseThrow(() -> new ResourceNotFoundException("Node not found"));
                 
         StudentProgress progress = studentProgressRepository.findByStudentAndSkillNode(student, node)
                 .orElseThrow(() -> new ResourceNotFoundException("Student progress not found for this node"));
                 
-        if("in_progress".equals(progress.getStatus())){
-            progress.setStatus("completed");
+        if("IN_PROGRESS".equals(progress.getStatus())){
+            progress.setStatus("COMPLETED");
             progress.setCompleteAt(LocalDateTime.now());
             studentProgressRepository.save(progress);
         }
