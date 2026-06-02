@@ -79,7 +79,7 @@ public class StudentService {
             student = Student.builder().user(user).build();
         }
         if (request.getUniversity() != null) student.setUniversity(request.getUniversity());
-        if (request.getYear_of_admission() != null) student.setYearOfAdmission(LocalDate.parse(request.getYear_of_admission()));
+        if (request.getYearOfAdmission() != null) student.setYearOfAdmission(LocalDate.parse(request.getYearOfAdmission()));
         if (request.getMajor() != null) student.setMajor(request.getMajor());
 
         if (request.getCareerId() != null) {

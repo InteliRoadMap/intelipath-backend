@@ -14,9 +14,8 @@ public class SetupStudentProfileRequest {
 
     private String university;
 
-    private String year_of_admission;
+    private String yearOfAdmission;
 
-    @NotBlank(message = "Major is required")
     private String major;
 
     private UUID careerId;
