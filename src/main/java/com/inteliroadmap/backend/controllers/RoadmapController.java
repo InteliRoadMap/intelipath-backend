@@ -66,6 +66,31 @@ public class RoadmapController {
         return ResponseEntity.ok(roadmapService.getRoadmap(careerId));
     }
 
+    @GetMapping("/{career_id}/progress")
+    @Operation(
+            summary = "Get Roadmap total progress",
+            description = "Get Roadmap total progress by career id"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Roadmap total progress fetched successfully",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = RoadmapResponse.class)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "No progress available"
+            )
+    })
+    public ResponseEntity<RoadmapResponse> getRoadmapProgress(@PathVariable("career_id") UUID careerId) {
+        log.info("Fetching total progress for career ID: {}", careerId);
+        // Delegate to RoadmapService to retrieve the career's full learning roadmap
+        return ResponseEntity.ok(roadmapService.getRoadmapProgress(careerId));
+    }
+
     /**
      * Retrieves detailed information about a specific learning node (skill node).
      *

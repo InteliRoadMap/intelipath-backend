@@ -11,9 +11,6 @@ import java.util.UUID;
 @Data
 public class ImportSkillsRequest {
 
-    @NotNull(message = "Student ID is required")
-    private UUID studentId;
-
     @NotEmpty(message = "Selected skills is required")
     private List<Skill> skillList;
 }

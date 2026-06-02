@@ -12,9 +12,6 @@ import java.util.UUID;
 @Data
 public class UpdateUserProgressRequest {
 
-    @NotNull(message = "Student ID is required")
-    private UUID studentId;
-
     @NotNull(message = "Node ID is required")
     private UUID nodeId;
 

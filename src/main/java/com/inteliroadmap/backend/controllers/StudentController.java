@@ -2,13 +2,11 @@ package com.inteliroadmap.backend.controllers;
 
 import com.inteliroadmap.backend.domain.dto.request.ImportSkillsRequest;
 import com.inteliroadmap.backend.domain.dto.request.SetupStudentProfileRequest;
-import com.inteliroadmap.backend.domain.dto.request.SetupUserProfileRequest;
 import com.inteliroadmap.backend.domain.dto.response.SkillResponse;
 import com.inteliroadmap.backend.domain.dto.response.StudentResponse;
 import com.inteliroadmap.backend.domain.dto.response.UserResponse;
 import com.inteliroadmap.backend.services.SkillService;
 import com.inteliroadmap.backend.services.StudentService;
-import com.inteliroadmap.backend.services.UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -62,7 +60,7 @@ public class StudentController {
                     description = "User not found"
             )
     })
-    public ResponseEntity<UserResponse> setupStudentProfile(
+    public ResponseEntity<StudentResponse> setupStudentProfile(
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     description = "Student Profile payload",
                     required = true,
@@ -79,12 +77,43 @@ public class StudentController {
     }
 
     /**
+     * Retrieves the information of a specific student.
+     *
+     * @param student_id The unique identifier of the student
+     * @return ResponseEntity containing student's information
+     */
+    @GetMapping("/profile")
+    @Operation(
+            summary = "Get student profile",
+            description = "Get student profile information"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Get student profile successful",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = StudentResponse.class)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "User not found"
+            )
+    })
+    public ResponseEntity<StudentResponse> getStudentProfile() {
+        log.info("Student profile retrieval request received");
+        // Delegate to StudentService to fetch the student profile
+        return ResponseEntity.ok(studentService.getStudentProfile());
+    }
+
+    /**
      * Retrieves the skills currently associated with a specific student.
      *
      * @param student_id The unique identifier of the student
      * @return ResponseEntity containing a list of the student's skills
      */
-    @GetMapping("/{student_id}/skills")
+    @GetMapping("/skills")
     @Operation(
             summary = "Get student skills",
             description = "Get student skills"
@@ -103,10 +132,10 @@ public class StudentController {
                     description = "Student skills not found"
             )
     })
-    public ResponseEntity<SkillResponse> getStudentSkills(@PathVariable UUID student_id) {
-        log.info("Fetching student skills for student ID: {}", student_id);
+    public ResponseEntity<SkillResponse> getStudentSkills() {
+        log.info("Fetching student skills");
         // Delegate to SkillService to fetch skills associated with the student
-        return ResponseEntity.ok(skillService.getStudentSkills(student_id));
+        return ResponseEntity.ok(skillService.getStudentSkills());
     }
 
     /**
@@ -117,13 +146,13 @@ public class StudentController {
      */
     @GetMapping("/skills/{category}")
     @Operation(
-            summary = "Get skills by category",
-            description = "Get skills by category"
+            summary = "Search skills by category",
+            description = "Search skills by category"
     )
     @ApiResponses(value = {
             @ApiResponse(
                     responseCode = "200",
-                    description = "Get skills by category successful",
+                    description = "Search skills by category successful",
                     content = @Content(
                             mediaType = "application/json",
                             schema = @Schema(implementation = SkillResponse.class)
@@ -176,7 +205,7 @@ public class StudentController {
             )
             @RequestBody @Valid ImportSkillsRequest importSkillsRequest
     ) {
-        log.info("Importing selected skills for student ID: {}", importSkillsRequest.getStudentId());
+        log.info("Importing selected skills for authenticated student");
         // Delegate to SkillService to process and save the selected skills
         return ResponseEntity.ok(skillService.importStudentSkills(importSkillsRequest));
     }

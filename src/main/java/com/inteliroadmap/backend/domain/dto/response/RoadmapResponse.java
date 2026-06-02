@@ -18,4 +18,5 @@ public class RoadmapResponse {
     private List<StudentProgress> progresses;
     private SkillNode skillNode;
     private String updateStatus;
+    private Double totalProgress;
 }

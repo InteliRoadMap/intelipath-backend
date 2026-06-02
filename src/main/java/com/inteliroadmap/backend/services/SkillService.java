@@ -7,6 +7,7 @@ import com.inteliroadmap.backend.domain.entity.*;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.repositories.*;
 import jakarta.transaction.Transactional;
+import org.springframework.security.core.context.SecurityContextHolder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -21,20 +22,43 @@ import java.util.UUID;
 @Slf4j
 public class SkillService {
 
+    private final UserRepository userRepository;
     private final SkillRepository skillRepository;
     private final StudentRepository studentRepository;
     private final StudentSkillRepository studentSkillRepository;
     private final CareerRoleRepository careerRoleRepository;
     private final CareerRequiredSkillRepository careerRequiredSkillRepository;
 
+    /**
+     * Securely identifies the currently authenticated student.
+     * Extracts the user email from the SecurityContextHolder and retrieves the corresponding Student profile.
+     *
+     * @return The authenticated Student entity
+     * @throws ResourceNotFoundException if the token is invalid or the student profile is missing
+     */
+    private Student getAuthenticatedStudent() {
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByEmail(email);
+        if (user == null) {
+            throw new ResourceNotFoundException("User not found from token");
+        }
+        Student student = studentRepository.findByStudentId(user.getUserId());
+        if (student == null) {
+            throw new ResourceNotFoundException("Student profile not found");
+        }
+        return student;
+    }
+
+    /**
+     * Retrieves all skills currently associated with the authenticated student.
+     *
+     * @return SkillResponse containing the list of the student's skills
+     */
     @Transactional
-    public SkillResponse getStudentSkills(UUID student_id) {
+    public SkillResponse getStudentSkills() {
         log.info("Skill Module: Get Student Skill Request received");
 
-        Student student = studentRepository.findByStudentId(student_id);
-        if (student == null) {
-            throw new ResourceNotFoundException("Student not found");
-        }
+        Student student = getAuthenticatedStudent();
 
         List<StudentSkill> skills = studentSkillRepository.findByStudent(student);
 
@@ -43,6 +67,12 @@ public class SkillService {
                 .build();
     }
 
+    /**
+     * Fetches all available skills in the system filtered by a specific category.
+     *
+     * @param category The category name to filter by (e.g., "Frontend", "Backend")
+     * @return SkillResponse containing the list of matching skills
+     */
     @Transactional
     public SkillResponse getSkillsByCategory(String category) {
         log.info("Skill Module: Get Skill By Category Request received");
@@ -54,14 +84,18 @@ public class SkillService {
                 .build();
     }
 
+    /**
+     * Imports a selected list of skills and associates them with the authenticated student.
+     * Safely ignores any existing skills to prevent duplicates.
+     *
+     * @param request The payload containing the list of skills to import
+     * @return SkillResponse containing the updated list of the student's skills
+     */
     @Transactional
     public SkillResponse importStudentSkills(ImportSkillsRequest request) {
         log.info("Skill Module: Import Student Skills Request received");
 
-        Student student = studentRepository.findByStudentId(request.getStudentId());
-        if (student == null) {
-            throw new ResourceNotFoundException("Student not found");
-        }
+        Student student = getAuthenticatedStudent();
 
         List<StudentSkill> studentSkills = studentSkillRepository.findByStudent(student);
         List<UUID> existingSkillIds = studentSkills.stream()
@@ -91,14 +125,18 @@ public class SkillService {
                 .build();
     }
 
+    /**
+     * Compares the authenticated student's current skills against the skills required by a specific career.
+     * Calculates and returns the list of missing skills that the student needs to acquire.
+     *
+     * @param request The payload containing the target career ID
+     * @return SkillResponse detailing current skills, required skills, and missing skills
+     */
     @Transactional
     public SkillResponse compareWithStudentSkills(CompareStRmSkillRequest request) {
         log.info("Skill Module: Comparing Student Skills with Roadmap Required Skills");
 
-        Student student = studentRepository.findByStudentId(request.getStudentId());
-        if (student == null) {
-            throw new ResourceNotFoundException("Student not found");
-        }
+        Student student = getAuthenticatedStudent();
 
         CareerRole career = careerRoleRepository.findById(request.getCareerId())
                 .orElseThrow(() -> new ResourceNotFoundException("Career not found"));

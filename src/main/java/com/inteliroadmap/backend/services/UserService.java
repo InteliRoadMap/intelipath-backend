@@ -38,10 +38,7 @@ public class UserService {
     public UserResponse setupUserProfile(SetupUserProfileRequest request) {
         log.info("User Module: Setup User Profile Request received");
 
-        String email = jwtService.extractEmail(request.getToken());
-        if (email == null) {
-            throw new ResourceNotFoundException("Invalid token");
-        }
+        String email = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
 
         User user = userRepository.findByEmail(email);
         if (user == null) {

@@ -7,12 +7,10 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
+import java.util.UUID;
 
 @Data
 public class SetupStudentProfileRequest {
-
-    @NotBlank(message = "Token is required")
-    private String token;
 
     private String university;
 
@@ -20,4 +18,6 @@ public class SetupStudentProfileRequest {
 
     @NotBlank(message = "Major is required")
     private String major;
+
+    private UUID careerId;
 }
