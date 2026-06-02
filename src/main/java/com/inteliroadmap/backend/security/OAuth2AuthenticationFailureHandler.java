@@ -1,4 +1,4 @@
-package com.inteliroadmap.backend.exceptions;
+package com.inteliroadmap.backend.security;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
