@@ -21,9 +21,10 @@ public class Skill {
     @Column(name = "skill_id")
     private UUID skillId;
 
-    @Column(name = "category")
     private String category;
 
-    @Column(name = "name", nullable = false)
-    private String name;
+    private String career;
+
+    @Column(name = "skill_name", nullable = false)
+    private String skillName;
 }

@@ -43,7 +43,7 @@ public class AuthController {
     @PostMapping("/register")
     @Operation(
             summary = "Register new account",
-            description = "Register a new Student account using email and password"
+            description = "Register a new Student account using username email and password"
     )
     @ApiResponses(value = {
             @ApiResponse(
@@ -81,7 +81,7 @@ public class AuthController {
      */
     @PostMapping("/login")
     @Operation(
-            summary = "Login with email and password",
+            summary = "Login with username/email and password",
             description = "Authenticate user and receive JWT access token"
     )
     @ApiResponses(value = {

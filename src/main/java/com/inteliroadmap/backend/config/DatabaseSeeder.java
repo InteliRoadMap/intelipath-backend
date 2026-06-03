@@ -1,8 +1,10 @@
 package com.inteliroadmap.backend.config;
 
 import com.inteliroadmap.backend.domain.entity.*;
+import com.inteliroadmap.backend.repositories.CareerRequiredSkillRepository;
 import com.inteliroadmap.backend.repositories.CareerRoleRepository;
 import com.inteliroadmap.backend.repositories.SkillNodeRepository;
+import com.inteliroadmap.backend.repositories.SkillRepository;
 import com.opencsv.CSVReader;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -12,6 +14,7 @@ import org.springframework.stereotype.Component;
 import java.io.FileReader;
 import java.io.File;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -22,23 +25,40 @@ public class DatabaseSeeder implements CommandLineRunner {
 
     private final CareerRoleRepository careerRoleRepository;
     private final SkillNodeRepository skillNodeRepository;
+    private final SkillRepository skillRepository;
+    private final CareerRequiredSkillRepository careerRequiredSkillRepository;
 
     private static final String ROADMAP_TEMPLATE = "RoadmapDataTemplate.csv";
+    private static final String SKILL_TEMPLATE = "SkillDataTemplate.csv";
+    private static final String CAREER_TEMPLATE = "CareerDataTemplate.csv";
 
     @Override
     public void run(String... args) throws Exception {
-        importRoadmapTemplate();
+        log.info("=====================================================");
+        log.info(" CHECKING DATABASE SEED DATA... ");
+        
+        importCareerDataTemplate();
+        importRoadmapDataTemplate();
+        importSkillDataTemplate();
+        
+        log.info("=====================================================");
+        log.info(" SEEDING SUMMARY NOTIFICATION ");
+        log.info(" - Career Roles loaded: {}", careerRoleRepository.count());
+        log.info(" - Skills loaded: {}", skillRepository.count());
+        log.info(" - Career Required Skills loaded: {}", careerRequiredSkillRepository.count());
+        log.info(" - Skill Nodes loaded: {}", skillNodeRepository.count());
+        log.info("=====================================================");
     }
 
-    private void importRoadmapTemplate() {
-        if (careerRoleRepository.count() > 0) {
+    private void importRoadmapDataTemplate() {
+        if (skillNodeRepository.count() > 0) {
             log.info("Roadmap already seeded. Skipping import.");
             return;
         }
 
         File csvFile = new File(ROADMAP_TEMPLATE);
         if (!csvFile.exists()) {
-            log.warn("RoadmapTemplate.csv not found. Skipping import.");
+            log.warn("RoadmapDataTemplate.csv not found. Skipping import.");
             return;
         }
 
@@ -106,7 +126,7 @@ public class DatabaseSeeder implements CommandLineRunner {
                             .name(name)
                             .level(level)
                             .orderIndex(orderIndex)
-                            .description(null)
+                            .description(description)
                             .resource(resourcesList)
                             .build();
                     
@@ -117,6 +137,111 @@ public class DatabaseSeeder implements CommandLineRunner {
             log.info("CSV Import for Roadmap completed successfully.");
         } catch (Exception e) {
             log.error("Error occurred while importing CSV of Roadmap", e);
+        }
+    }
+
+    private void importSkillDataTemplate() {
+        if (skillRepository.count() > 0) {
+            log.info("Skill already seeded. Skipping import.");
+            return;
+        }
+
+        File csvFile = new File(SKILL_TEMPLATE);
+        if (!csvFile.exists()) {
+            log.warn("SkillDataTemplate.csv not found. Skipping import.");
+            return;
+        }
+
+        log.info("Starting CSV Import for Skill...");
+        try (CSVReader reader = new CSVReader(new FileReader(csvFile))) {
+            String[] line;
+            int rowNum = 0;
+
+            java.util.Map<String, SkillNode> skillMap = new HashMap<>();
+
+            while ((line = reader.readNext()) != null) {
+                rowNum++;
+                // Skip the first two header rows
+                if (rowNum <= 1) continue;
+
+                if (line.length < 4) continue;
+
+                String category = line[0];
+                String careerRequired = line[1];
+                String skillName = line[2];
+
+                Skill skill = skillRepository.findBySkillName(skillName);
+                if (skill == null) {
+                    Skill newskill = Skill.builder()
+                            .category(category)
+                            .career(careerRequired)
+                            .skillName(skillName)
+                            .build();
+                    skill = skillRepository.save(newskill);
+                }
+
+                String importanceLevel = line[3];
+
+                CareerRole role = careerRoleRepository.findByCareerName(careerRequired);
+                
+                if (role != null) {
+                    CareerRequiredSkill careerRequiredSkill = CareerRequiredSkill.builder()
+                            .careerRole(role)
+                            .skill(skill)
+                            .importanceLevel(importanceLevel)
+                            .build();
+                    careerRequiredSkillRepository.save(careerRequiredSkill);
+                } else {
+                    log.warn("Career role '{}' not found for skill '{}'. Skipping required skill mapping.", careerRequired, skillName);
+                }
+            }
+            log.info("CSV Import for Skill completed successfully.");
+        } catch (Exception e) {
+            log.error("Error occurred while importing CSV of Skill", e);
+        }
+    }
+
+    private void importCareerDataTemplate() {
+        if (careerRoleRepository.count() > 0) {
+            log.info("Career Roles already seeded. Skipping import.");
+            return;
+        }
+
+        File csvFile = new File(CAREER_TEMPLATE);
+        if (!csvFile.exists()) {
+            log.warn("CareerDataTemplate.csv not found. Skipping import.");
+            return;
+        }
+
+        log.info("Starting CSV Import for Career Roles...");
+        try (CSVReader reader = new CSVReader(new FileReader(csvFile))) {
+            String[] line;
+            int rowNum = 0;
+
+            while ((line = reader.readNext()) != null) {
+                rowNum++;
+                // Skip the header row
+                if (rowNum <= 1) continue;
+
+                if (line.length < 2) continue;
+
+                String careerName = line[0];
+                String description = line[1];
+
+                CareerRole careerRole = careerRoleRepository.findByCareerName(careerName);
+                if (careerRole == null) {
+                    careerRole = CareerRole.builder()
+                            .careerName(careerName)
+                            .description(description)
+                            .build();
+                } else {
+                    careerRole.setDescription(description);
+                }
+                careerRoleRepository.save(careerRole);
+            }
+            log.info("CSV Import for Career Roles completed successfully.");
+        } catch (Exception e) {
+            log.error("Error occurred while importing CSV of Career Roles", e);
         }
     }
 }

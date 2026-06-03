@@ -78,8 +78,6 @@ public class StudentController {
 
     /**
      * Retrieves the information of a specific student.
-     *
-     * @param student_id The unique identifier of the student
      * @return ResponseEntity containing student's information
      */
     @GetMapping("/profile")
@@ -109,8 +107,6 @@ public class StudentController {
 
     /**
      * Retrieves the skills currently associated with a specific student.
-     *
-     * @param student_id The unique identifier of the student
      * @return ResponseEntity containing a list of the student's skills
      */
     @GetMapping("/skills")
@@ -139,12 +135,12 @@ public class StudentController {
     }
 
     /**
-     * Retrieves a list of available skills filtered by category.
+     * Retrieves a list of available skills filtered by a search query matching category or career.
      *
-     * @param category The skill category to filter by
-     * @return ResponseEntity containing a list of skills in the specified category
+     * @param search The query string to search by (category or career)
+     * @return ResponseEntity containing a list of matching skills
      */
-    @GetMapping("/skills/{category}")
+    @GetMapping("/skills/{search}")
     @Operation(
             summary = "Search skills by category",
             description = "Search skills by category"
@@ -163,10 +159,10 @@ public class StudentController {
                     description = "{category} skills not found"
             )
     })
-    public ResponseEntity<SkillResponse> getSkillsByCategory(@PathVariable String category) {
-        log.info("Fetching skills for category: {}", category);
-        // Delegate to SkillService to fetch generic skills by category
-        return ResponseEntity.ok(skillService.getSkillsByCategory(category));
+    public ResponseEntity<SkillResponse> searchSkills(@PathVariable String search) {
+        log.info("Fetching skills for search query: {}", search);
+        // Delegate to SkillService to fetch skills by category or career
+        return ResponseEntity.ok(skillService.searchSkills(search));
     }
 
     /**

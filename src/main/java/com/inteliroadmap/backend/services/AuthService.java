@@ -51,7 +51,7 @@ public class AuthService {
         //B2: Build User entity from request
         User user = buildUser(registerRequest);
         userRepository.save(user);
-        log.info("Register Module: User registered successfully: {}", registerRequest.getEmail());
+        log.info("Register Module: User registered successfully for user: {}", registerRequest.getUsername());
 
         return RegisterResponse.builder()
                 .message("Welcome to InteliPath, " + user.getUsername())
@@ -159,7 +159,7 @@ public class AuthService {
      * @return UserResponse containing JWT token and user info
      */
     public UserResponse buildAuthResponse(User user, String refreshToken, LocalDateTime expiresIn) {
-        log.info("Build Auth Response for email: {}", user.getEmail());
+        log.info("Build Auth Response for user: {}", user.getUsername());
         return UserResponse.builder()
                 .accessToken(
                         jwtService.generateAccessToken(
@@ -200,7 +200,7 @@ public class AuthService {
    }
 
     private String createAndSaveRefreshToken(User user) {
-        log.info("Create and Save Refresh token for user: {}", user.getEmail());
+        log.info("Create and Save Refresh token for user: {}", user.getUsername());
         String refreshToken = jwtService.generateRefreshToken(user.getEmail());
         RefreshToken token = RefreshToken.builder()
                 .token(refreshToken)

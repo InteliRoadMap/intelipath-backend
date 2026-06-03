@@ -68,16 +68,18 @@ public class SkillService {
     }
 
     /**
-     * Fetches all available skills in the system filtered by a specific category.
+     * Fetches all available skills in the system that match the search query in their category or career.
      *
-     * @param category The category name to filter by (e.g., "Frontend", "Backend")
+     * @param search The search string to filter by (e.g., "Frontend", "Backend", "Core")
      * @return SkillResponse containing the list of matching skills
      */
     @Transactional
-    public SkillResponse getSkillsByCategory(String category) {
-        log.info("Skill Module: Get Skill By Category Request received");
+    public SkillResponse searchSkills(String search) {
+        log.info("Skill Module: Search Skills Request received for query: {}", search);
 
-        List<Skill> skills = skillRepository.findByCategory(category);
+        List<Skill> skills =
+                skillRepository
+                        .findByCategoryContainingIgnoreCaseOrCareerContainingIgnoreCase(search, search);
 
         return SkillResponse.builder()
                 .skills(skills)
