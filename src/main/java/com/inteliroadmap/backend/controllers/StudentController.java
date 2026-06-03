@@ -36,6 +36,35 @@ public class StudentController {
     private final SkillService skillService;
 
     /**
+     * Retrieves the information of a specific student.
+     * @return ResponseEntity containing student's information
+     */
+    @GetMapping("/profile")
+    @Operation(
+            summary = "Get student profile",
+            description = "Get student profile information"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Get student profile successful",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = StudentResponse.class)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "User not found"
+            )
+    })
+    public ResponseEntity<StudentResponse> getStudentProfile() {
+        log.info("Student profile retrieval request received");
+        // Delegate to StudentService to fetch the student profile
+        return ResponseEntity.ok(studentService.getStudentProfile());
+    }
+
+    /**
      * Sets up or updates the profile information for a student.
      *
      * @param setupStudentProfileRequest The payload containing student profile details
@@ -74,35 +103,6 @@ public class StudentController {
         log.info("Student profile setup request received");
         // Delegate to StudentService to setup or update the student profile
         return ResponseEntity.ok(studentService.setupStudentProfile(setupStudentProfileRequest));
-    }
-
-    /**
-     * Retrieves the information of a specific student.
-     * @return ResponseEntity containing student's information
-     */
-    @GetMapping("/profile")
-    @Operation(
-            summary = "Get student profile",
-            description = "Get student profile information"
-    )
-    @ApiResponses(value = {
-            @ApiResponse(
-                    responseCode = "200",
-                    description = "Get student profile successful",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = StudentResponse.class)
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "404",
-                    description = "User not found"
-            )
-    })
-    public ResponseEntity<StudentResponse> getStudentProfile() {
-        log.info("Student profile retrieval request received");
-        // Delegate to StudentService to fetch the student profile
-        return ResponseEntity.ok(studentService.getStudentProfile());
     }
 
     /**
