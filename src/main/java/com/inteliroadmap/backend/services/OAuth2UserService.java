@@ -19,12 +19,7 @@ import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
-import java.util.Optional;
 
-/**
- * Custom OAuth2 User Service to handle OAuth2 user information retrieved from providers (e.g. Google).
- * It integrates with the database to find or create User and OauthAccount records.
- */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -34,100 +29,165 @@ public class OAuth2UserService extends DefaultOAuth2UserService {
     private final OauthAccountRepository oauthAccountRepository;
 
     /**
-     * Loads user info from OAuth2 provider and processes it (creates/updates DB records).
-     * @param userRequest the OAuth2 user request
-     * @return CustomOAuth2User containing the user's email and role
-     * @throws OAuth2AuthenticationException if authentication fails
+     * Loads user info from OAuth2 provider and creates or updates local user data.
+     *
+     * @param request the OAuth2 user request from Spring Security
+     * @return CustomOAuth2User containing the authenticated user's email and role
+     * @throws OAuth2AuthenticationException if OAuth2 authentication or user extraction fails
      */
     @Override
-    public OAuth2User loadUser(OAuth2UserRequest userRequest) throws OAuth2AuthenticationException {
-        log.info("Loading OAuth2 user from provider: {}", userRequest.getClientRegistration().getRegistrationId());
-        OAuth2User oAuth2User = super.loadUser(userRequest);
-        return processOAuth2User(userRequest, oAuth2User);
+    public OAuth2User loadUser(OAuth2UserRequest request) throws OAuth2AuthenticationException {
+        String provider = request.getClientRegistration().getRegistrationId();
+        log.info("Loading OAuth2 user from provider: {}", provider);
+
+        OAuth2User oauthUser = super.loadUser(request);
+        OAuth2UserInfoInternal userInfo = createUserInfo(provider, oauthUser.getAttributes());
+
+        validateEmail(userInfo);
+
+        User user = getOrCreateUser(userInfo);
+        linkOauthAccountIfNeeded(user, userInfo, provider);
+
+        log.info("OAuth2 login completed for email: {}, role: {}", user.getEmail(), user.getRole());
+
+        return new CustomOAuth2User(oauthUser, user.getEmail(), user.getRole().name());
     }
 
     /**
-     * Processes the retrieved OAuth2 user by checking DB and linking the account.
-     * @param oAuth2UserRequest the original request
-     * @param oAuth2User the retrieved OAuth2 user
-     * @return CustomOAuth2User mapped with the application's User entity
+     * Finds an existing user by email or creates a new student account.
+     *
+     * @param userInfo normalized OAuth2 user information
+     * @return existing or newly created user
      */
-    private OAuth2User processOAuth2User(OAuth2UserRequest oAuth2UserRequest, OAuth2User oAuth2User) {
-        String providerName = oAuth2UserRequest.getClientRegistration().getRegistrationId();
-        OAuth2UserInfoInternal oAuth2UserInfoInternal = create(providerName, oAuth2User.getAttributes());
+    private User getOrCreateUser(OAuth2UserInfoInternal userInfo) {
+        User user = userRepository.findByEmail(userInfo.getEmail());
 
-        if (oAuth2UserInfoInternal.getEmail() == null || oAuth2UserInfoInternal.getEmail().isEmpty()) {
-            throw new OAuth2AuthenticationException("Email not found from OAuth2 provider");
+        if (user == null) {
+            log.info("No existing user found. Creating new OAuth2 user: {}", userInfo.getEmail());
+            return createUser(userInfo);
         }
 
-        User user = userRepository.findByEmail(oAuth2UserInfoInternal.getEmail());
-
-        if (user != null) {
-            log.info("Found existing user with email: {}", user.getEmail());
-            // Optionally update user info here if needed
-            boolean updated = false;
-            if (user.getBio() == null && oAuth2UserInfoInternal.getBio() != null) {
-                user.setBio(oAuth2UserInfoInternal.getBio());
-                updated = true;
-            }
-            if (user.getGithubProfile() == null && oAuth2UserInfoInternal.getHtmlUrl() != null) {
-                user.setGithubProfile(oAuth2UserInfoInternal.getHtmlUrl());
-                updated = true;
-            }
-            if (updated) {
-                userRepository.save(user);
-            }
-        } else {
-            log.info("Registering new user via OAuth2 for email: {}", oAuth2UserInfoInternal.getEmail());
-            user = registerNewOAuth2User(oAuth2UserInfoInternal);
-        }
-
-        // Link OauthAccount if it doesn't exist
-        Optional<OauthAccount> oauthAccountOpt = oauthAccountRepository.findByProviderIdAndProviderName(
-                oAuth2UserInfoInternal.getProviderId(), providerName);
-
-        if (oauthAccountOpt.isEmpty()) {
-            log.info("Linking new OAuth account for user: {}", user.getEmail());
-            OauthAccount newOauthAccount = OauthAccount.builder()
-                    .user(user)
-                    .providerId(oAuth2UserInfoInternal.getProviderId())
-                    .providerName(providerName)
-                    .build();
-            oauthAccountRepository.save(newOauthAccount);
-        }
-
-        return new CustomOAuth2User(oAuth2User, user.getEmail(), user.getRole().name());
+        log.info("Existing user found for OAuth2 login: {}", user.getEmail());
+        return updateUserIfNeeded(user, userInfo);
     }
 
     /**
-     * Registers a new User entity from the OAuth2 info.
-     * @param oAuth2UserInfoInternal the standardized OAuth2 user info
-     * @return the saved User entity
+     * Creates a new local user from OAuth2 profile data.
+     *
+     * @param userInfo normalized OAuth2 user information
+     * @return saved user entity
      */
-    private User registerNewOAuth2User(OAuth2UserInfoInternal oAuth2UserInfoInternal) {
+    private User createUser(OAuth2UserInfoInternal userInfo) {
         User user = User.builder()
-                .email(oAuth2UserInfoInternal.getEmail())
-                .fullName(oAuth2UserInfoInternal.getFullName())
-                .bio(oAuth2UserInfoInternal.getBio())
-                .githubProfile(oAuth2UserInfoInternal.getHtmlUrl())
+                .email(userInfo.getEmail())
+                .fullName(userInfo.getFullName())
+                .bio(userInfo.getBio())
+                .githubProfile(userInfo.getHtmlUrl())
                 .role(UserRole.STUDENT)
                 .build();
-        return userRepository.save(user);
+
+        User savedUser = userRepository.save(user);
+        log.info("Created new OAuth2 user with id: {}, email: {}", savedUser.getUserId(), savedUser.getEmail());
+
+        return savedUser;
     }
 
     /**
-     * Creates the correct OAuth2UserInfoInternal instance based on the provider name.
+     * Updates missing optional profile fields from OAuth2 data.
      *
-     * @param providerName OAuth2 provider name (google, github)
-     * @param attributes   Raw attributes from OAuth2 provider
-     * @return OAuth2UserInfoInternal implementation
-     * @throws ResourceNotFoundException if provider is not supported
+     * @param user existing user entity
+     * @param userInfo normalized OAuth2 user information
+     * @return updated user if changes were made, otherwise original user
      */
-    private OAuth2UserInfoInternal create(String providerName, Map<String, Object> attributes) {
-        return switch (providerName.toLowerCase()) {
+    private User updateUserIfNeeded(User user, OAuth2UserInfoInternal userInfo) {
+        boolean changed = false;
+
+        if (user.getBio() == null && userInfo.getBio() != null) {
+            user.setBio(userInfo.getBio());
+            changed = true;
+        }
+
+        if (user.getGithubProfile() == null && userInfo.getHtmlUrl() != null) {
+            user.setGithubProfile(userInfo.getHtmlUrl());
+            changed = true;
+        }
+
+        if (!changed) {
+            log.debug("No OAuth2 profile update needed for user: {}", user.getEmail());
+            return user;
+        }
+
+        User updatedUser = userRepository.save(user);
+        log.info("Updated OAuth2 profile fields for user: {}", updatedUser.getEmail());
+
+        return updatedUser;
+    }
+
+    /**
+     * Links the OAuth2 provider account to the local user if it is not linked yet.
+     *
+     * @param user local user entity
+     * @param userInfo normalized OAuth2 user information
+     * @param provider OAuth2 provider name
+     */
+    private void linkOauthAccountIfNeeded(
+            User user,
+            OAuth2UserInfoInternal userInfo,
+            String provider
+    ) {
+        boolean exists = oauthAccountRepository
+                .findByProviderIdAndProviderName(userInfo.getProviderId(), provider)
+                .isPresent();
+
+        if (exists) {
+            log.debug("OAuth2 account already linked. provider: {}, providerId: {}", provider, userInfo.getProviderId());
+            return;
+        }
+
+        OauthAccount oauthAccount = OauthAccount.builder()
+                .user(user)
+                .providerId(userInfo.getProviderId())
+                .providerName(provider)
+                .build();
+
+        oauthAccountRepository.save(oauthAccount);
+        log.info("Linked OAuth2 account. user: {}, provider: {}, providerId: {}",
+                user.getEmail(), provider, userInfo.getProviderId());
+    }
+
+    /**
+     * Validates that OAuth2 provider returned a usable email.
+     *
+     * @param userInfo normalized OAuth2 user information
+     * @throws OAuth2AuthenticationException if email is missing
+     */
+    private void validateEmail(OAuth2UserInfoInternal userInfo) {
+        if (userInfo.getEmail() == null || userInfo.getEmail().isBlank()) {
+            log.warn("OAuth2 provider did not return an email");
+            throw new OAuth2AuthenticationException("Email not found from OAuth2 provider");
+        }
+    }
+
+    /**
+     * Creates provider-specific OAuth2 user info mapper.
+     *
+     * @param provider OAuth2 provider name
+     * @param attributes raw OAuth2 attributes from provider
+     * @return normalized OAuth2 user information
+     */
+    private OAuth2UserInfoInternal createUserInfo(
+            String provider,
+            Map<String, Object> attributes
+    ) {
+        log.debug("Creating OAuth2 user info mapper for provider: {}", provider);
+
+        return switch (provider.toLowerCase()) {
             case "google" -> new GoogleOAuth2UserInfo(attributes);
             case "github" -> new GitHubOauth2UserInfo(attributes);
-            default -> throw new ResourceNotFoundException("Unknown provider name: " + providerName);
+            default -> {
+                log.warn("Unsupported OAuth2 provider: {}", provider);
+                throw new ResourceNotFoundException("Unknown provider: " + provider);
+            }
         };
     }
 }

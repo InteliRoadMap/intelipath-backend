@@ -32,7 +32,6 @@ public class AuthService {
     private final RefreshTokenRepository refreshTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final JwtService jwtService;
-    private final EmailService emailService;
 
     /**
      * Register new student account
@@ -163,14 +162,14 @@ public class AuthService {
     public UserResponse buildAuthResponse(User user, String refreshToken, LocalDateTime expiresIn) {
         log.info("Build Auth Response for email: {}", user.getEmail());
         return UserResponse.builder()
-                .accessToken(
-                        jwtService.generateAccessToken(
-                                user.getEmail(),
-                                user.getRole().name()
-                        )
-                )
-                .refreshToken(refreshToken)
-                .expiresIn(String.valueOf(expiresIn))
+//                .accessToken(
+//                        jwtService.generateAccessToken(
+//                                user.getEmail(),
+//                                user.getRole().name()
+//                        )
+//                )
+//                .refreshToken(refreshToken)
+//                .expiresIn(String.valueOf(expiresIn))
                 .id(user.getUserId().toString())
                 .fullName(user.getFullName())
                 .role(user.getRole().name())
