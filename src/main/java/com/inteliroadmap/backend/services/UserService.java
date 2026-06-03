@@ -9,6 +9,7 @@ import com.inteliroadmap.backend.security.JwtService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -27,33 +28,24 @@ public class UserService {
      * @throws ResourceNotFoundException if token is missing, invalid, or user not found
      */
     @Transactional
-    public UserResponse getCurrentUser(String authorizationHeader) {
+    public UserResponse getCurrentUser() {
         log.info("User Module: Current user info request received");
 
-        //B1: Extract access token from Authorization header
-        String accessToken = extractBearerToken(authorizationHeader);
-
-        //B2: Validate access token
-        if (!jwtService.isTokenValid(accessToken)) {
-            log.warn("User Module: Invalid or expired access token");
-            throw new ResourceNotFoundException("Invalid or expired access token");
-        }
-
-        //B3: Extract email from access token
-        String email = jwtService.extractEmail(accessToken);
+        //B1: Extract email from SecurityContextHolder (populated by JwtAuthenticationFilter)
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
         if (email == null || email.isBlank()) {
-            log.warn("User Module: Cannot extract email from access token");
-            throw new ResourceNotFoundException("Cannot extract email from access token");
+            log.warn("User Module: Cannot extract email from security context");
+            throw new ResourceNotFoundException("Cannot extract email from security context");
         }
 
-        //B4: Find user by email
+        //B2: Find user by email
         User user = userRepository.findByEmail(email);
         if (user == null) {
             log.warn("User Module: User not found: {}", email);
             throw new ResourceNotFoundException("User not found");
         }
 
-        //B5: Build user response
+        //B3: Build user response
         return buildUserResponse(user);
     }
 
@@ -77,22 +69,6 @@ public class UserService {
 
         //B2: Build user response
         return buildUserResponse(user);
-    }
-
-    /**
-     * Extract raw JWT token from Authorization header.
-     *
-     * @param authorizationHeader Authorization header value
-     * @return raw JWT access token
-     * @throws ResourceNotFoundException if Authorization header is missing or invalid
-     */
-    private String extractBearerToken(String authorizationHeader) {
-        if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
-            log.warn("User Module: Missing or invalid Authorization header");
-            throw new ResourceNotFoundException("Missing or invalid Authorization header");
-        }
-
-        return authorizationHeader.substring(7);
     }
 
     /**

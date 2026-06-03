@@ -199,7 +199,7 @@ public class RoadmapController {
             )
     @RequestBody @Valid CompareStRmSkillRequest request
     ) {
-        log.info("Comparing roadmap required skills for career ID: {} against student ID: {}", request.getCareerId(), request.getStudentId());
+        log.info("Comparing roadmap required skills for career ID: {}", request.getCareerId());
         // Delegate to SkillService to compute the skill gap and return the comparison
         return ResponseEntity.ok(skillService.compareWithStudentSkills(request));
     }

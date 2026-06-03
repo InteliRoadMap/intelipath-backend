@@ -58,11 +58,9 @@ public class UserController {
                     description = "User not found"
             )
     })
-    public ResponseEntity<UserResponse> getCurrentUser(
-            @RequestHeader("Authorization") String authorizationHeader
-    ) {
+    public ResponseEntity<UserResponse> getCurrentUser() {
         log.info("Current user info request received");
-        return ResponseEntity.ok(userService.getCurrentUser(authorizationHeader));
+        return ResponseEntity.ok(userService.getCurrentUser());
     }
 
     /**

@@ -8,9 +8,6 @@ import java.util.UUID;
 @Data
 public class CompareStRmSkillRequest {
 
-    @NotBlank(message = "Student ID is required")
-    private UUID studentId;
-
     @NotBlank(message = "Career ID is required")
     private UUID careerId;
 }

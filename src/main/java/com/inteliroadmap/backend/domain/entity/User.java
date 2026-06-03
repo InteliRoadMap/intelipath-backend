@@ -33,14 +33,7 @@ public class User {
     private UUID userId;
 
     @Column(nullable = false, unique = true)
-    private String username;
-
-    @Column(nullable = false, unique = true)
     private String email;
-
-    @Column(nullable = false)
-    @com.fasterxml.jackson.annotation.JsonIgnore
-    private String password;
 
     @Column(name = "full_name")
     private String fullName;
@@ -63,6 +56,9 @@ public class User {
     @Enumerated(EnumType.STRING)
     @Column(name = "account_status")
     private UserStatus userStatus = UserStatus.ACTIVE;
+
+    @Column(name = "github_profile")
+    private String githubProfile;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
     @com.fasterxml.jackson.annotation.JsonIgnore
