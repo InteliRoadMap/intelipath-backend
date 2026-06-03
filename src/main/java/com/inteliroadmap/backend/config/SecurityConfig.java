@@ -41,7 +41,11 @@ public class SecurityConfig {
                         // PUBLIC ENDPOINTS - No authentication required
                         // ============================================================
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-                        .requestMatchers("/auth/**", "/p/**").permitAll()
+                        .requestMatchers(
+                                "/api/v1/auth/**",
+                                "/oauth2/**",
+                                "/login/oauth2/**"
+                        ).permitAll()
 
                         // ============================================================
                         // SWAGGER - No authentication required
@@ -116,9 +120,7 @@ public class SecurityConfig {
 
     /**
      * Password Encoder - BCrypt
-     *
      * Used to encode and verify passwords
-     *
      * @return BCryptPasswordEncoder
      */
     @Bean

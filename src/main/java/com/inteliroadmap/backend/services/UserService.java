@@ -1,16 +1,10 @@
 package com.inteliroadmap.backend.services;
 
-import com.inteliroadmap.backend.domain.dto.request.SetupStudentProfileRequest;
-import com.inteliroadmap.backend.domain.dto.request.SetupUserProfileRequest;
+import com.inteliroadmap.backend.domain.dto.request.UserRequest;
 import com.inteliroadmap.backend.domain.dto.response.UserResponse;
 import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.repositories.UserRepository;
-import com.inteliroadmap.backend.repositories.StudentRepository;
-import com.inteliroadmap.backend.domain.entity.Student;
-
-import java.time.LocalDate;
-
 import com.inteliroadmap.backend.security.JwtService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -26,41 +20,95 @@ public class UserService {
     private final JwtService jwtService;
 
     /**
-     * Set up or update a user's profile information.
-     * Extracts the user's email from the provided JWT token and updates their details in the database.
-     * Only fields that are not null in the request will be updated.
+     * Get current authenticated user information from JWT access token.
      *
-     * @param request SetupUserProfileRequest containing the JWT token and profile data to update.
-     * @return UserResponse containing the updated user's ID, full name, and role.
-     * @throws ResourceNotFoundException if the token is invalid or the user does not exist.
+     * @param authorizationHeader Authorization header containing Bearer access token
+     * @return UserResponse containing current authenticated user information
+     * @throws ResourceNotFoundException if token is missing, invalid, or user not found
      */
     @Transactional
-    public UserResponse setupUserProfile(SetupUserProfileRequest request) {
-        log.info("User Module: Setup User Profile Request received");
+    public UserResponse getCurrentUser(String authorizationHeader) {
+        log.info("User Module: Current user info request received");
 
-        String email = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getName();
+        //B1: Extract access token from Authorization header
+        String accessToken = extractBearerToken(authorizationHeader);
 
+        //B2: Validate access token
+        if (!jwtService.isTokenValid(accessToken)) {
+            log.warn("User Module: Invalid or expired access token");
+            throw new ResourceNotFoundException("Invalid or expired access token");
+        }
+
+        //B3: Extract email from access token
+        String email = jwtService.extractEmail(accessToken);
+        if (email == null || email.isBlank()) {
+            log.warn("User Module: Cannot extract email from access token");
+            throw new ResourceNotFoundException("Cannot extract email from access token");
+        }
+
+        //B4: Find user by email
         User user = userRepository.findByEmail(email);
         if (user == null) {
+            log.warn("User Module: User not found: {}", email);
             throw new ResourceNotFoundException("User not found");
         }
 
-        if (request.getFullName() != null) user.setFullName(request.getFullName());
-        if (request.getYob() != null) {
-            if (request.getYob().trim().isEmpty()) {
-                user.setYob(null);
-            } else {
-                user.setYob(LocalDate.parse(request.getYob()));
-            }
+        //B5: Build user response
+        return buildUserResponse(user);
+    }
+
+    /**
+     * Get user information by email.
+     *
+     * @param userRequest UserRequest containing email
+     * @return UserResponse containing user information
+     * @throws ResourceNotFoundException if user not found
+     */
+    @Transactional
+    public UserResponse getUserByEmail(UserRequest userRequest) {
+        log.info("User Module: User info request received for email: {}", userRequest.getEmail());
+
+        //B1: Find user by email
+        User user = userRepository.findByEmail(userRequest.getEmail());
+        if (user == null) {
+            log.warn("User Module: User not found: {}", userRequest.getEmail());
+            throw new ResourceNotFoundException("User not found");
         }
-        if (request.getBio() != null) user.setBio(request.getBio());
-        userRepository.save(user);
+
+        //B2: Build user response
+        return buildUserResponse(user);
+    }
+
+    /**
+     * Extract raw JWT token from Authorization header.
+     *
+     * @param authorizationHeader Authorization header value
+     * @return raw JWT access token
+     * @throws ResourceNotFoundException if Authorization header is missing or invalid
+     */
+    private String extractBearerToken(String authorizationHeader) {
+        if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
+            log.warn("User Module: Missing or invalid Authorization header");
+            throw new ResourceNotFoundException("Missing or invalid Authorization header");
+        }
+
+        return authorizationHeader.substring(7);
+    }
+
+    /**
+     * Build UserResponse DTO from User entity.
+     *
+     * @param user User entity
+     * @return UserResponse containing user information
+     */
+    private UserResponse buildUserResponse(User user) {
+        log.info("User Module: Build UserResponse for email: {}", user.getEmail());
 
         return UserResponse.builder()
                 .id(user.getUserId().toString())
+                .email(user.getEmail())
                 .fullName(user.getFullName())
                 .role(user.getRole().name())
                 .build();
     }
-
 }

@@ -67,17 +67,12 @@ public class StudentService {
     public StudentResponse setupStudentProfile(SetupStudentProfileRequest request) {
         log.info("Student Module: Setup Student Profile Request received");
 
-        String email = SecurityContextHolder.getContext().getAuthentication().getName();
-
-        User user = userRepository.findByEmail(email);
+        Student student = getAuthenticatedStudent();
+        User user = student.getUser();
         if (user == null) {
             throw new ResourceNotFoundException("User not found");
         }
 
-        Student student = studentRepository.findByUser(user);
-        if (student == null) {
-            student = Student.builder().user(user).build();
-        }
         if (request.getUniversity() != null) student.setUniversity(request.getUniversity());
         if (request.getYearOfAdmission() != null) {
             if (request.getYearOfAdmission().trim().isEmpty()) {

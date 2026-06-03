@@ -1,7 +1,6 @@
 package com.inteliroadmap.backend.controllers;
 
-import com.inteliroadmap.backend.domain.dto.request.SetupStudentProfileRequest;
-import com.inteliroadmap.backend.domain.dto.request.SetupUserProfileRequest;
+import com.inteliroadmap.backend.domain.dto.request.UserRequest;
 import com.inteliroadmap.backend.domain.dto.response.UserResponse;
 import com.inteliroadmap.backend.services.UserService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -16,47 +15,97 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+/**
+ * Controller - User API Endpoints
+ * Provides endpoints:
+ * - GET  /user/me      - Get current authenticated user info
+ * - POST /user/profile - Get user info by email
+ */
 @RestController
-@RequestMapping("/user")
+@RequestMapping("/api/v1/user")
 @RequiredArgsConstructor
 @Slf4j
-@Tag(name = "User services", description = "User endpoints")
+@Tag(name = "Info User", description = "User information endpoints")
 public class UserController {
 
     private final UserService userService;
 
-    @PatchMapping("/profile")
+    /**
+     * GET /user/me - Get current authenticated user information.
+     *
+     * @return ResponseEntity containing UserResponse of current authenticated user
+     */
+    @GetMapping("/me")
     @Operation(
-            summary = "Setup profile",
-            description = "User setup profile"
+            summary = "Get current user info",
+            description = "Get authenticated user information from JWT token"
     )
     @ApiResponses(value = {
             @ApiResponse(
                     responseCode = "200",
-                    description = "Setup profile successful",
+                    description = "User information retrieved successfully",
                     content = @Content(
                             mediaType = "application/json",
                             schema = @Schema(implementation = UserResponse.class)
                     )
             ),
             @ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized or invalid token"
+            ),
+            @ApiResponse(
                     responseCode = "404",
                     description = "User not found"
             )
     })
-    public ResponseEntity<UserResponse> setupUserProfile(
+    public ResponseEntity<UserResponse> getCurrentUser(
+            @RequestHeader("Authorization") String authorizationHeader
+    ) {
+        log.info("Current user info request received");
+        return ResponseEntity.ok(userService.getCurrentUser(authorizationHeader));
+    }
+
+    /**
+     * POST /user/profile - Get user information by email.
+     *
+     * @param userRequest UserRequest containing user email
+     * @return ResponseEntity containing UserResponse
+     */
+    @PostMapping("/profile")
+    @Operation(
+            summary = "Get user info by email",
+            description = "Get user information using email"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "User information retrieved successfully",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = UserResponse.class)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Invalid request payload"
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "User not found"
+            )
+    })
+    public ResponseEntity<UserResponse> getUserByEmail(
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
-                    description = "User Profile payload",
+                    description = "User email request payload",
                     required = true,
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = SetupUserProfileRequest.class)
+                            schema = @Schema(implementation = UserRequest.class)
                     )
             )
-            @RequestBody @Valid SetupUserProfileRequest setupUserProfileRequest
+            @RequestBody @Valid UserRequest userRequest
     ) {
-        log.info("User profile setup successfully");
-        return ResponseEntity.ok(userService.setupUserProfile(setupUserProfileRequest));
+        log.info("User info request received for email: {}", userRequest.getEmail());
+        return ResponseEntity.ok(userService.getUserByEmail(userRequest));
     }
-
 }
