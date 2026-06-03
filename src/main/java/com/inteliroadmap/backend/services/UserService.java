@@ -4,8 +4,10 @@ import com.inteliroadmap.backend.domain.dto.request.UserRequest;
 import com.inteliroadmap.backend.domain.dto.response.UserResponse;
 import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
+import com.inteliroadmap.backend.mappers.UserMapper;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.security.JwtService;
+import com.inteliroadmap.backend.utils.BearerTokenUtil;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,6 +20,7 @@ public class UserService {
 
     private final UserRepository userRepository;
     private final JwtService jwtService;
+    private final UserMapper userMapper;
 
     /**
      * Get current authenticated user information from JWT access token.
@@ -31,7 +34,7 @@ public class UserService {
         log.info("User Module: Current user info request received");
 
         //B1: Extract access token from Authorization header
-        String accessToken = extractBearerToken(authorizationHeader);
+        String accessToken = BearerTokenUtil.extractToken(authorizationHeader);
 
         //B2: Validate access token
         if (!jwtService.isTokenValid(accessToken)) {
@@ -54,7 +57,7 @@ public class UserService {
         }
 
         //B5: Build user response
-        return buildUserResponse(user);
+        return userMapper.toUserResponse(user);
     }
 
     /**
@@ -76,39 +79,6 @@ public class UserService {
         }
 
         //B2: Build user response
-        return buildUserResponse(user);
-    }
-
-    /**
-     * Extract raw JWT token from Authorization header.
-     *
-     * @param authorizationHeader Authorization header value
-     * @return raw JWT access token
-     * @throws ResourceNotFoundException if Authorization header is missing or invalid
-     */
-    private String extractBearerToken(String authorizationHeader) {
-        if (authorizationHeader == null || !authorizationHeader.startsWith("Bearer ")) {
-            log.warn("User Module: Missing or invalid Authorization header");
-            throw new ResourceNotFoundException("Missing or invalid Authorization header");
-        }
-
-        return authorizationHeader.substring(7);
-    }
-
-    /**
-     * Build UserResponse DTO from User entity.
-     *
-     * @param user User entity
-     * @return UserResponse containing user information
-     */
-    private UserResponse buildUserResponse(User user) {
-        log.info("User Module: Build UserResponse for email: {}", user.getEmail());
-
-        return UserResponse.builder()
-                .id(user.getUserId().toString())
-                .email(user.getEmail())
-                .fullName(user.getFullName())
-                .role(user.getRole().name())
-                .build();
+        return userMapper.toUserResponse(user);
     }
 }
