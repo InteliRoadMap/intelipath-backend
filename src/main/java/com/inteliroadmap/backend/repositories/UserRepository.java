@@ -2,6 +2,7 @@ package com.inteliroadmap.backend.repositories;
 
 import com.inteliroadmap.backend.domain.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
@@ -14,6 +15,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     boolean existsByEmail(String email);
 
-    List<User> findTop10ByOrderByEmailAsc();
+    @Query("SELECT u FROM User u ORDER BY u.createAt DESC")
+    List<User> findAllUsers();
 
 }

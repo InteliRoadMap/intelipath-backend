@@ -5,7 +5,8 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 public enum UserRole {
     STUDENT,
     COUNSELOR,
-    MENTOR;
+    MENTOR,
+    ADMIN;
 
     @JsonCreator
     public static UserRole fromString(String value) {

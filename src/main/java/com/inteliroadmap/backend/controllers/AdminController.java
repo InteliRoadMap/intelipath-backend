@@ -1,5 +1,6 @@
 package com.inteliroadmap.backend.controllers;
 
+import com.inteliroadmap.backend.domain.dto.request.admin.UpdateUserRoleRequest;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminCourseMetricResponse;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminSystemHealthResponse;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminUserListItemResponse;
@@ -11,6 +12,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
@@ -25,6 +27,8 @@ import java.util.List;
  * - GET /admin/dashboard/metrics/courses - Get total courses metric
  * - GET /admin/dashboard/metrics/health  - Get system health metric
  * - GET /admin/dashboard/users           - Get latest users list
+ * - PATCH /admin/dashboard/users/{userId}/role - Update user role
+ * - DELETE /admin/dashboard/users/{userId}      - Delete user
  */
 @RestController
 @RequestMapping("/api/v1/admin/dashboard")
@@ -181,5 +185,106 @@ public class AdminController {
         return ResponseEntity.ok(
                 adminDashboardService.getUsers(authorizationHeader)
         );
+    }
+
+    /**
+     * PATCH /admin/dashboard/users/{userId}/role - Update a user's role.
+     *
+     * @param authorizationHeader Authorization header containing Bearer access token
+     * @param userId              User id to update
+     * @param request             Request payload containing the new role
+     * @return ResponseEntity containing updated AdminUserListItemResponse
+     */
+    @PatchMapping("/users/{userId}/role")
+    @Operation(
+            summary = "Update user role",
+            description = "Update a user's role for admin dashboard user management"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "User role updated successfully",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = AdminUserListItemResponse.class)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Invalid user id or request payload"
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized or invalid token"
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "Admin access required"
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "User not found"
+            )
+    })
+    public ResponseEntity<AdminUserListItemResponse> updateUserRole(
+            @RequestHeader("Authorization") String authorizationHeader,
+            @PathVariable String userId,
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Update user role request payload",
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = UpdateUserRoleRequest.class)
+                    )
+            )
+            @RequestBody @Valid UpdateUserRoleRequest request
+    ) {
+        log.info("Admin Dashboard Controller: Update user role request received. userId: {}", userId);
+        return ResponseEntity.ok(
+                adminDashboardService.updateUserRole(authorizationHeader, userId, request)
+        );
+    }
+
+    /**
+     * DELETE /admin/dashboard/users/{userId} - Delete a user.
+     *
+     * @param authorizationHeader Authorization header containing Bearer access token
+     * @param userId              User id to delete
+     * @return ResponseEntity with no content
+     */
+    @DeleteMapping("/users/{userId}")
+    @Operation(
+            summary = "Delete user",
+            description = "Delete a user from admin dashboard user management"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "204",
+                    description = "User deleted successfully"
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Invalid user id or admin cannot delete own account"
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized or invalid token"
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "Admin access required"
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "User not found"
+            )
+    })
+    public ResponseEntity<Void> deleteUser(
+            @RequestHeader("Authorization") String authorizationHeader,
+            @PathVariable String userId
+    ) {
+        log.info("Admin Dashboard Controller: Delete user request received. userId: {}", userId);
+        adminDashboardService.deleteUser(authorizationHeader, userId);
+        return ResponseEntity.noContent().build();
     }
 }
