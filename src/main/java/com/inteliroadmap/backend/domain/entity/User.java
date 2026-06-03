@@ -39,6 +39,7 @@ public class User {
     private String email;
 
     @Column(nullable = false)
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private String password;
 
     @Column(name = "full_name")
@@ -64,6 +65,7 @@ public class User {
     private UserStatus userStatus = UserStatus.ACTIVE;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private List<OauthAccount> oauthAccounts;
 
 //    @Column(name = "otp")
@@ -79,6 +81,7 @@ public class User {
 //    private List<OauthAccount> oauthAccounts;
 //
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private List<RefreshToken> refreshTokens;
 
     @PrePersist

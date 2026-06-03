@@ -39,7 +39,7 @@ public class RoadmapService {
         if (user == null) {
             throw new ResourceNotFoundException("User not found from token");
         }
-        Student student = studentRepository.findByStudentId(user.getUserId());
+        Student student = studentRepository.findByUser(user);
         if (student == null) {
             throw new ResourceNotFoundException("Student profile not found");
         }

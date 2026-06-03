@@ -47,7 +47,7 @@ public class StudentService {
         if (user == null) {
             throw new ResourceNotFoundException("User not found from token");
         }
-        Student student = studentRepository.findByStudentId(user.getUserId());
+        Student student = studentRepository.findByUser(user);
         if (student == null) {
             throw new ResourceNotFoundException("Student profile not found");
         }
@@ -74,12 +74,18 @@ public class StudentService {
             throw new ResourceNotFoundException("User not found");
         }
 
-        Student student = studentRepository.findByStudentId(user.getUserId());
+        Student student = studentRepository.findByUser(user);
         if (student == null) {
             student = Student.builder().user(user).build();
         }
         if (request.getUniversity() != null) student.setUniversity(request.getUniversity());
-        if (request.getYearOfAdmission() != null) student.setYearOfAdmission(LocalDate.parse(request.getYearOfAdmission()));
+        if (request.getYearOfAdmission() != null) {
+            if (request.getYearOfAdmission().trim().isEmpty()) {
+                student.setYearOfAdmission(null);
+            } else {
+                student.setYearOfAdmission(LocalDate.parse(request.getYearOfAdmission()));
+            }
+        }
         if (request.getMajor() != null) student.setMajor(request.getMajor());
 
         if (request.getCareerId() != null) {
@@ -94,6 +100,7 @@ public class StudentService {
                 .id(user.getUserId())
                 .fullName(user.getFullName())
                 .role(user.getRole().name())
+                .careerId(student.getCareerRole() != null ? student.getCareerRole().getCareerId() : null)
                 .build();
     }
 
@@ -121,6 +128,7 @@ public class StudentService {
                 .year_of_admission(student.getYearOfAdmission())
                 .major(student.getMajor())
                 .githubProfile(student.getGithubProfile())
+                .careerId(student.getCareerRole() != null ? student.getCareerRole().getCareerId() : null)
                 .build();
     }
 }

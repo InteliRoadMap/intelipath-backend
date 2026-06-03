@@ -23,6 +23,7 @@ public class StudentSkill {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "student_id", nullable = false, foreignKey = @ForeignKey(name = "fk_us_user"))
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private Student student;
 
     @ManyToOne(fetch = FetchType.LAZY)

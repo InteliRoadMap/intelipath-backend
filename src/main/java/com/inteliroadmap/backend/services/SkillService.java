@@ -42,7 +42,7 @@ public class SkillService {
         if (user == null) {
             throw new ResourceNotFoundException("User not found from token");
         }
-        Student student = studentRepository.findByStudentId(user.getUserId());
+        Student student = studentRepository.findByUser(user);
         if (student == null) {
             throw new ResourceNotFoundException("Student profile not found");
         }
@@ -99,21 +99,25 @@ public class SkillService {
 
         Student student = getAuthenticatedStudent();
 
-        List<StudentSkill> studentSkills = studentSkillRepository.findByStudent(student);
-        List<UUID> existingSkillIds = studentSkills.stream()
+        List<StudentSkill> studentSkills = new java.util.ArrayList<>(studentSkillRepository.findByStudent(student));
+        List<UUID> existingSkillIds = new java.util.ArrayList<>(studentSkills.stream()
                 .map(ss -> ss.getSkill().getSkillId())
-                .toList();
+                .toList());
 
         List<Skill> skills = request.getSkillList();
         List<StudentSkill> newSkillsToSave = new java.util.ArrayList<>();
 
         for (Skill s : skills) {
-            if (!existingSkillIds.contains(s.getSkillId())) {
-                StudentSkill newStudentSkill = StudentSkill.builder()
-                        .student(student)
-                        .skill(s)
-                        .build();
-                newSkillsToSave.add(newStudentSkill);
+            if (s.getSkillId() != null && !existingSkillIds.contains(s.getSkillId())) {
+                Skill managedSkill = skillRepository.findById(s.getSkillId()).orElse(null);
+                if (managedSkill != null) {
+                    StudentSkill newStudentSkill = StudentSkill.builder()
+                            .student(student)
+                            .skill(managedSkill)
+                            .build();
+                    newSkillsToSave.add(newStudentSkill);
+                    existingSkillIds.add(managedSkill.getSkillId()); // prevent duplicates within request
+                }
             }
         }
 
