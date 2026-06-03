@@ -1,5 +1,6 @@
 package com.inteliroadmap.backend.services;
 
+import com.inteliroadmap.backend.domain.dto.request.SetupUserProfileRequest;
 import com.inteliroadmap.backend.domain.dto.request.UserRequest;
 import com.inteliroadmap.backend.domain.dto.response.UserResponse;
 import com.inteliroadmap.backend.domain.entity.User;
@@ -11,6 +12,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+
+import java.time.LocalDate;
 
 @Service
 @RequiredArgsConstructor
@@ -68,6 +71,31 @@ public class UserService {
         }
 
         //B2: Build user response
+        return buildUserResponse(user);
+    }
+
+    @Transactional
+    public UserResponse setupUserProfile(SetupUserProfileRequest request) {
+        log.info("User Module: Setup user profile request received");
+        
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByEmail(email);
+        if (user == null) {
+            throw new ResourceNotFoundException("User not found");
+        }
+        
+        if (request.getFullName() != null) user.setFullName(request.getFullName());
+        if (request.getYob() != null) {
+            if (request.getYob().trim().isEmpty()) {
+                user.setYob(null);
+            } else {
+                user.setYob(LocalDate.parse(request.getYob()));
+            }
+        }
+        if (request.getBio() != null) user.setBio(request.getBio());
+        
+        userRepository.save(user);
+        
         return buildUserResponse(user);
     }
 

@@ -49,7 +49,9 @@ public class StudentService {
         }
         Student student = studentRepository.findByUser(user);
         if (student == null) {
-            throw new ResourceNotFoundException("Student profile not found");
+            log.info("Student profile not found. Creating a new one for user: {}", email);
+            student = Student.builder().user(user).build();
+            student = studentRepository.save(student);
         }
         return student;
     }
@@ -122,7 +124,7 @@ public class StudentService {
                 .university(student.getUniversity())
                 .year_of_admission(student.getYearOfAdmission())
                 .major(student.getMajor())
-                .githubProfile(student.getGithubProfile())
+                .githubProfile(user.getGithubProfile())
                 .careerId(student.getCareerRole() != null ? student.getCareerRole().getCareerId() : null)
                 .build();
     }

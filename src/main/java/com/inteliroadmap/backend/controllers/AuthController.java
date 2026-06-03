@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.*;
  * - POST /auth/login    - Login with email and password
  */
 @RestController
-@RequestMapping("/api/v1/auth")
+@RequestMapping("/auth")
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Authentication", description = "Register and Login endpoints")
