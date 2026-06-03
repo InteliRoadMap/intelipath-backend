@@ -156,11 +156,6 @@ public class OAuth2UserService extends DefaultOAuth2UserService {
             changed = true;
         }
 
-        if (user.getGithubProfile() == null && userInfo.getHtmlUrl() != null) {
-            user.setGithubProfile(userInfo.getHtmlUrl());
-            changed = true;
-        }
-
         if (!changed) {
             log.debug("No OAuth2 profile update needed for user: {}", user.getEmail());
             return user;

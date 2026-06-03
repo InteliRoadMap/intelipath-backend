@@ -1,14 +1,10 @@
 package com.inteliroadmap.backend.services;
 
-import com.inteliroadmap.backend.domain.dto.request.*;
+import com.inteliroadmap.backend.domain.dto.request.RefreshRequest;
 import com.inteliroadmap.backend.domain.dto.response.RefreshResponse;
-import com.inteliroadmap.backend.domain.dto.response.RegisterResponse;
-import com.inteliroadmap.backend.domain.dto.response.UserResponse;
 import com.inteliroadmap.backend.domain.entity.RefreshToken;
 import com.inteliroadmap.backend.domain.entity.User;
-import com.inteliroadmap.backend.domain.enums.UserStatus;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
-import com.inteliroadmap.backend.mappers.UserMapper;
 import com.inteliroadmap.backend.repositories.RefreshTokenRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.security.JwtService;
@@ -28,111 +24,38 @@ public class AuthService {
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
     private final JwtService jwtService;
-    private final UserMapper userMapper;
-
-    /**
-     * Register new student account
-     *
-     * @param registerRequest RegisterRequest containing email, password, fullName
-     * @return UserResponse containing JWT token and user info
-     * @throws ResourceNotFoundException if email already exists
-     */
-    @Transactional
-    public RegisterResponse registerAccount(RegisterRequest registerRequest) {
-        log.info("Register Module: Register request received for email: {}", registerRequest.getEmail());
-
-        //B1: Check duplicate email registration
-        if (userRepository.existsByEmail(registerRequest.getEmail())) {
-            log.warn("Register Module: Email already in use: {}", registerRequest.getEmail());
-            throw new ResourceNotFoundException("Email already in use");
-        }
-
-        //B2: Build User entity from request
-        User user = userMapper.toEntity(registerRequest);
-        userRepository.save(user);
-        log.info("Register Module: User registered successfully: {}", registerRequest.getEmail());
-
-        return userMapper.toRegisterResponse(user);
-    }
-
-    /**
-     * Authenticate user using email and password
-     *
-     * Validation:
-     * 1. Verify email exists in database
-     * 2. Verify password matches encoded password
-     * 3. Verify account is not suspended
-     *
-     * @param loginRequest LoginRequest containing email and password
-     * @return UserResponse containing JWT token and user info
-     * @throws ResourceNotFoundException if email not found, wrong password, or account suspended
-     */
-    @Transactional
-    public UserResponse loginAccount(LoginRequest loginRequest) {
-        log.info("Login Module: Login request received for email: {}", loginRequest.getEmail());
-
-        //B1: Find user bt email
-        User user = userRepository.findByEmail(loginRequest.getEmail());
-        if  (user == null) {
-            log.warn("Login Module: User not found: {}", loginRequest.getEmail());
-            throw new ResourceNotFoundException("User not found");
-        }
-
-        // B2: Verify password against BCrypt encoded
-        // Password logic removed as the User entity no longer has a password property
-        // if (!passwordEncoder.matches(loginRequest.getPassword(), user.getPassword())) {
-        //     log.warn("Login Module: Passwords don't match");
-        //     throw new ResourceNotFoundException("Passwords don't match");
-        // }
-
-        //B3: Prevent suspended account
-        if (user.getUserStatus() == UserStatus.SUSPENDED) {
-            log.warn("Login Module: User is Suspended");
-            throw new ResourceNotFoundException("User is Suspended");
-        }
-
-        log.info("Login Module: User prepare to create Refresh token");
-        createAndSaveRefreshToken(user);
-        return buildAuthResponse(user);
-
-    }
 
     @Transactional
-    public RefreshResponse  refreshAccount(RefreshRequest refreshRequest) {
+    public RefreshResponse refreshAccount(RefreshRequest refreshRequest) {
         log.info("Refresh access token");
         String refreshToken = refreshRequest.getRefreshToken();
-        //B1: Check refresh token exists in DB
+
         RefreshToken storedToken = refreshTokenRepository.findByToken(refreshToken);
         if (storedToken == null) {
             log.warn("Refresh token not found");
             throw new ResourceNotFoundException("Refresh token not found");
         }
 
-        //B2: Check expired in DB
-        if (storedToken.getExpireAt().isBefore(LocalDateTime.now())){
+        if (storedToken.getExpireAt().isBefore(LocalDateTime.now())) {
             log.warn("Refresh token expired");
-            if (refreshTokenRepository.deleteByToken(refreshToken)){
+            if (refreshTokenRepository.deleteByToken(refreshToken)) {
                 log.warn("Refresh token deleted successfully");
             }
             throw new ResourceNotFoundException("Refresh token expired");
         }
 
-        //B3: Check JWT token is valid
         if (!jwtService.isTokenValid(refreshToken)) {
             log.warn("Refresh token invalid");
             throw new ResourceNotFoundException("Refresh token invalid");
         }
 
-        //B4: Check user from refresh token
         String email = jwtService.extractEmail(refreshToken);
-
         User user = userRepository.findByEmail(email);
         if (user == null) {
             log.warn("Refresh Module: User not found: {}", email);
             throw new ResourceNotFoundException("User not found");
         }
 
-        //B5: Generate new access token
         String newAccessToken = jwtService.generateAccessToken(
                 user.getEmail(),
                 user.getRole().name()
@@ -141,39 +64,13 @@ public class AuthService {
         LocalDateTime expiresIn = LocalDateTime.now().plus(Duration.ofMillis(jwtService.getAccessExpiration()));
 
         return refreshResponse(newAccessToken, expiresIn);
-
     }
 
-    /**
-     * Build UserResponse DTO from authenticated User entity
-     * @param user Authenticated User entity
-     * @return UserResponse containing JWT token and user info
-     */
-    public UserResponse buildAuthResponse(User user) {
-        log.info("Build Auth Response for email: {}", user.getEmail());
-        return userMapper.toAuthResponse(user);
-    }
-
-   private RefreshResponse refreshResponse(String accessToken, LocalDateTime expiresIn) {
+    private RefreshResponse refreshResponse(String accessToken, LocalDateTime expiresIn) {
         log.info("Refresh access token");
         return RefreshResponse.builder()
                 .accessToken(accessToken)
                 .expiresIn(String.valueOf(expiresIn))
                 .build();
-
-   }
-
-    private void createAndSaveRefreshToken(User user) {
-        log.info("Create and Save Refresh token for user: {}", user.getEmail());
-        String refreshToken = jwtService.generateRefreshToken(user.getEmail());
-        RefreshToken token = RefreshToken.builder()
-                .token(refreshToken)
-                .user(user)
-                .expireAt(
-                        LocalDateTime.now()
-                                .plus(Duration.ofMillis(jwtService.getRefreshExpiration()))
-                )
-                .build();
-        refreshTokenRepository.save(token);
     }
 }

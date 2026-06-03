@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.*;
  * - POST /user/profile - Get user info by email
  */
 @RestController
-@RequestMapping("/api/v1/user")
+@RequestMapping("/user")
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Info User", description = "User information endpoints")
@@ -58,11 +58,9 @@ public class UserController {
                     description = "User not found"
             )
     })
-    public ResponseEntity<UserResponse> getCurrentUser(
-            @RequestHeader("Authorization") String authorizationHeader
-    ) {
+    public ResponseEntity<UserResponse> getCurrentUser() {
         log.info("Current user info request received");
-        return ResponseEntity.ok(userService.getCurrentUser(authorizationHeader));
+        return ResponseEntity.ok(userService.getCurrentUser());
     }
 
     /**
@@ -71,7 +69,7 @@ public class UserController {
      * @param userRequest UserRequest containing user email
      * @return ResponseEntity containing UserResponse
      */
-    @PostMapping("/profile")
+    @PostMapping("/by-email")
     @Operation(
             summary = "Get user info by email",
             description = "Get user information using email"
@@ -107,5 +105,14 @@ public class UserController {
     ) {
         log.info("User info request received for email: {}", userRequest.getEmail());
         return ResponseEntity.ok(userService.getUserByEmail(userRequest));
+    }
+
+    @PatchMapping("/profile")
+    @Operation(summary = "Setup user profile")
+    public ResponseEntity<UserResponse> setupUserProfile(
+            @RequestBody @Valid com.inteliroadmap.backend.domain.dto.request.SetupUserProfileRequest request
+    ) {
+        log.info("User profile setup request received");
+        return ResponseEntity.ok(userService.setupUserProfile(request));
     }
 }

@@ -31,6 +31,7 @@ public class GitHubOauth2UserInfo extends OAuth2UserInfoInternal {
         return (String) attributes.get("bio");
     }
 
+    //GitHub account url
     @Override
     public String getHtmlUrl() {
         return (String) attributes.get("html_url");

@@ -14,6 +14,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@com.fasterxml.jackson.annotation.JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class SkillNode {
 
     @Id
@@ -41,6 +42,7 @@ public class SkillNode {
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "resource", columnDefinition = "jsonb")
-    private String resource;
+    private Object resource;
 }

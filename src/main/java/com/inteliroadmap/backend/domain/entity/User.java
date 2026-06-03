@@ -32,29 +32,16 @@ public class User {
     @Column(name = "user_id")
     private UUID userId;
 
-//    @Column(nullable = false)
-//    private String password;
+    @Column(nullable = false, unique = true)
+    private String email;
 
     @Column(name = "full_name")
     private String fullName;
-
-    @Column(nullable = false, unique = true)
-    private String email;
 
     private LocalDate yob;
 
     @Column(columnDefinition = "TEXT")
     private String bio;
-
-    @Column(name = "github_profile")
-    private String githubProfile;
-
-    private String university;
-
-    @Column(name = "year_of_admission")
-    private LocalDate yearOfAdmission;
-
-    private String major;
 
     @Column(name = "create_at")
     private LocalDateTime createAt;
@@ -70,7 +57,11 @@ public class User {
     @Column(name = "account_status")
     private UserStatus userStatus = UserStatus.ACTIVE;
 
+    @Column(name = "github_profile")
+    private String githubProfile;
+
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private List<OauthAccount> oauthAccounts;
 
 //    @Column(name = "otp")
@@ -86,6 +77,7 @@ public class User {
 //    private List<OauthAccount> oauthAccounts;
 //
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private List<RefreshToken> refreshTokens;
 
     @PrePersist

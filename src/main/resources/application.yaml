@@ -2,6 +2,9 @@ spring:
   application:
     name: InteliPath
 
+  config:
+    import: optional:file:.env[.properties]
+
   profiles:
     active: prod
 

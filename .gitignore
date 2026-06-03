@@ -303,4 +303,9 @@ dist
 .history
 .ionide
 
+# Data inject into Database
+RoadmapDataTemplate.csv
+SkillDataTemplate.csv
+CareerDataTemplate.csv
+
 # End of https://www.toptal.com/developers/gitignore/api/intellij,netbeans,visualstudiocode,maven,node
