@@ -3,14 +3,11 @@ package com.inteliroadmap.backend.controllers;
 import com.inteliroadmap.backend.domain.dto.request.LoginRequest;
 import com.inteliroadmap.backend.domain.dto.request.RefreshRequest;
 import com.inteliroadmap.backend.domain.dto.request.RegisterRequest;
-import com.inteliroadmap.backend.domain.dto.request.ForgotPasswordRequest;
-import com.inteliroadmap.backend.domain.dto.request.ResetPasswordRequest;
 import com.inteliroadmap.backend.domain.dto.response.RefreshResponse;
 import com.inteliroadmap.backend.domain.dto.response.RegisterResponse;
-import com.inteliroadmap.backend.domain.dto.response.ForgotPasswordResponse;
 import com.inteliroadmap.backend.domain.dto.response.UserResponse;
-import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.services.AuthService;
+import com.inteliroadmap.backend.services.OAuth2UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -30,13 +27,14 @@ import org.springframework.web.bind.annotation.*;
  * - POST /auth/login    - Login with email and password
  */
 @RestController
-@RequestMapping("/auth")
+@RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Authentication", description = "Register and Login endpoints")
 public class AuthController {
 
     private final AuthService authService;
+    private final OAuth2UserService oAuth2UserService;
 
     /**
      * POST /auth/register - Register new student account
@@ -169,82 +167,4 @@ public class AuthController {
         );
     }
 
-    /**
-     * POST /auth/forgot-password - Initiate password reset flow
-     * @param request ForgotPasswordRequest containing email
-     * @return ResponseEntity containing ForgotPasswordResponse
-     */
-    @PostMapping("/forgot-password")
-    @Operation(
-            summary = "Forgot password",
-            description = "Initiates password reset by sending an OTP to the user's email"
-    )
-    @ApiResponses(value = {
-            @ApiResponse(
-                    responseCode = "200",
-                    description = "OTP sent successfully",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ForgotPasswordResponse.class)
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "404",
-                    description = "Email not found"
-            )
-    })
-    public ResponseEntity<ForgotPasswordResponse> forgotPassword(
-            @io.swagger.v3.oas.annotations.parameters.RequestBody(
-                    description = "Forgot password request payload",
-                    required = true,
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ForgotPasswordRequest.class)
-                    )
-            )
-            @RequestBody @Valid ForgotPasswordRequest request
-    ) {
-        log.info("Forgot password request received for email: {}", request.getEmail());
-        return ResponseEntity.ok(authService.forgotPassword(request));
-    }
-
-    /**
-     * POST /auth/reset-password - Complete password reset flow
-     * @param request ResetPasswordRequest containing email, OTP, and new password
-     * @return ResponseEntity containing UserResponse (auto-login after reset)
-     */
-    @PostMapping("/reset-password")
-    @Operation(
-            summary = "Reset password",
-            description = "Completes password reset using OTP and returns new access tokens"
-    )
-    @ApiResponses(value = {
-            @ApiResponse(
-                    responseCode = "200",
-                    description = "Password reset successful",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = UserResponse.class)
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "404",
-                    description = "Email not found, or OTP invalid/expired"
-            )
-    })
-    public ResponseEntity<UserResponse> resetPassword(
-            @io.swagger.v3.oas.annotations.parameters.RequestBody(
-                    description = "Reset password request payload",
-                    required = true,
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = ResetPasswordRequest.class)
-                    )
-            )
-
-            @RequestBody @Valid ResetPasswordRequest request
-    ) {
-        log.info("Reset password request received for email: {}", request.getEmail());
-        return ResponseEntity.ok(authService.resetPassword(request));
-    }
 }
