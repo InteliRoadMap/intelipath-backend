@@ -114,8 +114,13 @@ public class OAuth2UserService extends DefaultOAuth2UserService {
      * @return the saved User entity
      */
     private User registerNewOAuth2User(OAuth2UserInfoInternal oAuth2UserInfoInternal) {
+        String email = oAuth2UserInfoInternal.getEmail();
+        String generatedUsername = email.split("@")[0] + "_" + java.util.UUID.randomUUID().toString().substring(0, 5);
+        
         User user = User.builder()
-                .email(oAuth2UserInfoInternal.getEmail())
+                .email(email)
+                .username(generatedUsername)
+                .password(java.util.UUID.randomUUID().toString())
                 .fullName(oAuth2UserInfoInternal.getFullName())
                 .bio(oAuth2UserInfoInternal.getBio())
                 .role(UserRole.STUDENT)
