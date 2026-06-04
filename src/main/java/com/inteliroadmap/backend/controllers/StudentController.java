@@ -135,33 +135,34 @@ public class StudentController {
     }
 
     /**
-     * Retrieves a list of available skills filtered by a search query matching category or career.
+     * Retrieves a list of available skills filtered by a search query matching name or career.
      *
-     * @param search The query string to search by (category or career)
+     * @param search The query string to search by (name or career)
      * @return ResponseEntity containing a list of matching skills
      */
     @GetMapping("/skills/{search}")
     @Operation(
-            summary = "Search skills by category",
-            description = "Search skills by category"
+            summary = "Search skills by name or career",
+            description = "Search skills by name or career"
     )
     @ApiResponses(value = {
             @ApiResponse(
                     responseCode = "200",
-                    description = "Search skills by category successful",
+                    description = "Search skills by name or career successful",
                     content = @Content(
                             mediaType = "application/json",
                             schema = @Schema(implementation = SkillResponse.class)
                     )
             ),
             @ApiResponse(
-                    responseCode = "404",
-                    description = "{category} skills not found"
+                    responseCode = "403",
+                    description = "Unauthorized Access",
+                    content = @Content
             )
     })
     public ResponseEntity<SkillResponse> searchSkills(@PathVariable String search) {
         log.info("Fetching skills for search query: {}", search);
-        // Delegate to SkillService to fetch skills by category or career
+        // Delegate to SkillService to fetch skills by name or career
         return ResponseEntity.ok(skillService.searchSkills(search));
     }
 

@@ -68,9 +68,9 @@ public class SkillService {
     }
 
     /**
-     * Fetches all available skills in the system that match the search query in their category or career.
+     * Fetches all available skills in the system that match the search query in their name or career.
      *
-     * @param search The search string to filter by (e.g., "Frontend", "Backend", "Core")
+     * @param search The search string to filter by
      * @return SkillResponse containing the list of matching skills
      */
     @Transactional
@@ -79,7 +79,7 @@ public class SkillService {
 
         List<Skill> skills =
                 skillRepository
-                        .findByCategoryContainingIgnoreCaseOrCareerContainingIgnoreCase(search, search);
+                        .findBySkillNameContainingIgnoreCaseOrCareerContainingIgnoreCase(search, search);
 
         return SkillResponse.builder()
                 .skills(skills)
