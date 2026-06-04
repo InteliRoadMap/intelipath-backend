@@ -1,13 +1,55 @@
 spring:
+  application:
+    name: InteliPath
+
+  profiles:
+    active: prod
+
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
-    driver-class-name: org.postgresql.Driver
+    # HikariCP: Connection Pool giúp quản lý kết nối DB
+    hikari:
+      # 5 connection idle
+      minimum-idle: 5
+      # 10 * 60 * 1000 = 10M : If idle over 10m Hikari will close connection
+      idle-timeout: 600000
+      # 18 * 60 * 1000 = 30M : Hikari will replace by new connection
+      max-lifetime: 1800000
+      # 3 * 1000 = 30ML : Time to give new connection for app
+      connection-timeout: 30000
+
   jpa:
     hibernate:
       ddl-auto: update
-    show-sql: true
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${CLIENT_ID_GOOGLE}
+            client-secret: ${CLIENT_SECRET_GOOGLE}
+            scope:
+              - email
+              - profile
+          github:
+            client-id: ${CLIENT_ID_GITHUB}
+            client-secret: ${CLIENT_SECRET_GITHUB}
+            scope:
+              - user:email
+              - read:user
+
+jwt:
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION:86400000}
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+  api-docs:
+    path: /v3/api-docs

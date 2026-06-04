@@ -8,6 +8,7 @@ public class IntelipathBackendApplication {
 
     public static void main(String[] args) {
         SpringApplication.run(IntelipathBackendApplication.class, args);
+        System.out.println("Intelipath Backend Application Started");
     }
 
 }
