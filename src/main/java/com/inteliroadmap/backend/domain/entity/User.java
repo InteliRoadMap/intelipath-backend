@@ -57,18 +57,9 @@ public class User {
     @Column(name = "account_status")
     private UserStatus userStatus = UserStatus.ACTIVE;
 
-    @Column(name = "github_profile")
-    private String githubProfile;
-
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
     @com.fasterxml.jackson.annotation.JsonIgnore
     private List<OauthAccount> oauthAccounts;
-
-//    @Column(name = "otp")
-//    private String otp;
-//
-//    @Column(name = "otp_expiry")
-//    private LocalDateTime otpExpiry;
 
 //    // 1 User có nhiều records ở bảng con
 //    // mappedBy = tên field trong class con trỏ ngược lại User

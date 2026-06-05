@@ -91,11 +91,37 @@ public class StudentService {
                 student.setCareerRole(career);
             }
         }
+        
+        boolean userChanged = false;
+        if (request.getBio() != null) {
+            user.setBio(request.getBio());
+            userChanged = true;
+        }
+        if (request.getYob() != null) {
+            if (request.getYob().trim().isEmpty()) {
+                user.setYob(null);
+            } else {
+                user.setYob(LocalDate.parse(request.getYob()));
+            }
+            userChanged = true;
+        }
+
+        if (userChanged) {
+            userRepository.save(user);
+        }
+
         studentRepository.save(student);
 
         return StudentResponse.builder()
-                .id(user.getUserId())
+                .id(student.getStudentId())
                 .fullName(user.getFullName())
+                .email(user.getEmail())
+                .yob(user.getYob())
+                .bio(user.getBio())
+                .university(student.getUniversity())
+                .yearOfAdmission(student.getYearOfAdmission())
+                .major(student.getMajor())
+                .githubProfile(student.getGithubProfile())
                 .role(user.getRole().name())
                 .careerId(student.getCareerRole() != null ? student.getCareerRole().getCareerId() : null)
                 .build();
@@ -122,9 +148,9 @@ public class StudentService {
                 .yob(user.getYob())
                 .bio(user.getBio())
                 .university(student.getUniversity())
-                .year_of_admission(student.getYearOfAdmission())
+                .yearOfAdmission(student.getYearOfAdmission())
                 .major(student.getMajor())
-                .githubProfile(user.getGithubProfile())
+                .githubProfile(student.getGithubProfile())
                 .careerId(student.getCareerRole() != null ? student.getCareerRole().getCareerId() : null)
                 .build();
     }

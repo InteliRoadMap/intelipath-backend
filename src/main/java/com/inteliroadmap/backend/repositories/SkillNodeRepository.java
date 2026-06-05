@@ -9,6 +9,6 @@ import java.util.UUID;
 
 @Repository
 public interface SkillNodeRepository extends JpaRepository<SkillNode, UUID> {
-    SkillNode findByName(String name);
+    SkillNode findByNodeName(String nodeName);
     List<SkillNode> findByCareerRole_CareerId(UUID careerId);
 }

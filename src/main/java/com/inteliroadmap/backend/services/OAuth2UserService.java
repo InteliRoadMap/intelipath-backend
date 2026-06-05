@@ -10,6 +10,8 @@ import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.repositories.OauthAccountRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.security.CustomOAuth2User;
+import com.inteliroadmap.backend.repositories.StudentRepository;
+import com.inteliroadmap.backend.domain.entity.Student;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
@@ -27,6 +29,7 @@ public class OAuth2UserService extends DefaultOAuth2UserService {
 
     private final UserRepository userRepository;
     private final OauthAccountRepository oauthAccountRepository;
+    private final StudentRepository studentRepository;
 
     /**
      * Loads user info from OAuth2 provider and creates or updates local user data.
@@ -82,12 +85,17 @@ public class OAuth2UserService extends DefaultOAuth2UserService {
                 .email(userInfo.getEmail())
                 .fullName(userInfo.getFullName())
                 .bio(userInfo.getBio())
-                .githubProfile(userInfo.getHtmlUrl())
                 .role(UserRole.STUDENT)
                 .build();
 
         User savedUser = userRepository.save(user);
         log.info("Created new OAuth2 user with id: {}, email: {}", savedUser.getUserId(), savedUser.getEmail());
+
+        Student student = Student.builder()
+                .user(savedUser)
+                .githubProfile(userInfo.getHtmlUrl())
+                .build();
+        studentRepository.save(student);
 
         return savedUser;
     }

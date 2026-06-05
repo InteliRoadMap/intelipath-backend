@@ -162,7 +162,9 @@ public class StudentController {
     })
     public ResponseEntity<SkillResponse> searchSkills(@PathVariable String search) {
         log.info("Fetching skills for search query: {}", search);
-        // Delegate to SkillService to fetch skills by name or career
+        if ("all".equalsIgnoreCase(search)) {
+            return ResponseEntity.ok(skillService.searchSkills(""));
+        }
         return ResponseEntity.ok(skillService.searchSkills(search));
     }
 

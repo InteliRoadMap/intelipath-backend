@@ -26,18 +26,22 @@ public class SkillNode {
     @JoinColumn(name = "career_id", nullable = false, foreignKey = @ForeignKey(name = "fk_sn_career"))
     private CareerRole careerRole;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "prerequisite", foreignKey = @ForeignKey(name = "fk_sn_prerequisite"))
-    private SkillNode prerequisite;
+    @Column(name = "subtree_name")
+    private String subtreeName;
 
-    @Column(name = "name", nullable = false)
-    private String name;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "connect_to", foreignKey = @ForeignKey(name = "fk_sn_connect_to"))
+    private SkillNode connectTo;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "child_node_of", foreignKey = @ForeignKey(name = "fk_sn_child_node_of"))
+    private SkillNode childNodeOf;
+
+    @Column(name = "node_name", nullable = false)
+    private String nodeName;
 
     @Column(name = "level")
     private Integer level;
-
-    @Column(name = "order_index")
-    private Integer orderIndex;
 
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
