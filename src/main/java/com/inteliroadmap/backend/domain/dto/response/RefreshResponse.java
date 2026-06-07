@@ -9,5 +9,6 @@ import lombok.Data;
 public class RefreshResponse {
 
     private String accessToken;
+    private String refreshToken;
     private String expiresIn;
 }

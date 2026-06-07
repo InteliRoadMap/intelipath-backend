@@ -28,19 +28,19 @@ public class DatabaseSeeder implements CommandLineRunner {
     private final SkillRepository skillRepository;
     private final CareerRequiredSkillRepository careerRequiredSkillRepository;
 
-    private static final String ROADMAP_TEMPLATE = "RoadmapDataTemplate.csv";
-    private static final String SKILL_TEMPLATE = "SkillDataTemplate.csv";
-    private static final String CAREER_TEMPLATE = "CareerDataTemplate.csv";
+    private static final String ROADMAP_TEMPLATE = "src/main/java/com/inteliroadmap/backend/RoadmapDataTemplate.csv";
+    private static final String SKILL_TEMPLATE = "src/main/java/com/inteliroadmap/backend/data/SkillDataTemplate.csv";
+    private static final String CAREER_TEMPLATE = "src/main/java/com/inteliroadmap/backend/data/CareerDataTemplate.csv";
 
     @Override
     public void run(String... args) throws Exception {
         log.info("=====================================================");
         log.info(" CHECKING DATABASE SEED DATA... ");
-        
+
         importCareerDataTemplate();
         importRoadmapDataTemplate();
         importSkillDataTemplate();
-        
+
         log.info("=====================================================");
         log.info(" SEEDING SUMMARY NOTIFICATION ");
         log.info(" - Career Roles loaded: {}", careerRoleRepository.count());
@@ -66,7 +66,7 @@ public class DatabaseSeeder implements CommandLineRunner {
         try (CSVReader reader = new CSVReader(new FileReader(csvFile))) {
             String[] line;
             int rowNum = 0;
-            
+
             java.util.Map<String, SkillNode> nodeMap = new HashMap<>();
 
             while ((line = reader.readNext()) != null) {
@@ -86,25 +86,24 @@ public class DatabaseSeeder implements CommandLineRunner {
                     careerRole = existingRole;
                 }
 
-                String prerequisite = line[1];
-                String name = line[2];
-                int level = Integer.parseInt(line[3]);
-                int orderIndex = Integer.parseInt(line[4]);
-                String resourceTitle = line[5];
+                String subtreeName = line[1];
+                String connectToName = line[2];
+                String childNodeOfName = line[3];
+                String nodeName = line[4];
+                String levelStr = line[5];
+                Integer level = levelStr.isEmpty() ? null : Integer.parseInt(levelStr);
                 String description = line[6];
-                String reference1 = line.length > 7 ? line[7] : "";
-                String reference2 = line.length > 8 ? line[8] : "";
-                String reference3 = line.length > 9 ? line[9] : "";
+                String link1 = line.length > 7 ? line[7] : "";
+                String link2 = line.length > 8 ? line[8] : "";
+                String link3 = line.length > 9 ? line[9] : "";
 
                 Map<String, String> resourceItem = new HashMap<>();
-                if (!resourceTitle.isEmpty()) resourceItem.put("title", resourceTitle);
-                if (!description.isEmpty()) resourceItem.put("description", description);
-                if (!reference1.isEmpty()) resourceItem.put("ref1", reference1);
-                if (!reference2.isEmpty()) resourceItem.put("ref2", reference2);
-                if (!reference3.isEmpty()) resourceItem.put("ref3", reference3);
+                if (!link1.isEmpty()) resourceItem.put("link1", link1);
+                if (!link2.isEmpty()) resourceItem.put("link2", link2);
+                if (!link3.isEmpty()) resourceItem.put("link3", link3);
 
-                if (nodeMap.containsKey(name)) {
-                    SkillNode existingNode = nodeMap.get(name);
+                if (nodeMap.containsKey(nodeName)) {
+                    SkillNode existingNode = nodeMap.get(nodeName);
                     java.util.List<Map<String, String>> resourcesList = (java.util.List<Map<String, String>>) existingNode.getResource();
                     resourcesList.add(resourceItem);
                     skillNodeRepository.save(existingNode);
@@ -112,26 +111,35 @@ public class DatabaseSeeder implements CommandLineRunner {
                     java.util.List<Map<String, String>> resourcesList = new java.util.ArrayList<>();
                     resourcesList.add(resourceItem);
 
-                    SkillNode prereqNode = null;
-                    if (!prerequisite.isEmpty()) {
-                        prereqNode = nodeMap.get(prerequisite);
-                        if (prereqNode == null) {
-                            prereqNode = skillNodeRepository.findByName(prerequisite);
+                    SkillNode connectToNode = null;
+                    if (!connectToName.isEmpty()) {
+                        connectToNode = nodeMap.get(connectToName);
+                        if (connectToNode == null) {
+                            connectToNode = skillNodeRepository.findByNodeName(connectToName);
+                        }
+                    }
+
+                    SkillNode childNodeOfNode = null;
+                    if (!childNodeOfName.isEmpty()) {
+                        childNodeOfNode = nodeMap.get(childNodeOfName);
+                        if (childNodeOfNode == null) {
+                            childNodeOfNode = skillNodeRepository.findByNodeName(childNodeOfName);
                         }
                     }
 
                     SkillNode skillNode = SkillNode.builder()
                             .careerRole(careerRole)
-                            .prerequisite(prereqNode)
-                            .name(name)
+                            .subtreeName(subtreeName)
+                            .connectTo(connectToNode)
+                            .childNodeOf(childNodeOfNode)
+                            .nodeName(nodeName)
                             .level(level)
-                            .orderIndex(orderIndex)
                             .description(description)
                             .resource(resourcesList)
                             .build();
-                    
+
                     skillNode = skillNodeRepository.save(skillNode);
-                    nodeMap.put(name, skillNode);
+                    nodeMap.put(nodeName, skillNode);
                 }
             }
             log.info("CSV Import for Roadmap completed successfully.");
@@ -183,7 +191,7 @@ public class DatabaseSeeder implements CommandLineRunner {
                 String importanceLevel = line[3];
 
                 CareerRole role = careerRoleRepository.findByCareerName(careerRequired);
-                
+
                 if (role != null) {
                     CareerRequiredSkill careerRequiredSkill = CareerRequiredSkill.builder()
                             .careerRole(role)
@@ -223,18 +231,21 @@ public class DatabaseSeeder implements CommandLineRunner {
                 // Skip the header row
                 if (rowNum <= 1) continue;
 
-                if (line.length < 2) continue;
+                if (line.length < 1) continue;
 
                 String careerName = line[0];
-                String description = line[1];
+                String prerequisite = line.length > 1 ? line[1] : "";
+                String description = line.length > 2 ? line[2] : "";
 
                 CareerRole careerRole = careerRoleRepository.findByCareerName(careerName);
                 if (careerRole == null) {
                     careerRole = CareerRole.builder()
                             .careerName(careerName)
+                            .prerequisite(prerequisite)
                             .description(description)
                             .build();
                 } else {
+                    careerRole.setPrerequisite(prerequisite);
                     careerRole.setDescription(description);
                 }
                 careerRoleRepository.save(careerRole);

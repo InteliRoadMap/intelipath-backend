@@ -22,11 +22,11 @@ public class CareerRequiredSkill {
     private UUID skillRequiredId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "career_id", nullable = false, foreignKey = @ForeignKey(name = "fk_rrs_career"))
+    @JoinColumn(name = "career_id", nullable = false, foreignKey = @ForeignKey(name = "fk_crs_career"))
     private CareerRole careerRole;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "skill_id", nullable = false, foreignKey = @ForeignKey(name = "fk_rrs_skill"))
+    @JoinColumn(name = "skill_id", nullable = false, foreignKey = @ForeignKey(name = "fk_crs_skill"))
     private Skill skill;
 
     @Column(name = "importance_level")

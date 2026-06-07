@@ -18,6 +18,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -124,8 +125,14 @@ public class AdminDashboardService {
 
     private User findUserById(String userId) {
         try {
-            return userRepository.findById(UUID.fromString(userId))
-                    .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+            UUID id = UUID.fromString(userId);
+            Optional<User> userOptional = userRepository.findById(id);
+
+            if (userOptional.isEmpty()) {
+                throw new ResourceNotFoundException("User not found");
+            }
+
+            return userOptional.get();
         } catch (IllegalArgumentException e) {
             throw new ResourceNotFoundException("Invalid user id");
         }

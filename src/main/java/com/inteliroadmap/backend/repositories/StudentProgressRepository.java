@@ -15,5 +15,9 @@ public interface StudentProgressRepository extends JpaRepository<StudentProgress
 
     List<StudentProgress> findByStudent(Student student);
 
+    List<StudentProgress> findByStudent_StudentId(UUID studentId);
+
+    List<StudentProgress> findByStudent_StudentIdAndSkillNode_NodeIdIn(UUID studentId, List<UUID> nodeIds);
+
     java.util.Optional<StudentProgress> findByStudentAndSkillNode(Student student, SkillNode skillNode);
 }

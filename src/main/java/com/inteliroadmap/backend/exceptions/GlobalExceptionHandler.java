@@ -7,13 +7,16 @@ import lombok.NoArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.FieldError;
+import org.springframework.validation.ObjectError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.context.request.WebRequest;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 @RestControllerAdvice
@@ -63,16 +66,43 @@ public class GlobalExceptionHandler {
             validationErrors.put(fieldName, errorMessage);
         });
 
+        String message = "Validation failed";
+        List<ObjectError> errors = exception.getBindingResult().getAllErrors();
+        if (!errors.isEmpty() && errors.getFirst().getDefaultMessage() != null) {
+            message = errors.getFirst().getDefaultMessage();
+        }
+
         ErrorResponse errorResponse = ErrorResponse.builder()
                 .timestamp(LocalDateTime.now())
                 .status(HttpStatus.BAD_REQUEST.value())
                 .error("VALIDATION_ERROR")
-                .message("Validation failed")
+                .message(message)
                 .details(validationErrors.toString())
                 .path(request.getDescription(false).replace("uri=", ""))
                 .build();
 
         return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+    }
+
+    /**
+     * Handles invalid or expired refresh tokens.
+     *
+     * @param exception invalid refresh token exception
+     * @param request current request
+     * @return JSON error response with HTTP 401
+     */
+    @ExceptionHandler(ResponseStatusException.class)
+    public ResponseEntity<ErrorResponse> handleResponseStatusException(
+            ResponseStatusException exception, WebRequest request) {
+        ErrorResponse errorResponse = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(exception.getStatusCode().value())
+                .error(exception.getStatusCode().toString())
+                .message(exception.getReason())
+                .path(request.getDescription(false).replace("uri=", ""))
+                .build();
+
+        return new ResponseEntity<>(errorResponse, exception.getStatusCode());
     }
 
     /**

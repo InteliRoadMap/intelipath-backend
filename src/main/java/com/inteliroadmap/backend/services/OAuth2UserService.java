@@ -131,7 +131,6 @@ public class OAuth2UserService extends DefaultOAuth2UserService {
                 .email(userInfo.getEmail())
                 .fullName(userInfo.getFullName())
                 .bio(userInfo.getBio())
-                .githubProfile(userInfo.getHtmlUrl())
                 .role(UserRole.STUDENT)
                 .build();
 

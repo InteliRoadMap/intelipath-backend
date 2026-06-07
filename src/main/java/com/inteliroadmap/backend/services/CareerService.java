@@ -11,6 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
@@ -39,8 +40,12 @@ public class CareerService {
     public CareerResponse getCareerRequirements(UUID careerId) {
         log.info("Career Module: Fetching requirements for career ID: {}", careerId);
 
-        CareerRole careerRole = careerRoleRepository.findById(careerId)
-                .orElseThrow(() -> new ResourceNotFoundException("Career role not found"));
+        Optional<CareerRole> careerRoleOptional = careerRoleRepository.findById(careerId);
+        if (careerRoleOptional.isEmpty()) {
+            throw new ResourceNotFoundException("Career role not found");
+        }
+
+        CareerRole careerRole = careerRoleOptional.get();
 
         List<SkillNode> nodes = skillNodeRepository.findByCareerRole_CareerId(careerId);
 

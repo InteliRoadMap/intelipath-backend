@@ -23,11 +23,11 @@ public class StudentProgress {
     private UUID progressId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "student_id", nullable = false, foreignKey = @ForeignKey(name = "fk_up_student"))
+    @JoinColumn(name = "student_id", nullable = false, foreignKey = @ForeignKey(name = "fk_sp_student"))
     private Student student;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "node_id", nullable = false, foreignKey = @ForeignKey(name = "fk_up_node"))
+    @JoinColumn(name = "node_id", nullable = false, foreignKey = @ForeignKey(name = "fk_sp_node"))
     private SkillNode skillNode;
 
     @Column(name = "status", nullable = false)

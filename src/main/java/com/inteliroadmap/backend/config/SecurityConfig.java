@@ -42,11 +42,10 @@ public class SecurityConfig {
                         // ============================================================
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(
-                                "/auth/**",
+                                "/api/v1/auth/**",
                                 "/oauth2/**",
                                 "/login/oauth2/**"
                         ).permitAll()
-
                         // ============================================================
                         // SWAGGER - No authentication required
                         // ============================================================
@@ -61,12 +60,13 @@ public class SecurityConfig {
                         // STUDENT ENDPOINTS - Role: STUDENT
                         // Sprint 2: Profile & Assessment
                         // ============================================================
-                        .requestMatchers(HttpMethod.GET, "/profile/**").hasRole("STUDENT")
+                        .requestMatchers("/api/v1/student/**").hasRole("STUDENT")
 
                         // ============================================================
                         // ROADMAP ENDPOINTS - Role: STUDENT
                         // Sprint 3: Roadmap
                         // ============================================================
+                         .requestMatchers("/api/v1/roadmap/**").hasRole("STUDENT")
                          .requestMatchers(HttpMethod.GET, "/roadmap/**").hasRole("STUDENT")
                          .requestMatchers(HttpMethod.PUT, "/roadmap/**").hasRole("STUDENT")
 
