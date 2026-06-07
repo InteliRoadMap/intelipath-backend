@@ -40,6 +40,7 @@ public class PortfolioProject {
     @Column(name = "stars")
     private Integer stars = 0;
 
+    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "tech_stack", columnDefinition = "jsonb")
-    private String techStack;
+    private Object techStack;
 }

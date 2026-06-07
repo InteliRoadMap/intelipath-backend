@@ -32,29 +32,16 @@ public class User {
     @Column(name = "user_id")
     private UUID userId;
 
-//    @Column(nullable = false)
-//    private String password;
+    @Column(nullable = false, unique = true)
+    private String email;
 
     @Column(name = "full_name")
     private String fullName;
-
-    @Column(nullable = false, unique = true)
-    private String email;
 
     private LocalDate yob;
 
     @Column(columnDefinition = "TEXT")
     private String bio;
-
-    @Column(name = "github_profile")
-    private String githubProfile;
-
-    private String university;
-
-    @Column(name = "year_of_admission")
-    private LocalDate yearOfAdmission;
-
-    private String major;
 
     @Column(name = "create_at")
     private LocalDateTime createAt;
@@ -71,21 +58,17 @@ public class User {
     private UserStatus userStatus = UserStatus.ACTIVE;
 
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private List<OauthAccount> oauthAccounts;
 
-//    @Column(name = "otp")
-//    private String otp;
-//
-//    @Column(name = "otp_expiry")
-//    private LocalDateTime otpExpiry;
-
-//    // 1 User có nhiều records ở bảng con
+    //    // 1 User có nhiều records ở bảng con
 //    // mappedBy = tên field trong class con trỏ ngược lại User
 //    // cascade = ALL: thao tác trên User sẽ ảnh hưởng luôn các bảng con
 //    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
 //    private List<OauthAccount> oauthAccounts;
 //
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private List<RefreshToken> refreshTokens;
 
     @PrePersist

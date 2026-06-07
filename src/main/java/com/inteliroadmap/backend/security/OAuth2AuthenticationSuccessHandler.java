@@ -38,6 +38,8 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
 
     @Override
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException, ServletException {
+        CustomOAuth2User oauth2User = (CustomOAuth2User) authentication.getPrincipal();
+        String email = oauth2User.getEmail();
         String targetUrl = determineTargetUrl(request, response, authentication);
 
         if (response.isCommitted()) {
@@ -45,6 +47,7 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
             return;
         }
 
+        log.info("Authentication success for user: {}", email);
         getRedirectStrategy().sendRedirect(request, response, targetUrl);
     }
 

@@ -25,6 +25,18 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
 
+    /**
+     * Refresh requests validate their token in the authentication service.
+     *
+     * @param request current HTTP request
+     * @return true when this filter must not process the request
+     */
+    @Override
+    protected boolean shouldNotFilter(HttpServletRequest request) {
+        return "POST".equalsIgnoreCase(request.getMethod())
+                && "/api/v1/auth/refresh".equals(request.getRequestURI());
+    }
+
      /**
      * Filter logic - Chạy trên mỗi HTTP request
      *

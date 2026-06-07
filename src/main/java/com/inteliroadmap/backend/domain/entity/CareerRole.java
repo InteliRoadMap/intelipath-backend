@@ -14,6 +14,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@com.fasterxml.jackson.annotation.JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class CareerRole {
 
     @Id
@@ -21,9 +22,12 @@ public class CareerRole {
     @Column(name = "career_id")
     private UUID careerId;
 
-    @Column(name = "role_name", nullable = false)
-    private String roleName;
+    @Column(name = "career_name", nullable = false)
+    private String careerName;
 
-    @Column(name = "descriptiion")
+    @Column(name = "prerequisite")
+    private String prerequisite;
+
+    @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 }

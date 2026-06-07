@@ -11,13 +11,13 @@ spring:
     password: ${DB_PASSWORD}
     # HikariCP: Connection Pool giúp quản lý kết nối DB
     hikari:
-      # 5 connection idle
-      minimum-idle: 5
-      # 10 * 60 * 1000 = 10M : If idle over 10m Hikari will close connection
-      idle-timeout: 600000
-      # 18 * 60 * 1000 = 30M : Hikari will replace by new connection
-      max-lifetime: 1800000
-      # 3 * 1000 = 30ML : Time to give new connection for app
+      minimum-idle: 1
+      maximum-pool-size: 5
+      # Close excess idle connections after 5 minutes.
+      idle-timeout: 300000
+      # Refresh connections before long-lived pooler sessions become stale.
+      max-lifetime: 1200000
+      # Maximum time to wait for a connection from the pool.
       connection-timeout: 30000
 
   jpa:
@@ -26,6 +26,13 @@ spring:
     properties:
       hibernate:
         format_sql: true
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
+    connect-retries: 10
+    connect-retries-interval: 5s
 
   security:
     oauth2:
@@ -53,4 +60,3 @@ springdoc:
     path: /swagger-ui.html
   api-docs:
     path: /v3/api-docs
-
