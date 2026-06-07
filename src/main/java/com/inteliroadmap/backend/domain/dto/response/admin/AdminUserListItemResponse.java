@@ -10,6 +10,7 @@ import lombok.NoArgsConstructor;
 @Builder
 public class AdminUserListItemResponse {
     private String id;
+    private String email;
     private String name;
     private String role;
     private String joinedDate;
