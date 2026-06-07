@@ -37,9 +37,9 @@ public class DatabaseSeeder implements CommandLineRunner {
         log.info("=====================================================");
         log.info(" CHECKING DATABASE SEED DATA... ");
 
-        importCareerDataTemplate();
-        importRoadmapDataTemplate();
-        importSkillDataTemplate();
+//        importCareerDataTemplate();
+//        importRoadmapDataTemplate();
+//        importSkillDataTemplate();
 
         log.info("=====================================================");
         log.info(" SEEDING SUMMARY NOTIFICATION ");
