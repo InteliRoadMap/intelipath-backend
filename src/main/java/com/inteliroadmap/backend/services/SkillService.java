@@ -6,82 +6,66 @@ import com.inteliroadmap.backend.domain.dto.response.CounselorResponse;
 import com.inteliroadmap.backend.domain.dto.response.SkillResponse;
 import com.inteliroadmap.backend.domain.entity.*;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
-import com.inteliroadmap.backend.mappers.DatasetMapper;
+import com.inteliroadmap.backend.helper.AuthenticatedStudentHelper;
+import com.inteliroadmap.backend.mappers.SkillMapper;
 import com.inteliroadmap.backend.repositories.*;
 import jakarta.transaction.Transactional;
-import org.springframework.security.core.context.SecurityContextHolder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.*;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class SkillService {
 
-    private final UserRepository userRepository;
     private final SkillRepository skillRepository;
-    private final StudentRepository studentRepository;
     private final StudentSkillRepository studentSkillRepository;
     private final CareerRoleRepository careerRoleRepository;
     private final CareerRequiredSkillRepository careerRequiredSkillRepository;
+    private final AuthenticatedStudentHelper authenticatedStudentHelper;
+    private final SkillMapper skillMapper;
 
     /**
-     * Securely identifies the currently authenticated student.
-     * Extracts the user email from the SecurityContextHolder and retrieves the corresponding Student profile.
+     * Retrieves the authenticated student's selected skills and all skills available in the system.
      *
-     * @return The authenticated Student entity
-     * @throws ResourceNotFoundException if the token is invalid or the student profile is missing
-     */
-    private Student getAuthenticatedStudent() {
-        String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        User user = userRepository.findByEmail(email);
-        if (user == null) {
-            throw new ResourceNotFoundException("User not found from token");
-        }
-        Student student = studentRepository.findByUser(user);
-        if (student == null) {
-            throw new ResourceNotFoundException("Student profile not found");
-        }
-        return student;
-    }
-
-    /**
-     * Retrieves all skills currently associated with the authenticated student.
-     *
-     * @return SkillResponse containing the list of the student's skills
+     * @return response containing selected skills and every available skill
      */
     @Transactional
     public SkillResponse getStudentSkills() {
-        log.info("Skill Module: Get Student Skill Request received");
+        log.info("Fetching selected skills and all available skills for the authenticated student");
 
-        Student student = getAuthenticatedStudent();
+        Student student = authenticatedStudentHelper.getOrCreateStudent();
 
-        List<StudentSkill> skills = studentSkillRepository.findByStudent(student);
+        List<StudentSkill> selectedSkills = studentSkillRepository.findByStudent(student);
+        List<Skill> allSkills = skillRepository.findAll();
 
         return SkillResponse.builder()
-                .studentSkills(skills)
+                .selectedSkills(skillMapper.toSelectedSkillResponses(selectedSkills))
+                .skills(skillMapper.toSkillItemResponses(allSkills))
                 .build();
     }
 
     /**
-     * Fetches all available skills in the system that match the search query in their name or career.
+     * Searches available skills by skill name without case sensitivity.
      *
-     * @param search The search string to filter by
-     * @return SkillResponse containing the list of matching skills
+     * @param search skill name fragment to search for
+     * @return response containing matching skills
      */
     @Transactional
     public SkillResponse searchSkills(String search) {
-        log.info("Skill Module: Search Skills Request received for query: {}", search);
+        log.info("Searching skills by name: {}", search);
 
-        List<Skill> skills =
-                skillRepository
-                        .findBySkillNameContainingIgnoreCaseOrCareerContainingIgnoreCase(search, search);
+        List<Skill> skills = skillRepository.findBySkillNameContainingIgnoreCase(search);
 
         return SkillResponse.builder()
-                .skills(skills)
+                .skills(skillMapper.toSkillItemResponses(skills))
                 .build();
     }
 
@@ -96,37 +80,41 @@ public class SkillService {
     public SkillResponse importStudentSkills(ImportSkillsRequest request) {
         log.info("Skill Module: Import Student Skills Request received");
 
-        Student student = getAuthenticatedStudent();
+        Student student = authenticatedStudentHelper.getOrCreateStudentForUpdate();
+        Set<UUID> requestedSkillIds = new LinkedHashSet<>(request.getSkillIds());
+        List<Skill> requestedSkills = skillRepository.findAllById(requestedSkillIds);
 
-        List<StudentSkill> studentSkills = new java.util.ArrayList<>(studentSkillRepository.findByStudent(student));
-        List<UUID> existingSkillIds = new java.util.ArrayList<>(studentSkills.stream()
-                .map(ss -> ss.getSkill().getSkillId())
-                .toList());
-
-        List<Skill> skills = request.getSkillList();
-        List<StudentSkill> newSkillsToSave = new java.util.ArrayList<>();
-
-        for (Skill s : skills) {
-            if (s.getSkillId() != null && !existingSkillIds.contains(s.getSkillId())) {
-                Skill managedSkill = skillRepository.findById(s.getSkillId()).orElse(null);
-                if (managedSkill != null) {
-                    StudentSkill newStudentSkill = StudentSkill.builder()
-                            .student(student)
-                            .skill(managedSkill)
-                            .build();
-                    newSkillsToSave.add(newStudentSkill);
-                    existingSkillIds.add(managedSkill.getSkillId()); // prevent duplicates within request
-                }
-            }
+        Set<UUID> foundSkillIds = requestedSkills.stream()
+                .map(Skill::getSkillId)
+                .collect(java.util.stream.Collectors.toSet());
+        Set<UUID> missingSkillIds = new LinkedHashSet<>(requestedSkillIds);
+        missingSkillIds.removeAll(foundSkillIds);
+        if (!missingSkillIds.isEmpty()) {
+            throw new ResourceNotFoundException("Skills not found: " + missingSkillIds);
         }
+
+        Set<UUID> existingSkillIds = studentSkillRepository
+                .findByStudentAndSkill_SkillIdIn(student, List.copyOf(requestedSkillIds))
+                .stream()
+                .map(studentSkill -> studentSkill.getSkill().getSkillId())
+                .collect(java.util.stream.Collectors.toSet());
+
+        List<StudentSkill> newSkillsToSave = requestedSkills.stream()
+                .filter(skill -> !existingSkillIds.contains(skill.getSkillId()))
+                .map(skill -> StudentSkill.builder()
+                        .student(student)
+                        .skill(skill)
+                        .build())
+                .toList();
 
         if (!newSkillsToSave.isEmpty()) {
             studentSkillRepository.saveAll(newSkillsToSave);
             studentSkills.addAll(newSkillsToSave);
         }
 
+        List<StudentSkill> studentSkills = studentSkillRepository.findByStudent(student);
         return SkillResponse.builder()
-                .studentSkills(studentSkills)
+                .selectedSkills(skillMapper.toSelectedSkillResponses(studentSkills))
                 .build();
     }
 
@@ -141,20 +129,31 @@ public class SkillService {
     public SkillResponse getMissingSkills(GetSkillGapRequest request) {
         log.info("Get student skill gap of a career request received");
 
-        Student student = getAuthenticatedStudent();
+        Student student = authenticatedStudentHelper.getOrCreateStudent();
 
-        List<Skill> missingSkills = new ArrayList<>();
+        Optional<CareerRole> careerOptional = careerRoleRepository.findById(request.getCareerId());
+        if (careerOptional.isEmpty()) {
+            throw new ResourceNotFoundException("Career not found");
+        }
+
+        CareerRole career = careerOptional.get();
 
         List<DatasetMapper> missingSkillsData = studentRepository
                 .findMissingSkillsByStudentIdAndCareerName(student.getStudentId(), request.getCareerName());
 
-        for(DatasetMapper row : missingSkillsData) {
-            Skill skill = skillRepository.findBySkillId(row.getSkillId());
-            missingSkills.add(skill);
-        }
+        List<UUID> studentSkillIds = studentSkills.stream()
+                .map(ss -> ss.getSkill().getSkillId())
+                .toList();
+
+        List<Skill> missingSkills = requiredSkills.stream()
+                .map(CareerRequiredSkill::getSkill)
+                .filter(skill -> !studentSkillIds.contains(skill.getSkillId()))
+                .toList();
 
         return SkillResponse.builder()
-                .skills(missingSkills)
+                .selectedSkills(skillMapper.toSelectedSkillResponses(studentSkills))
+                .requiredSkills(skillMapper.toRequiredSkillResponses(requiredSkills))
+                .missingSkills(skillMapper.toSkillItemResponses(missingSkills))
                 .build();
     }
 }

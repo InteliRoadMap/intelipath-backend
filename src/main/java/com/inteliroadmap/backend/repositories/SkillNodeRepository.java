@@ -11,4 +11,5 @@ import java.util.UUID;
 public interface SkillNodeRepository extends JpaRepository<SkillNode, UUID> {
     SkillNode findByNodeName(String nodeName);
     List<SkillNode> findByCareerRole_CareerId(UUID careerId);
+    List<SkillNode> findByCareerRole_CareerIdOrderByLevelAscNodeNameAsc(UUID careerId);
 }

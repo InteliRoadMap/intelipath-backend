@@ -19,14 +19,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.UUID;
-
 /**
  * Controller responsible for handling student-related API endpoints.
  * Provides functionality for profile setup and skill management.
  */
 @RestController
-@RequestMapping("/student")
+@RequestMapping("/api/v1/student")
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Student services", description = "Student endpoints")
@@ -106,13 +104,14 @@ public class StudentController {
     }
 
     /**
-     * Retrieves the skills currently associated with a specific student.
-     * @return ResponseEntity containing a list of the student's skills
+     * Retrieves the authenticated student's selected skills and all available skills.
+     *
+     * @return response containing selected skills and all skills in the database
      */
     @GetMapping("/skills")
     @Operation(
-            summary = "Get student skills",
-            description = "Get student skills"
+            summary = "Get selected and available skills",
+            description = "Get the authenticated student's selected skills and all available skills"
     )
     @ApiResponses(value = {
             @ApiResponse(
@@ -129,49 +128,40 @@ public class StudentController {
             )
     })
     public ResponseEntity<SkillResponse> getStudentSkills() {
-        log.info("Fetching student skills");
-        // Delegate to SkillService to fetch skills associated with the student
+        log.info("Fetching selected and available skills for the authenticated student");
         return ResponseEntity.ok(skillService.getStudentSkills());
     }
 
     /**
-     * Retrieves a list of available skills filtered by a search query matching name or career.
+     * Searches available skills by skill name without case sensitivity.
      *
-     * @param search The query string to search by (name or career)
-     * @return ResponseEntity containing a list of matching skills
+     * @param search skill name fragment to search for
+     * @return response containing matching skills
      */
     @GetMapping("/skills/{search}")
     @Operation(
-            summary = "Search skills by name or career",
-            description = "Search skills by name or career"
+            summary = "Search skills by name",
+            description = "Search skills by skill name without case sensitivity"
     )
     @ApiResponses(value = {
             @ApiResponse(
                     responseCode = "200",
-                    description = "Search skills by name or career successful",
+                    description = "Skill search completed successfully",
                     content = @Content(
                             mediaType = "application/json",
                             schema = @Schema(implementation = SkillResponse.class)
                     )
-            ),
-            @ApiResponse(
-                    responseCode = "403",
-                    description = "Unauthorized Access",
-                    content = @Content
             )
     })
     public ResponseEntity<SkillResponse> searchSkills(@PathVariable String search) {
-        log.info("Fetching skills for search query: {}", search);
-        if ("all".equalsIgnoreCase(search)) {
-            return ResponseEntity.ok(skillService.searchSkills(""));
-        }
+        log.info("Searching skills by name: {}", search);
         return ResponseEntity.ok(skillService.searchSkills(search));
     }
 
     /**
      * Imports a list of selected skills and associates them with the student.
      *
-     * @param importSkillsRequest The payload containing the student ID and selected skills
+     * @param importSkillsRequest The payload containing selected skill IDs
      * @return ResponseEntity containing the updated list of the student's skills
      */
     @PostMapping("/skills/select")
@@ -190,7 +180,7 @@ public class StudentController {
             ),
             @ApiResponse(
                     responseCode = "404",
-                    description = "User not found"
+                    description = "User or skill not found"
             )
     })
     public ResponseEntity<SkillResponse> importStudentSkills(

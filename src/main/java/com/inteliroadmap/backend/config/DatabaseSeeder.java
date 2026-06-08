@@ -66,7 +66,7 @@ public class DatabaseSeeder implements CommandLineRunner {
         try (CSVReader reader = new CSVReader(new FileReader(csvFile))) {
             String[] line;
             int rowNum = 0;
-            
+
             Map<String, SkillNode> nodeMap = new HashMap<>();
 
             while ((line = reader.readNext()) != null) {
@@ -101,6 +101,7 @@ public class DatabaseSeeder implements CommandLineRunner {
                 if (!link1.isEmpty()) resourceItem.put("link1", link1);
                 if (!link2.isEmpty()) resourceItem.put("link2", link2);
                 if (!link3.isEmpty()) resourceItem.put("link3", link3);
+
 
                 if (nodeMap.containsKey(nodeName)) {
                     SkillNode existingNode = nodeMap.get(nodeName);
@@ -137,7 +138,7 @@ public class DatabaseSeeder implements CommandLineRunner {
                             .description(description)
                             .resource(resourcesList)
                             .build();
-                    
+
                     skillNode = skillNodeRepository.save(skillNode);
                     nodeMap.put(nodeName, skillNode);
                 }
@@ -191,7 +192,7 @@ public class DatabaseSeeder implements CommandLineRunner {
                 String importanceLevel = line[3];
 
                 CareerRole role = careerRoleRepository.findByCareerName(careerRequired);
-                
+
                 if (role != null) {
                     CareerRequiredSkill careerRequiredSkill = CareerRequiredSkill.builder()
                             .careerRole(role)

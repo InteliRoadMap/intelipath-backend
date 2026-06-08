@@ -22,7 +22,7 @@ import org.springframework.web.bind.annotation.*;
  * - POST /user/profile - Get user info by email
  */
 @RestController
-@RequestMapping("/user")
+@RequestMapping("/api/v1/user")
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Info User", description = "User information endpoints")

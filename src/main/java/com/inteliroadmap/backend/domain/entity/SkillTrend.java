@@ -23,7 +23,7 @@ public class SkillTrend {
     private UUID trendId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "skill_id", nullable = false, foreignKey = @ForeignKey(name = "fk_st_skill"))
+    @JoinColumn(name = "skill_id", nullable = false, foreignKey = @ForeignKey(name = "fk_strd_skill"))
     private Skill skill;
 
     @Column(name = "jobs_needed")

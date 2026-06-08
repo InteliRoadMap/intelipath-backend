@@ -1,5 +1,6 @@
 package com.inteliroadmap.backend.security;
 
+import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import io.jsonwebtoken.*;
 import io.jsonwebtoken.security.Keys;
 import lombok.Getter;
@@ -141,4 +142,6 @@ public class JwtService {
                 secretKey.getBytes()
         );
     }
+
+
 }

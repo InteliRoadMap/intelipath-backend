@@ -14,13 +14,19 @@ import com.inteliroadmap.backend.repositories.StudentRepository;
 import com.inteliroadmap.backend.domain.entity.Student;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.core.ParameterizedTypeReference;
+import org.springframework.http.HttpHeaders;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClient;
 
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -44,7 +50,8 @@ public class OAuth2UserService extends DefaultOAuth2UserService {
         log.info("Loading OAuth2 user from provider: {}", provider);
 
         OAuth2User oauthUser = super.loadUser(request);
-        OAuth2UserInfoInternal userInfo = createUserInfo(provider, oauthUser.getAttributes());
+        Map<String, Object> attributes = resolveAttributes(provider, oauthUser, request);
+        OAuth2UserInfoInternal userInfo = createUserInfo(provider, attributes);
 
         validateEmail(userInfo);
 
@@ -54,6 +61,48 @@ public class OAuth2UserService extends DefaultOAuth2UserService {
         log.info("OAuth2 login completed for email: {}, role: {}", user.getEmail(), user.getRole());
 
         return new CustomOAuth2User(oauthUser, user.getEmail(), user.getRole().name());
+    }
+
+    private Map<String, Object> resolveAttributes(
+            String provider,
+            OAuth2User oauthUser,
+            OAuth2UserRequest request
+    ) {
+        Map<String, Object> attributes = new HashMap<>(oauthUser.getAttributes());
+
+        if ("github".equalsIgnoreCase(provider) && attributes.get("email") == null) {
+            fetchPrimaryGithubEmail(request.getAccessToken().getTokenValue())
+                    .ifPresent(email -> attributes.put("email", email));
+        }
+
+        return attributes;
+    }
+
+    private Optional<String> fetchPrimaryGithubEmail(String accessToken) {
+        try {
+            List<Map<String, Object>> emails = RestClient.create("https://api.github.com")
+                    .get()
+                    .uri("/user/emails")
+                    .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken)
+                    .header(HttpHeaders.ACCEPT, "application/vnd.github+json")
+                    .retrieve()
+                    .body(new ParameterizedTypeReference<>() {
+                    });
+
+            if (emails == null) {
+                return Optional.empty();
+            }
+
+            return emails.stream()
+                    .filter(email -> Boolean.TRUE.equals(email.get("primary")))
+                    .filter(email -> Boolean.TRUE.equals(email.get("verified")))
+                    .map(email -> (String) email.get("email"))
+                    .filter(email -> email != null && !email.isBlank())
+                    .findFirst();
+        } catch (Exception e) {
+            log.warn("Could not fetch GitHub primary email: {}", e.getMessage());
+            return Optional.empty();
+        }
     }
 
     /**

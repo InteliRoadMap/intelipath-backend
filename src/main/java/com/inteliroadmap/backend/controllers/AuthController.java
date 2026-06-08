@@ -18,11 +18,10 @@ import org.springframework.web.bind.annotation.*;
 /**
  * Controller - Authentication API Endpoints
  * Provides endpoints:
- * - POST /auth/register - Register new student account
- * - POST /auth/login    - Login with email and password
+ * - POST /api/v1/auth/refresh - Rotate a refresh token and issue new tokens
  */
 @RestController
-@RequestMapping("/auth")
+@RequestMapping("/api/v1/auth")
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Authentication", description = "Register and Login endpoints")
@@ -31,14 +30,15 @@ public class AuthController {
     private final AuthService authService;
 
     /**
-     * POST /auth/refresh - Refresh access token using refresh token
+     * Rotates a valid refresh token and returns a new access/refresh token pair.
+     *
      * @param refreshRequest RefreshRequest containing refresh token
-     * @return ResponseEntity containing new access token
+     * @return response containing newly issued tokens
      */
     @PostMapping("/refresh")
     @Operation(
             summary = "Refresh access token",
-            description = "Generate new JWT access token using refresh token"
+            description = "Rotate a valid refresh token and generate a new JWT access token"
     )
     @ApiResponses(value = {
             @ApiResponse(

@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -58,8 +59,12 @@ public class RoadmapService {
         log.info("Roadmap Module: Fetching roadmap for career ID: {}", careerId);
         
         Student student = getAuthenticatedStudent();
-        CareerRole careerRole = careerRoleRepository.findById(careerId)
-                .orElseThrow(() -> new ResourceNotFoundException("Career role not found"));
+        Optional<CareerRole> careerRoleOptional = careerRoleRepository.findById(careerId);
+        if (careerRoleOptional.isEmpty()) {
+            throw new ResourceNotFoundException("Career role not found");
+        }
+
+        CareerRole careerRole = careerRoleOptional.get();
                 
         List<SkillNode> nodes = skillNodeRepository.findByCareerRole_CareerId(careerId);
         List<StudentProgress> progresses = studentProgressRepository.findByStudent(student);
@@ -111,8 +116,12 @@ public class RoadmapService {
     public RoadmapResponse getNode(UUID nodeId) {
         log.info("Roadmap Module: Fetching Node information");
 
-        SkillNode node = skillNodeRepository.findById(nodeId)
-                .orElseThrow(() -> new ResourceNotFoundException("Node not found"));
+        Optional<SkillNode> nodeOptional = skillNodeRepository.findById(nodeId);
+        if (nodeOptional.isEmpty()) {
+            throw new ResourceNotFoundException("Node not found");
+        }
+
+        SkillNode node = nodeOptional.get();
 
         return RoadmapResponse.builder()
                 .skillNode(node)
@@ -132,11 +141,20 @@ public class RoadmapService {
 
         Student student = getAuthenticatedStudent();
 
-        SkillNode node = skillNodeRepository.findById(request.getNodeId())
-                .orElseThrow(() -> new ResourceNotFoundException("Node not found"));
+        Optional<SkillNode> nodeOptional = skillNodeRepository.findById(request.getNodeId());
+        if (nodeOptional.isEmpty()) {
+            throw new ResourceNotFoundException("Node not found");
+        }
+
+        SkillNode node = nodeOptional.get();
                 
-        StudentProgress progress = studentProgressRepository.findByStudentAndSkillNode(student, node)
-                .orElseThrow(() -> new ResourceNotFoundException("Student progress not found for this node"));
+        Optional<StudentProgress> progressOptional =
+                studentProgressRepository.findByStudentAndSkillNode(student, node);
+        if (progressOptional.isEmpty()) {
+            throw new ResourceNotFoundException("Student progress not found for this node");
+        }
+
+        StudentProgress progress = progressOptional.get();
                 
         if("IN_PROGRESS".equals(progress.getStatus())){
             progress.setStatus("COMPLETED");

@@ -11,4 +11,6 @@ import java.util.UUID;
 public interface CareerRequiredSkillRepository extends JpaRepository<CareerRequiredSkill, UUID> {
 
     List<CareerRequiredSkill> findByCareerRole(CareerRole careerRole);
+
+    List<CareerRequiredSkill> findByCareerRole_CareerId(UUID careerId);
 }
