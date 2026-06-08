@@ -1,5 +1,12 @@
 package com.inteliroadmap.backend.mappers;
 
-public interface DatasetMapper {
+import java.util.UUID;
 
+public interface DatasetMapper {
+    String getFullName();
+    String getSkillName();
+
+    UUID getSkillId();
+    UUID getStudentId();
+    UUID getCareerId();
 }

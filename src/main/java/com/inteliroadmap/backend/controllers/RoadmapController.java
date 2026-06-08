@@ -1,7 +1,6 @@
 package com.inteliroadmap.backend.controllers;
 
-import com.inteliroadmap.backend.domain.dto.request.CompareStRmSkillRequest;
-import com.inteliroadmap.backend.domain.dto.request.ImportSkillsRequest;
+import com.inteliroadmap.backend.domain.dto.request.GetSkillGapRequest;
 import com.inteliroadmap.backend.domain.dto.request.UpdateUserProgressRequest;
 import com.inteliroadmap.backend.domain.dto.response.RoadmapResponse;
 import com.inteliroadmap.backend.domain.dto.response.SkillResponse;
@@ -188,20 +187,20 @@ public class RoadmapController {
                     description = "Student or Career not found"
             )
     })
-    public ResponseEntity<SkillResponse> compareWithStudentSkills(
+    public ResponseEntity<SkillResponse> getMissingSkills(
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     description = "Compare student skill request payload",
                     required = true,
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = CompareStRmSkillRequest.class)
+                            schema = @Schema(implementation = GetSkillGapRequest.class)
                     )
             )
-    @RequestBody @Valid CompareStRmSkillRequest request
+    @RequestBody @Valid GetSkillGapRequest request
     ) {
-        log.info("Comparing roadmap required skills for career ID: {}", request.getCareerId());
+        log.info("Comparing roadmap required skills for career ID: {}", request.getCareerName());
         // Delegate to SkillService to compute the skill gap and return the comparison
-        return ResponseEntity.ok(skillService.compareWithStudentSkills(request));
+        return ResponseEntity.ok(skillService.getMissingSkills(request));
     }
 
 }

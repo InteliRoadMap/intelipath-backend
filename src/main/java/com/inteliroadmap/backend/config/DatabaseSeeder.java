@@ -13,10 +13,10 @@ import org.springframework.stereotype.Component;
 
 import java.io.FileReader;
 import java.io.File;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 
 @Component
 @RequiredArgsConstructor
@@ -67,7 +67,7 @@ public class DatabaseSeeder implements CommandLineRunner {
             String[] line;
             int rowNum = 0;
             
-            java.util.Map<String, SkillNode> nodeMap = new HashMap<>();
+            Map<String, SkillNode> nodeMap = new HashMap<>();
 
             while ((line = reader.readNext()) != null) {
                 rowNum++;
@@ -104,11 +104,11 @@ public class DatabaseSeeder implements CommandLineRunner {
 
                 if (nodeMap.containsKey(nodeName)) {
                     SkillNode existingNode = nodeMap.get(nodeName);
-                    java.util.List<Map<String, String>> resourcesList = (java.util.List<Map<String, String>>) existingNode.getResource();
+                    List<Map<String, String>> resourcesList = (List<Map<String, String>>) existingNode.getResource();
                     resourcesList.add(resourceItem);
                     skillNodeRepository.save(existingNode);
                 } else {
-                    java.util.List<Map<String, String>> resourcesList = new java.util.ArrayList<>();
+                    List<Map<String, String>> resourcesList = new ArrayList<>();
                     resourcesList.add(resourceItem);
 
                     SkillNode connectToNode = null;
@@ -165,7 +165,7 @@ public class DatabaseSeeder implements CommandLineRunner {
             String[] line;
             int rowNum = 0;
 
-            java.util.Map<String, SkillNode> skillMap = new HashMap<>();
+            Map<String, SkillNode> skillMap = new HashMap<>();
 
             while ((line = reader.readNext()) != null) {
                 rowNum++;

@@ -30,6 +30,9 @@ public class Feedback {
     @JoinColumn(name = "receiver_id", nullable = false, foreignKey = @ForeignKey(name = "fk_fb_receiver"))
     private User receiver;
 
+    @Column(name = "sender_name")
+    private String senderName;
+
     @Column(name = "content", columnDefinition = "TEXT")
     private String content;
 

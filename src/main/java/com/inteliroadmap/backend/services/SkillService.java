@@ -1,10 +1,12 @@
 package com.inteliroadmap.backend.services;
 
-import com.inteliroadmap.backend.domain.dto.request.CompareStRmSkillRequest;
+import com.inteliroadmap.backend.domain.dto.request.GetSkillGapRequest;
 import com.inteliroadmap.backend.domain.dto.request.ImportSkillsRequest;
+import com.inteliroadmap.backend.domain.dto.response.CounselorResponse;
 import com.inteliroadmap.backend.domain.dto.response.SkillResponse;
 import com.inteliroadmap.backend.domain.entity.*;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
+import com.inteliroadmap.backend.mappers.DatasetMapper;
 import com.inteliroadmap.backend.repositories.*;
 import jakarta.transaction.Transactional;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -12,10 +14,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
+import java.util.*;
 
 @Service
 @RequiredArgsConstructor
@@ -139,29 +138,22 @@ public class SkillService {
      * @return SkillResponse detailing current skills, required skills, and missing skills
      */
     @Transactional
-    public SkillResponse compareWithStudentSkills(CompareStRmSkillRequest request) {
-        log.info("Skill Module: Comparing Student Skills with Roadmap Required Skills");
+    public SkillResponse getMissingSkills(GetSkillGapRequest request) {
+        log.info("Get student skill gap of a career request received");
 
         Student student = getAuthenticatedStudent();
 
-        CareerRole career = careerRoleRepository.findById(request.getCareerId())
-                .orElseThrow(() -> new ResourceNotFoundException("Career not found"));
+        List<Skill> missingSkills = new ArrayList<>();
 
-        List<CareerRequiredSkill> requiredSkills = careerRequiredSkillRepository.findByCareerRole(career);
-        List<StudentSkill> studentSkills = studentSkillRepository.findByStudent(student);
+        List<DatasetMapper> missingSkillsData = studentRepository
+                .findMissingSkillsByStudentIdAndCareerName(student.getStudentId(), request.getCareerName());
 
-        List<UUID> studentSkillIds = studentSkills.stream()
-                .map(ss -> ss.getSkill().getSkillId())
-                .toList();
-
-        List<Skill> missingSkills = requiredSkills.stream()
-                .map(CareerRequiredSkill::getSkill)
-                .filter(skill -> !studentSkillIds.contains(skill.getSkillId()))
-                .toList();
+        for(DatasetMapper row : missingSkillsData) {
+            Skill skill = skillRepository.findBySkillId(row.getSkillId());
+            missingSkills.add(skill);
+        }
 
         return SkillResponse.builder()
-                .studentSkills(studentSkills)
-                .careerRequiredSkills(requiredSkills)
                 .skills(missingSkills)
                 .build();
     }

@@ -67,8 +67,8 @@ public class SecurityConfig {
                         // ROADMAP ENDPOINTS - Role: STUDENT
                         // Sprint 3: Roadmap
                         // ============================================================
-                         .requestMatchers(HttpMethod.GET, "/roadmap/**").hasRole("STUDENT")
-                         .requestMatchers(HttpMethod.PUT, "/roadmap/**").hasRole("STUDENT")
+                        .requestMatchers(HttpMethod.GET, "/roadmap/**").hasRole("STUDENT")
+                        .requestMatchers(HttpMethod.PUT, "/roadmap/**").hasRole("STUDENT")
 
                         // ============================================================
                         // AI CHAT ENDPOINTS - Role: STUDENT
@@ -88,8 +88,8 @@ public class SecurityConfig {
                         // COUNSELOR ENDPOINTS - Role: COUNSELOR
                         // Sprint 5: Counselor Dashboard
                         // ============================================================
-                        // .requestMatchers(HttpMethod.GET, "/counselor/**").hasRole("COUNSELOR")
-                        // .requestMatchers(HttpMethod.POST, "/feedback/**").hasRole("COUNSELOR")
+                        .requestMatchers(HttpMethod.GET, "/counselor/**").hasRole("COUNSELOR")
+                        .requestMatchers(HttpMethod.POST, "/feedback/**").hasRole("COUNSELOR")
 
                         // ============================================================
                         // MARKET PULSE ENDPOINTS - Role: STUDENT, COUNSELOR
