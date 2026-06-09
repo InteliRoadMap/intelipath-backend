@@ -1,5 +1,6 @@
-package com.inteliroadmap.backend.domain.dto.response.dashboard;
+package com.inteliroadmap.backend.domain.dto.response.student;
 
+import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -11,9 +12,8 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class AiHistoryItemResponse {
+public class RoadmapStepResponse {
     private UUID id;
-    private String tag;
     private String title;
-    private String preview;
+    private RoadmapStepStatus status;
 }

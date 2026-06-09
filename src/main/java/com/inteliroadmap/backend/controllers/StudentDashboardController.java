@@ -1,6 +1,6 @@
 package com.inteliroadmap.backend.controllers;
 
-import com.inteliroadmap.backend.domain.dto.response.dashboard.*;
+import com.inteliroadmap.backend.domain.dto.response.student.*;
 import com.inteliroadmap.backend.services.dashboard.StudentDashboardService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
