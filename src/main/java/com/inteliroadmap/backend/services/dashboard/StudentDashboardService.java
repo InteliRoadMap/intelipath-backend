@@ -1,7 +1,7 @@
 package com.inteliroadmap.backend.services.dashboard;
 
 import com.inteliroadmap.backend.domain.dto.response.SkillResponse;
-import com.inteliroadmap.backend.domain.dto.response.dashboard.*;
+import com.inteliroadmap.backend.domain.dto.response.student.*;
 import com.inteliroadmap.backend.domain.entity.*;
 import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;

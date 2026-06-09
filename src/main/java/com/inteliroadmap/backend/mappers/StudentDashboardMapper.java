@@ -1,6 +1,6 @@
 package com.inteliroadmap.backend.mappers;
 
-import com.inteliroadmap.backend.domain.dto.response.dashboard.*;
+import com.inteliroadmap.backend.domain.dto.response.student.*;
 import com.inteliroadmap.backend.domain.entity.*;
 import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
 import org.springframework.stereotype.Component;
