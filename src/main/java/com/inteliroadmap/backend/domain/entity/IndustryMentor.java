@@ -17,13 +17,8 @@ import java.util.UUID;
 public class IndustryMentor {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "mentor_id")
-    private UUID mentorId;
-
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false, unique = true, foreignKey = @ForeignKey(name = "fk_im_user"))
-    private User user;
+    @Column(name = "user_id")
+    private UUID userId;
 
     @Column(name = "company")
     private String company;

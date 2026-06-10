@@ -6,8 +6,11 @@ import com.inteliroadmap.backend.domain.entity.CareerRole;
 import com.inteliroadmap.backend.domain.entity.Student;
 import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
+import com.inteliroadmap.backend.helper.AuthenticatedStudentHelper;
+import com.inteliroadmap.backend.mappers.StudentMapper;
 import com.inteliroadmap.backend.repositories.CareerRoleRepository;
 import com.inteliroadmap.backend.repositories.StudentRepository;
+import com.inteliroadmap.backend.repositories.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +23,7 @@ import java.time.LocalDate;
 @Slf4j
 public class StudentService {
 
+    private final UserRepository userRepository;
     private final StudentRepository studentRepository;
     private final CareerRoleRepository careerRoleRepository;
     private final AuthenticatedStudentHelper authenticatedStudentHelper;
@@ -39,7 +43,7 @@ public class StudentService {
         log.info("Student Module: Setup Student Profile Request received");
 
         Student student = authenticatedStudentHelper.getOrCreateStudentForUpdate();
-        User user = student.getUser();
+        User user = userRepository.findByUserId(student.getUserId());
         if (user == null) {
             throw new ResourceNotFoundException("User not found");
         }

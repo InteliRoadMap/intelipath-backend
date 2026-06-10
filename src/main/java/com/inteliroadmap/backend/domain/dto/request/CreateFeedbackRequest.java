@@ -1,13 +1,14 @@
-﻿package com.inteliroadmap.backend.domain.dto.request;
+package com.inteliroadmap.backend.domain.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.util.UUID;
 
 @Data
 public class CreateFeedbackRequest {
-    @NotBlank(message = "Receiver ID is required")
+    @NotNull(message = "Receiver ID is required")
     private UUID receiverId;
 
     @NotBlank(message = "Content is required")

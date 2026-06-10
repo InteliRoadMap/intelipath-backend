@@ -17,10 +17,8 @@ public class CounselorResponse {
     private int total;
     private Map<String, Integer> careerStatistics;
     private Map<String, Integer> missingSkills;
-    private List<Feedback>  feedbacks;
+    private String careerName;
+    private List<Feedback> feedbacks;
     private Feedback feedback;
-//    private Map<String, String> studentInfo;
-//    private List<Map<String, String>> feedbackInfo;
-//    private List<String> missingSkills;
-//    private Double roadmapProgress;
+    private List<Map<String, Object>> students;
 }

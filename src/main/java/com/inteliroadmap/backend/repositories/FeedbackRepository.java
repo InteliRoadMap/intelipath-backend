@@ -12,7 +12,10 @@ import java.util.UUID;
 @Repository
 public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     List<Feedback> findTop5ByReceiver_UserIdOrderByCreateAtDesc(UUID userId);
+
     List<Feedback> findByReceiver(User receiver);
 
     Feedback findByFeedbackId(UUID feedbackId);
+
+    List<Feedback> findBySenderOrReceiverOrderByCreateAtDesc(User sender, User receiver);
 }

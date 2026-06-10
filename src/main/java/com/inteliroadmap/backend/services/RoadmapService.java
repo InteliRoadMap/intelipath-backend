@@ -26,6 +26,7 @@ public class RoadmapService {
     private final CareerRoleRepository careerRoleRepository;
     private final SkillNodeRepository skillNodeRepository;
     private final StudentProgressRepository studentProgressRepository;
+    private final com.inteliroadmap.backend.helper.AuthenticatedStudentHelper authenticatedStudentHelper;
 
     /**
      * Securely identifies the currently authenticated student.
@@ -35,16 +36,7 @@ public class RoadmapService {
      * @throws ResourceNotFoundException if the token is invalid or the student profile is missing
      */
     private Student getAuthenticatedStudent() {
-        String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        User user = userRepository.findByEmail(email);
-        if (user == null) {
-            throw new ResourceNotFoundException("User not found from token");
-        }
-        Student student = studentRepository.findByUser(user);
-        if (student == null) {
-            throw new ResourceNotFoundException("Student profile not found");
-        }
-        return student;
+        return authenticatedStudentHelper.getOrCreateStudent();
     }
 
     /**
@@ -97,7 +89,9 @@ public class RoadmapService {
         
         long completedCount = progresses.stream()
                 .filter(p -> "COMPLETED".equals(p.getStatus()))
-                .filter(p -> p.getSkillNode().getCareerRole().getCareerId().equals(careerId))
+                .filter(p -> p.getSkillNode() != null && 
+                             p.getSkillNode().getCareerRole() != null && 
+                             p.getSkillNode().getCareerRole().getCareerId().equals(careerId))
                 .count();
                 
         double percentage = ((double) completedCount / allNodes.size()) * 100.0;

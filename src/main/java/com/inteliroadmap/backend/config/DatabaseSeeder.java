@@ -1,11 +1,9 @@
 package com.inteliroadmap.backend.config;
 
 import com.inteliroadmap.backend.domain.entity.*;
-import com.inteliroadmap.backend.repositories.CareerRequiredSkillRepository;
-import com.inteliroadmap.backend.repositories.CareerRoleRepository;
-import com.inteliroadmap.backend.repositories.SkillNodeRepository;
-import com.inteliroadmap.backend.repositories.SkillRepository;
 import com.opencsv.CSVReader;
+import com.inteliroadmap.backend.repositories.*;
+import com.inteliroadmap.backend.domain.enums.UserRole;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -27,6 +25,12 @@ public class DatabaseSeeder implements CommandLineRunner {
     private final SkillNodeRepository skillNodeRepository;
     private final SkillRepository skillRepository;
     private final CareerRequiredSkillRepository careerRequiredSkillRepository;
+    private final UserRepository userRepository;
+    private final StudentRepository studentRepository;
+    private final AcademicCounselorRepository academicCounselorRepository;
+    private final FeedbackRepository feedbackRepository;
+    private final StudentSkillRepository studentSkillRepository;
+    private final StudentProgressRepository studentProgressRepository;
 
     private static final String ROADMAP_TEMPLATE = "data/RoadmapDataTemplate.csv";
     private static final String SKILL_TEMPLATE = "data/SkillDataTemplate.csv";
@@ -40,6 +44,8 @@ public class DatabaseSeeder implements CommandLineRunner {
         importCareerDataTemplate();
         importRoadmapDataTemplate();
         importSkillDataTemplate();
+        importMockStudentsAndFeedbacks();
+        importMockFeedbacksForRealCounselors();
         
         log.info("=====================================================");
         log.info(" SEEDING SUMMARY NOTIFICATION ");
@@ -255,5 +261,163 @@ public class DatabaseSeeder implements CommandLineRunner {
         } catch (Exception e) {
             log.error("Error occurred while importing CSV of Career Roles", e);
         }
+    }
+
+    private void importMockStudentsAndFeedbacks() {
+        log.info("Starting Mock Data Import for Students...");
+
+        List<AcademicCounselor> counselors = academicCounselorRepository.findAll();
+        AcademicCounselor counselor;
+        User counselorUser;
+        if (counselors.isEmpty()) {
+            counselorUser = userRepository.findByEmail("counselor_mock@example.com");
+            if (counselorUser == null) {
+                counselorUser = User.builder()
+                        .email("counselor_mock@example.com")
+                        .fullName("Mock Counselor")
+                        .role(UserRole.COUNSELOR)
+                        .build();
+                counselorUser = userRepository.save(counselorUser);
+            }
+            counselor = AcademicCounselor.builder()
+                    .userId(counselorUser.getUserId())
+                    .university("InteliPath University")
+                    .build();
+            counselor = academicCounselorRepository.save(counselor);
+        } else {
+            counselor = counselors.get(0);
+            counselorUser = userRepository.findById(counselor.getUserId()).orElse(null);
+        }
+
+        List<CareerRole> allCareers = careerRoleRepository.findAll();
+        List<Skill> allSkills = skillRepository.findAll();
+        List<SkillNode> allNodes = skillNodeRepository.findAll();
+
+        if (allCareers.isEmpty() || allSkills.isEmpty()) return;
+
+        java.util.Random random = new java.util.Random();
+
+        for (int i = 1; i <= 20; i++) {
+            String email = "student" + i + "@example.com";
+            User user = userRepository.findByEmail(email);
+            if (user == null) {
+                user = User.builder()
+                        .email(email)
+                        .fullName("Student " + i)
+                        .role(UserRole.STUDENT)
+                        .build();
+                user = userRepository.save(user);
+            }
+
+            if (studentRepository.findById(user.getUserId()).isPresent()) continue;
+
+            CareerRole career = allCareers.get(random.nextInt(allCareers.size()));
+
+            Student student = Student.builder()
+                    .userId(user.getUserId())
+                    .careerRole(career)
+                    .university("Mock University " + (random.nextInt(5) + 1))
+                    .build();
+            student = studentRepository.save(student);
+
+            java.util.Collections.shuffle(allSkills);
+            int numSkills = random.nextInt(5) + 2;
+            for (int j = 0; j < numSkills && j < allSkills.size(); j++) {
+                Skill skill = allSkills.get(j);
+                StudentSkill ss = StudentSkill.builder()
+                        .student(student)
+                        .skill(skill)
+                        .build();
+                studentSkillRepository.save(ss);
+            }
+
+            if (i % 3 == 0 && !allNodes.isEmpty()) {
+                java.util.Collections.shuffle(allNodes);
+                int numProgress = random.nextInt(4) + 1;
+                for (int j = 0; j < numProgress && j < allNodes.size(); j++) {
+                    SkillNode node = allNodes.get(j);
+                    StudentProgress sp = StudentProgress.builder()
+                            .student(student)
+                            .skillNode(node)
+                            .status(random.nextBoolean() ? "COMPLETED" : "IN_PROGRESS")
+                            .build();
+                    studentProgressRepository.save(sp);
+                }
+            }
+
+            if (counselorUser != null) {
+                if (random.nextBoolean()) {
+                    Feedback f1 = Feedback.builder()
+                            .sender(user)
+                            .receiver(counselorUser)
+                            .senderName(user.getFullName())
+                            .content("Hello Counselor, I need help with my career path.")
+                            .type("GENERAL")
+                            .build();
+                    feedbackRepository.save(f1);
+                }
+                if (random.nextBoolean()) {
+                    Feedback f2 = Feedback.builder()
+                            .sender(counselorUser)
+                            .receiver(user)
+                            .senderName(counselorUser.getFullName())
+                            .content("Sure, " + user.getFullName() + ", let's schedule a meeting.")
+                            .type("CAREER")
+                            .build();
+                    feedbackRepository.save(f2);
+                }
+            }
+        }
+        log.info("Mock Data Import completed.");
+    }
+
+    private void importMockFeedbacksForRealCounselors() {
+        log.info("Checking for feedback seeding for real counselors...");
+        List<User> counselors = userRepository.findAll().stream()
+                .filter(u -> u.getRole() == UserRole.COUNSELOR && !u.getEmail().equals("counselor_mock@example.com"))
+                .collect(java.util.stream.Collectors.toList());
+
+        if (counselors.isEmpty()) return;
+
+        List<User> students = new java.util.ArrayList<>();
+        for (int i = 1; i <= 20; i++) {
+            User st = userRepository.findByEmail("student" + i + "@example.com");
+            if (st != null) students.add(st);
+        }
+
+        if (students.isEmpty()) return;
+
+        java.util.Random random = new java.util.Random();
+
+        for (User counselor : counselors) {
+            List<Feedback> existing = feedbackRepository.findByReceiver(counselor);
+            if (!existing.isEmpty()) continue;
+
+            log.info("Seeding feedbacks for counselor: {}", counselor.getEmail());
+
+            for (User student : students) {
+                if (random.nextBoolean()) {
+                    Feedback f1 = Feedback.builder()
+                            .sender(student)
+                            .receiver(counselor)
+                            .senderName(student.getFullName())
+                            .content("Hello " + counselor.getFullName() + ", I need help with my career path.")
+                            .type("GENERAL")
+                            .build();
+                    feedbackRepository.save(f1);
+                }
+                if (random.nextBoolean()) {
+                    Feedback f2 = Feedback.builder()
+                            .sender(counselor)
+                            .receiver(student)
+                            .senderName(counselor.getFullName())
+                            .content("Sure, " + student.getFullName() + ", let's schedule a meeting.")
+                            .type("CAREER")
+                            .build();
+                    feedbackRepository.save(f2);
+                }
+            }
+        }
+        log.info("Feedback seeding for real counselors completed.");
     }
 }

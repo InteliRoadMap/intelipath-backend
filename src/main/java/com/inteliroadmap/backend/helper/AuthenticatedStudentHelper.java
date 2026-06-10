@@ -28,10 +28,10 @@ public class AuthenticatedStudentHelper {
      */
     public Student getOrCreateStudent() {
         User user = getAuthenticatedUser();
-        Student student = studentRepository.findByUser(user);
+        Student student = studentRepository.findById(user.getUserId()).orElse(null);
         if (student == null) {
             log.info("Student profile not found. Creating a new one for user: {}", user.getEmail());
-            student = studentRepository.save(Student.builder().user(user).build());
+            student = studentRepository.save(Student.builder().userId(user.getUserId()).build());
         }
         return student;
     }
@@ -50,13 +50,13 @@ public class AuthenticatedStudentHelper {
         }
 
         User user = userOptional.get();
-        Optional<Student> studentOptional = studentRepository.findByUserForUpdate(user);
+        Optional<Student> studentOptional = studentRepository.findByIdForUpdate(user.getUserId());
         if (studentOptional.isPresent()) {
             return studentOptional.get();
         }
 
         Student student = Student.builder()
-                .user(user)
+                .userId(user.getUserId())
                 .build();
 
         return studentRepository.save(student);

@@ -1,11 +1,8 @@
 package com.inteliroadmap.backend.controllers;
 
-import com.inteliroadmap.backend.domain.dto.request.GetSkillGapRequest;
 import com.inteliroadmap.backend.domain.dto.request.UpdateUserProgressRequest;
 import com.inteliroadmap.backend.domain.dto.response.RoadmapResponse;
-import com.inteliroadmap.backend.domain.dto.response.SkillResponse;
 import com.inteliroadmap.backend.services.RoadmapService;
-import com.inteliroadmap.backend.services.SkillService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -25,14 +22,13 @@ import java.util.UUID;
  * Provides functionality to fetch career roadmaps, view specific learning nodes, and track user progress.
  */
 @RestController
-@RequestMapping("/roadmap")
+@RequestMapping("/api/v1/roadmap")
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Roadmap services", description = "Roadmap endpoints")
 public class RoadmapController {
 
     private final RoadmapService roadmapService;
-    private final SkillService skillService;
 
     /**
      * Retrieves the complete learning roadmap for a specific career.
@@ -162,45 +158,6 @@ public class RoadmapController {
         return ResponseEntity.ok(roadmapService.updateNodeProgress(request));
     }
 
-    /**
-     * Compares the skills required by a roadmap (career) against the student's current skills to identify gaps.
-     *
-     * @param request The payload containing the student ID and the target career ID
-     * @return ResponseEntity containing the student's skills, the career's required skills, and the missing skills
-     */
-    @PostMapping("/skills/compare")
-    @Operation(
-            summary = "Compare Roadmap required skills with student skills",
-            description = "Get Roadmap required skills and compare with student existing skills"
-    )
-    @ApiResponses(value = {
-            @ApiResponse(
-                    responseCode = "200",
-                    description = "Skills successfully compared",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = SkillResponse.class)
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "404",
-                    description = "Student or Career not found"
-            )
-    })
-    public ResponseEntity<SkillResponse> getMissingSkills(
-            @io.swagger.v3.oas.annotations.parameters.RequestBody(
-                    description = "Compare student skill request payload",
-                    required = true,
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = GetSkillGapRequest.class)
-                    )
-            )
-    @RequestBody @Valid GetSkillGapRequest request
-    ) {
-        log.info("Comparing roadmap required skills for career ID: {}", request.getCareerName());
-        // Delegate to SkillService to compute the skill gap and return the comparison
-        return ResponseEntity.ok(skillService.getMissingSkills(request));
-    }
+
 
 }

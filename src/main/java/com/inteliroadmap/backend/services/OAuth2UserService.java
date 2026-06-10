@@ -12,6 +12,7 @@ import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.security.CustomOAuth2User;
 import com.inteliroadmap.backend.repositories.StudentRepository;
 import com.inteliroadmap.backend.domain.entity.Student;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
@@ -45,6 +46,7 @@ public class OAuth2UserService extends DefaultOAuth2UserService {
      * @throws OAuth2AuthenticationException if OAuth2 authentication or user extraction fails
      */
     @Override
+    @Transactional
     public OAuth2User loadUser(OAuth2UserRequest request) throws OAuth2AuthenticationException {
         String provider = request.getClientRegistration().getRegistrationId();
         log.info("Loading OAuth2 user from provider: {}", provider);
@@ -141,7 +143,7 @@ public class OAuth2UserService extends DefaultOAuth2UserService {
         log.info("Created new OAuth2 user with id: {}, email: {}", savedUser.getUserId(), savedUser.getEmail());
 
         Student student = Student.builder()
-                .user(savedUser)
+                .userId(savedUser.getUserId())
                 .githubProfile(userInfo.getHtmlUrl())
                 .build();
         studentRepository.save(student);

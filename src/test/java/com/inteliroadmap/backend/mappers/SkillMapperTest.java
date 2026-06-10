@@ -21,7 +21,7 @@ class SkillMapperTest {
                 .career("Software Developer")
                 .build();
         StudentSkill studentSkill = StudentSkill.builder()
-                .student(Student.builder().studentId(UUID.randomUUID()).build())
+                .student(Student.builder().userId(UUID.randomUUID()).build())
                 .skill(skill)
                 .build();
 

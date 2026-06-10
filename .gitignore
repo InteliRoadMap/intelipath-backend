@@ -309,4 +309,8 @@ data/RoadmapDataTemplate.csv
 data/SkillDataTemplate.csv
 data/CareerDataTemplate.csv
 
+
+src/main/java/com/inteliroadmap/backend/config/DatabaseSeeder.java
+src/main/java/com/inteliroadmap/backend/config/MockDataSeeder.java
+
 # End of https://www.toptal.com/developers/gitignore/api/intellij,netbeans,visualstudiocode,maven,node

@@ -1,5 +1,6 @@
 package com.inteliroadmap.backend.repositories;
 
+import com.inteliroadmap.backend.domain.entity.AcademicCounselor;
 import com.inteliroadmap.backend.domain.entity.CareerRole;
 import com.inteliroadmap.backend.domain.entity.Student;
 import com.inteliroadmap.backend.domain.entity.User;
@@ -18,15 +19,15 @@ import java.util.UUID;
 
 @Repository
 public interface StudentRepository extends JpaRepository<Student, UUID> {
-    Student findByStudentId(UUID studentId);
 
-    Student findByCareerRole(CareerRole careerRole);
+    Student findByUserId(UUID userId);
+    List<Student> findByCareerRole(CareerRole careerRole);
 
-    Student findByUser(User user);
-
-    Student findByUser_UserId(UUID userId);
+    @Query("SELECT s FROM Student s, User u WHERE s.userId = u.userId AND (LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(s.university) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(s.careerRole.careerName) LIKE LOWER(CONCAT('%', :search, '%')))")
+    List<Student> searchStudentsInfo(@Param("search") String search);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
-    @Query("select student from Student student where student.user = :user")
-    Optional<Student> findByUserForUpdate(User user);
+    @Query("select student from Student student where student.userId = :userId")
+    Optional<Student> findByIdForUpdate(@Param("userId") UUID userId);
+
 }
