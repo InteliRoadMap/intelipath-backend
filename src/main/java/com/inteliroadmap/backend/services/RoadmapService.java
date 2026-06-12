@@ -9,6 +9,7 @@ import com.inteliroadmap.backend.domain.dto.response.RoadmapResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapNodeDto;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.SkillGapResponse;
 import com.inteliroadmap.backend.domain.entity.*;
+import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
 import com.inteliroadmap.backend.repositories.*;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.security.JwtService;
@@ -160,7 +161,7 @@ public class RoadmapService {
         List<StudentProgress> progresses = studentProgressRepository.findByStudent(student);
 
         long completedCount = progresses.stream()
-                .filter(p -> "COMPLETED".equals(p.getStatus()))
+                .filter(p -> RoadmapStepStatus.COMPLETED == p.getStatus())
                 .filter(p -> p.getSkillNode() != null &&
                              p.getSkillNode().getCareerRole() != null &&
                              p.getSkillNode().getCareerRole().getCareerId().equals(careerId))
@@ -222,7 +223,7 @@ public class RoadmapService {
 
         StudentProgress progress = progressOptional.get();
 
-        if("IN_PROGRESS".equals(progress.getStatus().toString())){
+        if(RoadmapStepStatus.IN_PROGRESS == progress.getStatus()){
             progress.setStatus(RoadmapStepStatus.COMPLETED);
             progress.setCompleteAt(LocalDateTime.now());
             studentProgressRepository.save(progress);
@@ -254,7 +255,7 @@ public class RoadmapService {
         Map<UUID, String> progressMap = progressList.stream()
                 .collect(Collectors.toMap(
                         progress -> progress.getSkillNode().getNodeId(),
-                        StudentProgress::getStatus
+                        progress -> progress.getStatus().toFrontendValue()
                 ));
 
         List<RoadmapNodeDto> nodeDtos = nodes.stream()
@@ -262,7 +263,7 @@ public class RoadmapService {
                 .toList();
 
         int completed = (int) progressList.stream()
-                .filter(progress -> "completed".equalsIgnoreCase(progress.getStatus()))
+                .filter(progress -> RoadmapStepStatus.COMPLETED == progress.getStatus())
                 .count();
         int progressPercent = nodes.isEmpty() ? 0 : (completed * 100) / nodes.size();
 
@@ -326,7 +327,7 @@ public class RoadmapService {
                 );
 
         int completed = (int) progressList.stream()
-                .filter(progress -> "completed".equalsIgnoreCase(progress.getStatus()))
+                .filter(progress -> RoadmapStepStatus.COMPLETED == progress.getStatus())
                 .count();
         return (completed * 100) / nodes.size();
     }
@@ -377,8 +378,15 @@ public class RoadmapService {
                     .build();
         }
 
-        progress.setStatus(request.getStatus());
-        if ("completed".equalsIgnoreCase(request.getStatus())
+        RoadmapStepStatus newStatus;
+        try {
+            newStatus = RoadmapStepStatus.valueOf(request.getStatus().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            newStatus = RoadmapStepStatus.IN_PROGRESS;
+        }
+        
+        progress.setStatus(newStatus);
+        if (RoadmapStepStatus.COMPLETED == newStatus
                 && progress.getCompleteAt() == null) {
             progress.setCompleteAt(LocalDateTime.now());
         }
@@ -472,7 +480,7 @@ public class RoadmapService {
 
         for (SkillNode node : nodes) {
             StudentProgress progress = progressByNodeId.get(node.getNodeId());
-            if (progress != null && COMPLETED_STATUS.equalsIgnoreCase(progress.getStatus())) {
+            if (progress != null && RoadmapStepStatus.COMPLETED == progress.getStatus()) {
                 statusByNodeId.put(node.getNodeId(), FRONTEND_COMPLETED_STATUS);
                 continue;
             }
@@ -498,7 +506,7 @@ public class RoadmapService {
                 .map(SkillNode::getNodeId)
                 .map(progressByNodeId::get)
                 .filter(Objects::nonNull)
-                .filter(progress -> COMPLETED_STATUS.equalsIgnoreCase(progress.getStatus()))
+                .filter(progress -> RoadmapStepStatus.COMPLETED == progress.getStatus())
                 .count();
 
         return (int) Math.round(((double) completedCount / nodes.size()) * 100);

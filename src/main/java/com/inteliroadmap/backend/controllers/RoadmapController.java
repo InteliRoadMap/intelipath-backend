@@ -16,6 +16,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -29,17 +30,18 @@ import java.util.UUID;
 @RequiredArgsConstructor
 @Tag(name = "Roadmap", description = "Dynamic Roadmap APIs for Students")
 @SecurityRequirement(name = "Bearer Authentication")
+@PreAuthorize("hasRole('STUDENT')")
 public class RoadmapController {
 
     private final RoadmapService roadmapService;
 
     @GetMapping("/student")
-    @Operation(summary = "Get student's roadmap", description = "Lấy toàn bộ lộ trình (Flat Array) của sinh viên đang đăng nhập, kết hợp với trạng thái tiến độ để vẽ Map.")
+    @Operation(summary = "Get student's roadmap", description = "Fetch the entire roadmap (Flat Array) of the logged-in student, combined with progress status to render the Map.")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Thành công",
+            @ApiResponse(responseCode = "200", description = "Successful",
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = StudentRoadmapResponse.class))),
-            @ApiResponse(responseCode = "401", description = "Unauthorized - Chưa đăng nhập hoặc Token sai"),
-            @ApiResponse(responseCode = "404", description = "Not Found - Không tìm thấy sinh viên hoặc sinh viên chưa có Career")
+            @ApiResponse(responseCode = "401", description = "Unauthorized - Not logged in or invalid token"),
+            @ApiResponse(responseCode = "404", description = "Not Found - Student not found or student does not have a Career")
     })
     public ResponseEntity<StudentRoadmapResponse> getStudentRoadmap(
             @RequestHeader("Authorization") String authHeader) {
@@ -47,12 +49,12 @@ public class RoadmapController {
     }
 
     @GetMapping("/{careerId}")
-    @Operation(summary = "Get career roadmap template", description = "Lấy template lộ trình gốc của một Career cụ thể (không có tiến độ của sinh viên).")
+    @Operation(summary = "Get career roadmap template", description = "Fetch the base roadmap template of a specific Career (without student progress).")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Thành công",
+            @ApiResponse(responseCode = "200", description = "Successful",
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = StudentRoadmapResponse.class))),
             @ApiResponse(responseCode = "401", description = "Unauthorized"),
-            @ApiResponse(responseCode = "404", description = "Not Found - Không tìm thấy Career")
+            @ApiResponse(responseCode = "404", description = "Not Found - Career not found")
     })
     public ResponseEntity<StudentRoadmapResponse> getCareerRoadmapTemplate(
             @PathVariable UUID careerId) {
@@ -60,9 +62,9 @@ public class RoadmapController {
     }
 
     @GetMapping("/{careerId}/progress")
-    @Operation(summary = "Get career progress", description = "Lấy % tiến độ tổng quan của sinh viên đối với một Career.")
+    @Operation(summary = "Get career progress", description = "Fetch the overall progress percentage of a student for a Career.")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Thành công",
+            @ApiResponse(responseCode = "200", description = "Successful",
                     content = @Content(mediaType = "application/json", schema = @Schema(type = "integer"))),
             @ApiResponse(responseCode = "401", description = "Unauthorized")
     })
@@ -73,12 +75,12 @@ public class RoadmapController {
     }
 
     @GetMapping("/nodes/{nodeId}")
-    @Operation(summary = "Get node detail", description = "Lấy chi tiết 1 Node trong lộ trình.")
+    @Operation(summary = "Get node detail", description = "Fetch details of a single Node in the roadmap.")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Thành công",
+            @ApiResponse(responseCode = "200", description = "Successful",
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = RoadmapNodeDto.class))),
             @ApiResponse(responseCode = "401", description = "Unauthorized"),
-            @ApiResponse(responseCode = "404", description = "Not Found - Không tìm thấy Node")
+            @ApiResponse(responseCode = "404", description = "Not Found - Node not found")
     })
     public ResponseEntity<RoadmapNodeDto> getNodeDetail(
             @PathVariable UUID nodeId) {
@@ -86,12 +88,12 @@ public class RoadmapController {
     }
 
     @PatchMapping("/nodes/progress")
-    @Operation(summary = "Update node progress", description = "Cập nhật trạng thái của 1 Node (vd: 'completed', 'in_progress').")
+    @Operation(summary = "Update node progress", description = "Update the status of a Node (e.g., 'completed', 'in_progress').")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Thành công"),
-            @ApiResponse(responseCode = "400", description = "Bad Request - Payload không hợp lệ"),
+            @ApiResponse(responseCode = "200", description = "Successful"),
+            @ApiResponse(responseCode = "400", description = "Bad Request - Invalid payload"),
             @ApiResponse(responseCode = "401", description = "Unauthorized"),
-            @ApiResponse(responseCode = "404", description = "Not Found - Không tìm thấy Node hoặc Sinh viên")
+            @ApiResponse(responseCode = "404", description = "Not Found - Node or Student not found")
     })
     public ResponseEntity<Void> updateNodeProgress(
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
@@ -109,12 +111,12 @@ public class RoadmapController {
     }
 
     @PostMapping("/skills/compare")
-    @Operation(summary = "Compare skills", description = "So sánh kỹ năng hiện tại của sinh viên với các kỹ năng yêu cầu của Career để tìm ra Skill Gaps.")
+    @Operation(summary = "Compare skills", description = "Compare the student's current skills with the skills required by the Career to find Skill Gaps.")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Thành công",
+            @ApiResponse(responseCode = "200", description = "Successful",
                     content = @Content(mediaType = "application/json", schema = @Schema(implementation = SkillGapResponse.class))),
             @ApiResponse(responseCode = "401", description = "Unauthorized"),
-            @ApiResponse(responseCode = "404", description = "Not Found - Sinh viên chưa chọn Career")
+            @ApiResponse(responseCode = "404", description = "Not Found - Student has not selected a Career")
     })
     public ResponseEntity<SkillGapResponse> compareSkills(
             @RequestHeader("Authorization") String authHeader) {

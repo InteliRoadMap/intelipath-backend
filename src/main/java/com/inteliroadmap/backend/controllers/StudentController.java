@@ -16,8 +16,8 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -30,6 +30,7 @@ import org.springframework.web.bind.annotation.*;
 @Slf4j
 @Tag(name = "Student services", description = "Student endpoints")
 @SecurityRequirement(name = "Bearer Authentication")
+@PreAuthorize("hasRole('STUDENT')")
 public class StudentController {
 
     private final StudentService studentService;
