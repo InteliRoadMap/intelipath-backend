@@ -286,7 +286,7 @@ public class StudentDashboardService {
             boolean currentNodeAssigned
     ) {
         StudentProgress progress = progressByNodeId.get(node.getNodeId());
-        if (progress != null && "COMPLETED".equalsIgnoreCase(progress.getStatus())) {
+        if (progress != null && "COMPLETED".equalsIgnoreCase(progress.getStatus().toString())) {
             return RoadmapStepStatus.COMPLETED;
         }
 

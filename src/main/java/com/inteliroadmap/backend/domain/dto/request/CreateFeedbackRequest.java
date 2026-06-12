@@ -1,5 +1,6 @@
 package com.inteliroadmap.backend.domain.dto.request;
 
+import com.inteliroadmap.backend.domain.enums.FeedbackType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -15,5 +16,5 @@ public class CreateFeedbackRequest {
     private String content;
 
     @NotBlank(message = "Type is required")
-    private String type;
+    private FeedbackType type;
 }

@@ -3,6 +3,8 @@ package com.inteliroadmap.backend.services;
 import com.inteliroadmap.backend.domain.dto.request.UpdateUserProgressRequest;
 import com.inteliroadmap.backend.domain.dto.response.RoadmapResponse;
 import com.inteliroadmap.backend.domain.entity.*;
+import com.inteliroadmap.backend.domain.enums.ImportanceLevel;
+import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
 import com.inteliroadmap.backend.repositories.*;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -150,8 +152,8 @@ public class RoadmapService {
 
         StudentProgress progress = progressOptional.get();
                 
-        if("IN_PROGRESS".equals(progress.getStatus())){
-            progress.setStatus("COMPLETED");
+        if("IN_PROGRESS".equals(progress.getStatus().toString())){
+            progress.setStatus(RoadmapStepStatus.COMPLETED);
             progress.setCompleteAt(LocalDateTime.now());
             studentProgressRepository.save(progress);
         }

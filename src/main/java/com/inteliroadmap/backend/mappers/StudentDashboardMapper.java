@@ -2,6 +2,7 @@ package com.inteliroadmap.backend.mappers;
 
 import com.inteliroadmap.backend.domain.dto.response.dashboard.*;
 import com.inteliroadmap.backend.domain.entity.*;
+import com.inteliroadmap.backend.domain.enums.ImportanceLevel;
 import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
 import org.springframework.stereotype.Component;
 
@@ -90,18 +91,18 @@ public class StudentDashboardMapper {
     }
 
     public int importanceRank(CareerRequiredSkill requiredSkill) {
-        String importanceLevel = requiredSkill.getImportanceLevel();
-        if ("CRITICAL".equalsIgnoreCase(importanceLevel)) {
+        ImportanceLevel importanceLevel = requiredSkill.getImportanceLevel();
+        if ("CRITICAL".equalsIgnoreCase(importanceLevel.toString())) {
             return 0;
         }
-        if ("HIGH".equalsIgnoreCase(importanceLevel)) {
+        if ("HIGH".equalsIgnoreCase(importanceLevel.toString())) {
             return 1;
         }
         return 2;
     }
 
-    private String skillGapType(String importanceLevel) {
-        if ("HIGH".equalsIgnoreCase(importanceLevel) || "CRITICAL".equalsIgnoreCase(importanceLevel)) {
+    private String skillGapType(ImportanceLevel importanceLevel) {
+        if ("HIGH".equalsIgnoreCase(importanceLevel.toString()) || "CRITICAL".equalsIgnoreCase(importanceLevel.toString())) {
             return CRITICAL_TYPE;
         }
         return MARKET_TYPE;

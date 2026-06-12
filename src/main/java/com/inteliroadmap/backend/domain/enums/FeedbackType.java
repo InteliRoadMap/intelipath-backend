@@ -1,4 +1,4 @@
-﻿package com.inteliroadmap.backend.domain.enums;
+package com.inteliroadmap.backend.domain.enums;
 
 import com.fasterxml.jackson.annotation.JsonCreator;
 

@@ -4,6 +4,7 @@ import com.inteliroadmap.backend.domain.dto.response.SkillResponse;
 import com.inteliroadmap.backend.domain.dto.response.dashboard.*;
 import com.inteliroadmap.backend.domain.entity.*;
 import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
+import com.inteliroadmap.backend.domain.enums.ImportanceLevel;
 import com.inteliroadmap.backend.helper.AuthenticatedStudentHelper;
 import com.inteliroadmap.backend.mappers.SkillMapper;
 import com.inteliroadmap.backend.mappers.StudentDashboardMapper;
@@ -37,6 +38,7 @@ class StudentDashboardServiceTest {
     private StudentDashboardService studentDashboardService;
 
     private User user;
+    private AuthenticatedStudentHelper authenticatedStudentHelper;
 
     @BeforeEach
     void setUp() {
@@ -51,6 +53,8 @@ class StudentDashboardServiceTest {
         chatMessageRepository = mock(ChatMessageRepository.class);
         skillTrendRepository = mock(SkillTrendRepository.class);
 
+        authenticatedStudentHelper = mock(AuthenticatedStudentHelper.class);
+
         studentDashboardService = new StudentDashboardService(
                 userRepository,
                 studentRepository,
@@ -64,7 +68,7 @@ class StudentDashboardServiceTest {
                 skillTrendRepository,
                 new SkillMapper(),
                 new StudentDashboardMapper(),
-                mock(AuthenticatedStudentHelper.class)
+                authenticatedStudentHelper
         );
 
         user = User.builder()
@@ -88,6 +92,7 @@ class StudentDashboardServiceTest {
     void roadmapProgressReturnsEmptyWhenStudentHasNoCareer() {
         Student student = student(null);
         when(studentRepository.findById(user.getUserId())).thenReturn(java.util.Optional.of(student));
+        when(authenticatedStudentHelper.getOrCreateStudent()).thenReturn(student);
 
         DashboardRoadmapProgressResponse response = studentDashboardService.getRoadmapProgress();
 
@@ -103,6 +108,7 @@ class StudentDashboardServiceTest {
         SkillNode firstNode = node(career, "Java Basics");
         SkillNode secondNode = node(career, "Spring Boot");
         when(studentRepository.findById(user.getUserId())).thenReturn(java.util.Optional.of(student));
+        when(authenticatedStudentHelper.getOrCreateStudent()).thenReturn(student);
         when(skillNodeRepository.findByCareerRole_CareerIdOrderByLevelAscNodeNameAsc(career.getCareerId()))
                 .thenReturn(List.of(firstNode, secondNode));
         when(studentProgressRepository.findByStudent_UserIdAndSkillNode_NodeIdIn(
@@ -126,9 +132,10 @@ class StudentDashboardServiceTest {
         StudentProgress completedProgress = StudentProgress.builder()
                 .student(student)
                 .skillNode(firstNode)
-                .status("COMPLETED")
+                .status(RoadmapStepStatus.COMPLETED)
                 .build();
         when(studentRepository.findById(user.getUserId())).thenReturn(java.util.Optional.of(student));
+        when(authenticatedStudentHelper.getOrCreateStudent()).thenReturn(student);
         when(skillNodeRepository.findByCareerRole_CareerIdOrderByLevelAscNodeNameAsc(career.getCareerId()))
                 .thenReturn(List.of(firstNode, secondNode, thirdNode));
         when(studentProgressRepository.findByStudent_UserIdAndSkillNode_NodeIdIn(
@@ -233,6 +240,7 @@ class StudentDashboardServiceTest {
 //                .skill(java)
 //                .build();
 //        when(studentRepository.findById(user.getUserId())).thenReturn(java.util.Optional.of(student));
+//        when(authenticatedStudentHelper.getOrCreateStudent()).thenReturn(student);
 //        when(careerRequiredSkillRepository.findByCareerRole_CareerId(career.getCareerId()))
 //                .thenReturn(List.of(requiredSkill));
 //        when(studentSkillRepository.findByStudent_UserId(student.getUserId()))
@@ -275,7 +283,7 @@ class StudentDashboardServiceTest {
                 .build();
     }
 
-    private CareerRequiredSkill requiredSkill(CareerRole careerRole, Skill skill, String importanceLevel) {
+    private CareerRequiredSkill requiredSkill(CareerRole careerRole, Skill skill, ImportanceLevel importanceLevel) {
         return CareerRequiredSkill.builder()
                 .skillRequiredId(UUID.randomUUID())
                 .careerRole(careerRole)

@@ -1,5 +1,6 @@
 package com.inteliroadmap.backend.domain.entity;
 
+import com.inteliroadmap.backend.domain.enums.FeedbackType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -37,7 +38,8 @@ public class Feedback {
     private String content;
 
     @Column(name = "type")
-    private String type;
+    @Enumerated(EnumType.STRING)
+    private FeedbackType type;
 
     @Column(name = "create_at", nullable = false)
     private LocalDateTime createAt;

@@ -1,5 +1,6 @@
 package com.inteliroadmap.backend.domain.entity;
 
+import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -31,8 +32,9 @@ public class StudentProgress {
     private SkillNode skillNode;
 
     @Column(name = "status", nullable = false)
+    @Enumerated(EnumType.STRING)
     @Builder.Default
-    private String status = "IN_PROGRESS";
+    private RoadmapStepStatus status = RoadmapStepStatus.IN_PROGRESS;
 
     @Column(name = "create_at", nullable = false)
     private LocalDateTime createAt;
