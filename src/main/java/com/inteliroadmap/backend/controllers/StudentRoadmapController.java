@@ -1,7 +1,7 @@
 package com.inteliroadmap.backend.controllers;
 
-import com.inteliroadmap.backend.domain.dto.response.SkillResponse;
-import com.inteliroadmap.backend.services.dashboard.StudentDashboardService;
+import com.inteliroadmap.backend.domain.dto.response.StudentRoadmapResponse;
+import com.inteliroadmap.backend.services.RoadmapService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -12,37 +12,37 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
-@RequestMapping("/api/v1/roadmap/skills")
+@RequestMapping("/api/v1/roadmap")
 @RequiredArgsConstructor
 @Slf4j
-@Tag(name = "Roadmap Skills", description = "Student roadmap skill comparison endpoints")
+@Tag(name = "Student Roadmap", description = "Authenticated student roadmap endpoints")
 @SecurityRequirement(name = "Bearer Authentication")
-public class RoadmapSkillController {
+public class StudentRoadmapController {
 
-    private final StudentDashboardService studentDashboardService;
+    private final RoadmapService roadmapService;
 
     /**
-     * Compare authenticated student's selected skills with required career skills.
+     * Gets the authenticated student's current target roadmap.
      *
-     * @return skill comparison response
+     * @return frontend contract response with roadmap progress and nodes
      */
-    @PostMapping("/compare")
+    @GetMapping("/student")
     @Operation(
-            summary = "Compare student skills",
-            description = "Compare the authenticated student's selected skills with the skills required by the target career"
+            summary = "Get student roadmap",
+            description = "Get the authenticated student's target roadmap, progress, nodes, and learning resources"
     )
     @ApiResponses(value = {
             @ApiResponse(
                     responseCode = "200",
-                    description = "Student skills compared successfully",
+                    description = "Student roadmap fetched successfully",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = SkillResponse.class)
+                            schema = @Schema(implementation = StudentRoadmapResponse.class)
                     )
             ),
             @ApiResponse(
@@ -54,8 +54,8 @@ public class RoadmapSkillController {
                     description = "Student or target career not found"
             )
     })
-    public ResponseEntity<SkillResponse> compareSkills() {
-        log.info("Roadmap Skills API: Compare skills request received");
-        return ResponseEntity.ok(studentDashboardService.compareCurrentStudentSkills());
+    public ResponseEntity<StudentRoadmapResponse> getStudentRoadmap() {
+        log.info("Student Roadmap API: Get student roadmap request received");
+        return ResponseEntity.ok(roadmapService.getStudentRoadmap());
     }
 }

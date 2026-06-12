@@ -33,6 +33,8 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .cors(Customizer.withDefaults()) // ← Tự động dùng CorsConfig bean
                 .sessionManagement(session -> session
+                        // OAuth2 login needs a temporary session to preserve the authorization request.
+                        // Protected APIs still authenticate with JWT and do not depend on this session.
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS)
                 )
                 .authorizeHttpRequests(auth -> auth
@@ -56,51 +58,12 @@ public class SecurityConfig {
                                 "/webjars/**"
                         ).permitAll()
 
-                        // ============================================================
-                        // STUDENT ENDPOINTS - Role: STUDENT
-                        // Sprint 2: Profile & Assessment
-                        // ============================================================
                         .requestMatchers("/api/v1/student/**").hasRole("STUDENT")
-
-                        // ============================================================
-                        // ROADMAP ENDPOINTS - Role: STUDENT
-                        // Sprint 3: Roadmap
-                        // ============================================================
+                         .requestMatchers("/api/v1/career-roles/**").hasRole("STUDENT")
                          .requestMatchers("/api/v1/roadmap/**").hasRole("STUDENT")
                          .requestMatchers(HttpMethod.GET, "/roadmap/**").hasRole("STUDENT")
                          .requestMatchers(HttpMethod.PUT, "/roadmap/**").hasRole("STUDENT")
 
-                        // ============================================================
-                        // AI CHAT ENDPOINTS - Role: STUDENT
-                        // Sprint 4: AI Virtual Mentor
-                        // ============================================================
-                        // .requestMatchers(HttpMethod.POST, "/chat/**").hasRole("STUDENT")
-                        // .requestMatchers(HttpMethod.GET, "/chat/**").hasRole("STUDENT")
-
-                        // ============================================================
-                        // PORTFOLIO ENDPOINTS - Role: STUDENT
-                        // Sprint 4: E-Portfolio
-                        // ============================================================
-                        // .requestMatchers(HttpMethod.POST, "/portfolio/**").hasRole("STUDENT")
-                        // .requestMatchers(HttpMethod.GET, "/portfolio/**").hasRole("STUDENT")
-
-                        // ============================================================
-                        // COUNSELOR ENDPOINTS - Role: COUNSELOR
-                        // Sprint 5: Counselor Dashboard
-                        // ============================================================
-                        // .requestMatchers(HttpMethod.GET, "/counselor/**").hasRole("COUNSELOR")
-                        // .requestMatchers(HttpMethod.POST, "/feedback/**").hasRole("COUNSELOR")
-
-                        // ============================================================
-                        // MARKET PULSE ENDPOINTS - Role: STUDENT, COUNSELOR
-                        // Sprint 5: Market Pulse
-                        // ============================================================
-                        // .requestMatchers(HttpMethod.GET, "/market/**")
-                        //     .hasAnyRole("STUDENT", "COUNSELOR")
-
-                        // ============================================================
-                        // All other endpoints require authentication
-                        // ============================================================
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth2 -> oauth2

@@ -6,8 +6,7 @@ import lombok.Data;
 import java.util.UUID;
 
 @Data
-public class CompareStRmSkillRequest {
-
+public class TargetCareerRequest {
     @NotNull(message = "Career ID is required")
     private UUID careerId;
 }

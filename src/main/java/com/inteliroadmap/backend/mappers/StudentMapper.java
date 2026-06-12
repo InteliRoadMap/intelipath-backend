@@ -27,10 +27,11 @@ public class StudentMapper {
                 .yob(user.getYob())
                 .bio(user.getBio())
                 .university(student.getUniversity())
-                .year_of_admission(student.getYearOfAdmission())
+                .yearOfAdmission(student.getYearOfAdmission())
                 .major(student.getMajor())
                 .githubProfile(student.getGithubProfile())
                 .careerId(student.getCareerRole() != null ? student.getCareerRole().getCareerId() : null)
+                .careerName(student.getCareerRole() != null ? student.getCareerRole().getCareerName() : null)
                 .build();
     }
 }

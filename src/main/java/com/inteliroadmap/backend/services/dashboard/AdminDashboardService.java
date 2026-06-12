@@ -1,6 +1,6 @@
 package com.inteliroadmap.backend.services.dashboard;
 
-import com.inteliroadmap.backend.domain.dto.request.admin.UpdateUserRoleRequest;
+import com.inteliroadmap.backend.domain.dto.request.UpdateUserRoleRequest;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminCourseMetricResponse;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminSystemHealthResponse;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminUserListItemResponse;
@@ -86,11 +86,8 @@ public class AdminDashboardService {
     }
 
     @Transactional
-    public AdminUserListItemResponse updateUserRole(
-            String authorizationHeader,
-            String userId,
-            UpdateUserRoleRequest request
-    ) {
+    public AdminUserListItemResponse updateUserRole(String authorizationHeader, String userId, UpdateUserRoleRequest request) {
+
         validateAdmin(authorizationHeader);
 
         log.info("Admin Dashboard Module: Update user role. userId: {}, role: {}", userId, request.getRole());
@@ -106,8 +103,7 @@ public class AdminDashboardService {
     }
 
     @Transactional
-    public void deleteUser(String authorizationHeader, String userId) {
-        validateAdmin(authorizationHeader);
+    public void deleteUser(String authorizationHeader, String userId) {validateAdmin(authorizationHeader);
 
         log.info("Admin Dashboard Module: Delete user. userId: {}", userId);
 

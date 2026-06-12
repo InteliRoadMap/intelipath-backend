@@ -2,9 +2,9 @@ package com.inteliroadmap.backend.controllers;
 
 import com.inteliroadmap.backend.domain.dto.request.ImportSkillsRequest;
 import com.inteliroadmap.backend.domain.dto.request.SetupStudentProfileRequest;
+import com.inteliroadmap.backend.domain.dto.request.TargetCareerRequest;
 import com.inteliroadmap.backend.domain.dto.response.SkillResponse;
 import com.inteliroadmap.backend.domain.dto.response.StudentResponse;
-import com.inteliroadmap.backend.domain.dto.response.UserResponse;
 import com.inteliroadmap.backend.services.SkillService;
 import com.inteliroadmap.backend.services.StudentService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -24,10 +25,11 @@ import org.springframework.web.bind.annotation.*;
  * Provides functionality for profile setup and skill management.
  */
 @RestController
-@RequestMapping("/api/v1/student")
+@RequestMapping("/api/v1/students")
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Student services", description = "Student endpoints")
+@SecurityRequirement(name = "Bearer Authentication")
 public class StudentController {
 
     private final StudentService studentService;
@@ -52,13 +54,16 @@ public class StudentController {
                     )
             ),
             @ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized or invalid access token"
+            ),
+            @ApiResponse(
                     responseCode = "404",
                     description = "User not found"
             )
     })
     public ResponseEntity<StudentResponse> getStudentProfile() {
         log.info("Student profile retrieval request received");
-        // Delegate to StudentService to fetch the student profile
         return ResponseEntity.ok(studentService.getStudentProfile());
     }
 
@@ -79,12 +84,20 @@ public class StudentController {
                     description = "Setup profile successful",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = UserResponse.class)
+                            schema = @Schema(implementation = StudentResponse.class)
                     )
             ),
             @ApiResponse(
+                    responseCode = "400",
+                    description = "Invalid student profile payload"
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized or invalid access token"
+            ),
+            @ApiResponse(
                     responseCode = "404",
-                    description = "User not found"
+                    description = "User or career role not found"
             )
     })
     public ResponseEntity<StudentResponse> setupStudentProfile(
@@ -97,11 +110,53 @@ public class StudentController {
                     )
             )
             @RequestBody @Valid SetupStudentProfileRequest setupStudentProfileRequest
-    ) {
+        ) {
         log.info("Student profile setup request received");
-        // Delegate to StudentService to setup or update the student profile
         return ResponseEntity.ok(studentService.setupStudentProfile(setupStudentProfileRequest));
     }
+
+    @PutMapping("/target-career")
+    @Operation(
+            summary = "Update target career",
+            description = "Update the authenticated student's target career using a database career UUID"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Target career updated successfully",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = StudentResponse.class)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Invalid career ID"
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized or invalid access token"
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Student or career role not found"
+            )
+    })
+    public ResponseEntity<StudentResponse> updateTargetCareer(
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Target career request payload",
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = TargetCareerRequest.class)
+                    )
+            )
+            @RequestBody @Valid TargetCareerRequest request
+    ) {
+        log.info("Student target career update request received");
+        return ResponseEntity.ok(studentService.updateTargetCareer(request.getCareerId()));
+    }
+
 
     /**
      * Retrieves the authenticated student's selected skills and all available skills.
@@ -123,6 +178,10 @@ public class StudentController {
                     )
             ),
             @ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized or invalid access token"
+            ),
+            @ApiResponse(
                     responseCode = "404",
                     description = "Student skills not found"
             )
@@ -138,7 +197,7 @@ public class StudentController {
      * @param search skill name fragment to search for
      * @return response containing matching skills
      */
-    @GetMapping("/skills/{search}")
+    @GetMapping("/skills/search")
     @Operation(
             summary = "Search skills by name",
             description = "Search skills by skill name without case sensitivity"
@@ -151,11 +210,16 @@ public class StudentController {
                             mediaType = "application/json",
                             schema = @Schema(implementation = SkillResponse.class)
                     )
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized or invalid access token"
             )
     })
-    public ResponseEntity<SkillResponse> searchSkills(@PathVariable String search) {
-        log.info("Searching skills by name: {}", search);
-        return ResponseEntity.ok(skillService.searchSkills(search));
+    public ResponseEntity<SkillResponse> searchSkills(@RequestParam String keyword) {
+        log.info("Searching skills by name: {}", keyword);
+
+        return ResponseEntity.ok(skillService.searchSkills(keyword));
     }
 
     /**
@@ -179,6 +243,14 @@ public class StudentController {
                     )
             ),
             @ApiResponse(
+                    responseCode = "400",
+                    description = "Invalid skill selection payload"
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized or invalid access token"
+            ),
+            @ApiResponse(
                     responseCode = "404",
                     description = "User or skill not found"
             )
@@ -195,7 +267,6 @@ public class StudentController {
             @RequestBody @Valid ImportSkillsRequest importSkillsRequest
     ) {
         log.info("Importing selected skills for authenticated student");
-        // Delegate to SkillService to process and save the selected skills
         return ResponseEntity.ok(skillService.importStudentSkills(importSkillsRequest));
     }
 }

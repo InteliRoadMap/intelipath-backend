@@ -5,6 +5,8 @@ import com.inteliroadmap.backend.domain.entity.*;
 import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Component
@@ -12,7 +14,7 @@ public class StudentDashboardMapper {
 
     private static final String CRITICAL_TYPE = "critical";
     private static final String MARKET_TYPE = "market";
-    private static final String RECOMMENDATION_TYPE = "Skill";
+    private static final String RECOMMENDATION_TYPE = "Skill Gap";
     private static final String RECOMMENDATION_ICON = "Network";
 
     public DashboardRoadmapProgressResponse toRoadmapProgressResponse(List<RoadmapStepResponse> steps) {
@@ -44,7 +46,7 @@ public class StudentDashboardMapper {
         return MentorFeedbackItemResponse.builder()
                 .id(feedback.getFeedbackId())
                 .name(feedback.getSender() != null ? feedback.getSender().getFullName() : null)
-                .time(feedback.getCreateAt())
+                .time(formatRelativeTime(feedback.getCreateAt()))
                 .text(feedback.getContent())
                 .build();
     }
@@ -115,5 +117,25 @@ public class StudentDashboardMapper {
             return skill.getCareer();
         }
         return null;
+    }
+
+    private String formatRelativeTime(LocalDateTime time) {
+        if (time == null) {
+            return null;
+        }
+
+        Duration duration = Duration.between(time, LocalDateTime.now());
+        long minutes = Math.max(0, duration.toMinutes());
+        if (minutes < 60) {
+            return minutes + " minutes ago";
+        }
+
+        long hours = duration.toHours();
+        if (hours < 24) {
+            return hours + " hours ago";
+        }
+
+        long days = duration.toDays();
+        return days + " days ago";
     }
 }

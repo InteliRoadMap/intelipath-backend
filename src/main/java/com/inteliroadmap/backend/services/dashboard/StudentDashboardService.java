@@ -194,7 +194,7 @@ public class StudentDashboardService {
 
         Student student = getCurrentStudent();
         if (student == null || student.getCareerRole() == null) {
-            return null;
+            return MarketDemandResponse.builder().build();
         }
 
         CareerRole careerRole = student.getCareerRole();

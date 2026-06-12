@@ -1,207 +1,118 @@
 package com.inteliroadmap.backend.controllers;
 
-import com.inteliroadmap.backend.domain.dto.request.CompareStRmSkillRequest;
-import com.inteliroadmap.backend.domain.dto.request.ImportSkillsRequest;
-import com.inteliroadmap.backend.domain.dto.request.UpdateUserProgressRequest;
-import com.inteliroadmap.backend.domain.dto.response.RoadmapResponse;
-import com.inteliroadmap.backend.domain.dto.response.SkillResponse;
+import com.inteliroadmap.backend.domain.dto.request.UpdateNodeProgressRequest;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapNodeDto;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.SkillGapResponse;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.StudentRoadmapResponse;
 import com.inteliroadmap.backend.services.RoadmapService;
-import com.inteliroadmap.backend.services.SkillService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
 
-/**
- * Controller responsible for handling roadmap and learning progress API endpoints.
- * Provides functionality to fetch career roadmaps, view specific learning nodes, and track user progress.
- */
 @RestController
-@RequestMapping("/roadmap")
+@RequestMapping("/api/v1/roadmaps")
 @RequiredArgsConstructor
-@Slf4j
-@Tag(name = "Roadmap services", description = "Roadmap endpoints")
+@Tag(name = "Roadmap", description = "Dynamic Roadmap APIs for Students")
+@SecurityRequirement(name = "Bearer Authentication")
 public class RoadmapController {
 
     private final RoadmapService roadmapService;
-    private final SkillService skillService;
 
-    /**
-     * Retrieves the complete learning roadmap for a specific career.
-     *
-     * @param careerId The unique identifier (UUID) of the career.
-     * @return ResponseEntity containing a RoadmapResponse with the associated career and skill nodes.
-     */
-    @GetMapping("/{career_id}")
-    @Operation(
-            summary = "Get Roadmap",
-            description = "Get available roadmaps by career id"
-    )
+    @GetMapping("/student")
+    @Operation(summary = "Get student's roadmap", description = "Lấy toàn bộ lộ trình (Flat Array) của sinh viên đang đăng nhập, kết hợp với trạng thái tiến độ để vẽ Map.")
     @ApiResponses(value = {
-            @ApiResponse(
-                    responseCode = "200",
-                    description = "Roadmap fetched successfully",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = RoadmapResponse.class)
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "404",
-                    description = "No roadmap available"
-            )
+            @ApiResponse(responseCode = "200", description = "Thành công",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = StudentRoadmapResponse.class))),
+            @ApiResponse(responseCode = "401", description = "Unauthorized - Chưa đăng nhập hoặc Token sai"),
+            @ApiResponse(responseCode = "404", description = "Not Found - Không tìm thấy sinh viên hoặc sinh viên chưa có Career")
     })
-    public ResponseEntity<RoadmapResponse> getRoadmap(@PathVariable("career_id") UUID careerId) {
-        log.info("Fetching roadmap for career ID: {}", careerId);
-        // Delegate to RoadmapService to retrieve the career's full learning roadmap
-        return ResponseEntity.ok(roadmapService.getRoadmap(careerId));
+    public ResponseEntity<StudentRoadmapResponse> getStudentRoadmap(
+            @RequestHeader("Authorization") String authHeader) {
+        return ResponseEntity.ok(roadmapService.getStudentRoadmap(authHeader));
     }
 
-    @GetMapping("/{career_id}/progress")
-    @Operation(
-            summary = "Get Roadmap total progress",
-            description = "Get Roadmap total progress by career id"
-    )
+    @GetMapping("/{careerId}")
+    @Operation(summary = "Get career roadmap template", description = "Lấy template lộ trình gốc của một Career cụ thể (không có tiến độ của sinh viên).")
     @ApiResponses(value = {
-            @ApiResponse(
-                    responseCode = "200",
-                    description = "Roadmap total progress fetched successfully",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = RoadmapResponse.class)
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "404",
-                    description = "No progress available"
-            )
+            @ApiResponse(responseCode = "200", description = "Thành công",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = StudentRoadmapResponse.class))),
+            @ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @ApiResponse(responseCode = "404", description = "Not Found - Không tìm thấy Career")
     })
-    public ResponseEntity<RoadmapResponse> getRoadmapProgress(@PathVariable("career_id") UUID careerId) {
-        log.info("Fetching total progress for career ID: {}", careerId);
-        // Delegate to RoadmapService to retrieve the career's full learning roadmap
-        return ResponseEntity.ok(roadmapService.getRoadmapProgress(careerId));
+    public ResponseEntity<StudentRoadmapResponse> getCareerRoadmapTemplate(
+            @PathVariable UUID careerId) {
+        return ResponseEntity.ok(roadmapService.getCareerRoadmapTemplate(careerId));
     }
 
-    /**
-     * Retrieves detailed information about a specific learning node (skill node).
-     *
-     * @param nodeId The unique identifier (UUID) of the skill node.
-     * @return ResponseEntity containing a RoadmapResponse with the node's specific details.
-     */
-    @GetMapping("/node/{node_id}")
-    @Operation(
-            summary = "Get node info",
-            description = "Get node info by id"
-    )
+    @GetMapping("/{careerId}/progress")
+    @Operation(summary = "Get career progress", description = "Lấy % tiến độ tổng quan của sinh viên đối với một Career.")
     @ApiResponses(value = {
-            @ApiResponse(
-                    responseCode = "200",
-                    description = "Node info fetched successfully",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = RoadmapResponse.class)
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "404",
-                    description = "No node available"
-            )
+            @ApiResponse(responseCode = "200", description = "Thành công",
+                    content = @Content(mediaType = "application/json", schema = @Schema(type = "integer"))),
+            @ApiResponse(responseCode = "401", description = "Unauthorized")
     })
-    public ResponseEntity<RoadmapResponse> getNode(@PathVariable("node_id") UUID nodeId) {
-        log.info("Fetching details for skill node ID: {}", nodeId);
-        // Delegate to RoadmapService to fetch specific node information
-        return ResponseEntity.ok(roadmapService.getNode(nodeId));
+    public ResponseEntity<Integer> getCareerProgress(
+            @PathVariable UUID careerId,
+            @RequestHeader("Authorization") String authHeader) {
+        return ResponseEntity.ok(roadmapService.getCareerProgress(careerId, authHeader));
     }
 
-    /**
-     * Updates the authenticated user's progress, marking a specific skill node as finished.
-     *
-     * @param request The payload containing the student ID and the target node ID.
-     * @return ResponseEntity containing a RoadmapResponse confirming the progress update.
-     */
-    @PatchMapping("/node/progress")
-    @Operation(
-            summary = "Update Node status",
-            description = "Update Node status after finishing it"
-    )
+    @GetMapping("/nodes/{nodeId}")
+    @Operation(summary = "Get node detail", description = "Lấy chi tiết 1 Node trong lộ trình.")
     @ApiResponses(value = {
-            @ApiResponse(
-                    responseCode = "200",
-                    description = "Node status update successfully",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = RoadmapResponse.class)
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "404",
-                    description = "No node available"
-            )
+            @ApiResponse(responseCode = "200", description = "Thành công",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = RoadmapNodeDto.class))),
+            @ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @ApiResponse(responseCode = "404", description = "Not Found - Không tìm thấy Node")
     })
-    public ResponseEntity<RoadmapResponse> updateNodeProgress(
+    public ResponseEntity<RoadmapNodeDto> getNodeDetail(
+            @PathVariable UUID nodeId) {
+        return ResponseEntity.ok(roadmapService.getNodeDetail(nodeId));
+    }
+
+    @PatchMapping("/nodes/progress")
+    @Operation(summary = "Update node progress", description = "Cập nhật trạng thái của 1 Node (vd: 'completed', 'in_progress').")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Thành công"),
+            @ApiResponse(responseCode = "400", description = "Bad Request - Payload không hợp lệ"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @ApiResponse(responseCode = "404", description = "Not Found - Không tìm thấy Node hoặc Sinh viên")
+    })
+    public ResponseEntity<Void> updateNodeProgress(
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     description = "Update Node progress request payload",
                     required = true,
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = UpdateUserProgressRequest.class)
+                            schema = @Schema(implementation = UpdateNodeProgressRequest.class)
                     )
             )
-            @RequestBody @Valid UpdateUserProgressRequest request
-    ) {
-        log.info("Updating progress for skill node ID: {}", request.getNodeId());
-        // Delegate to RoadmapService to mark the specified node as completed
-        return ResponseEntity.ok(roadmapService.updateNodeProgress(request));
+            @Valid @RequestBody UpdateNodeProgressRequest request,
+            @RequestHeader("Authorization") String authHeader) {
+        roadmapService.updateNodeProgress(request, authHeader);
+        return ResponseEntity.ok().build();
     }
 
-    /**
-     * Compares the skills required by a roadmap (career) against the student's current skills to identify gaps.
-     *
-     * @param request The payload containing the student ID and the target career ID
-     * @return ResponseEntity containing the student's skills, the career's required skills, and the missing skills
-     */
     @PostMapping("/skills/compare")
-    @Operation(
-            summary = "Compare Roadmap required skills with student skills",
-            description = "Get Roadmap required skills and compare with student existing skills"
-    )
+    @Operation(summary = "Compare skills", description = "So sánh kỹ năng hiện tại của sinh viên với các kỹ năng yêu cầu của Career để tìm ra Skill Gaps.")
     @ApiResponses(value = {
-            @ApiResponse(
-                    responseCode = "200",
-                    description = "Skills successfully compared",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = SkillResponse.class)
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "404",
-                    description = "Student or Career not found"
-            )
+            @ApiResponse(responseCode = "200", description = "Thành công",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = SkillGapResponse.class))),
+            @ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @ApiResponse(responseCode = "404", description = "Not Found - Sinh viên chưa chọn Career")
     })
-    public ResponseEntity<SkillResponse> compareWithStudentSkills(
-            @io.swagger.v3.oas.annotations.parameters.RequestBody(
-                    description = "Compare student skill request payload",
-                    required = true,
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = CompareStRmSkillRequest.class)
-                    )
-            )
-    @RequestBody @Valid CompareStRmSkillRequest request
-    ) {
-        log.info("Comparing roadmap required skills for career ID: {}", request.getCareerId());
-        // Delegate to SkillService to compute the skill gap and return the comparison
-        return ResponseEntity.ok(skillService.compareWithStudentSkills(request));
+    public ResponseEntity<SkillGapResponse> compareSkills(
+            @RequestHeader("Authorization") String authHeader) {
+        return ResponseEntity.ok(roadmapService.compareSkills(authHeader));
     }
-
 }

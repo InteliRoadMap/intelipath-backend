@@ -13,9 +13,13 @@ import com.inteliroadmap.backend.repositories.StudentRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
+import java.time.format.DateTimeParseException;
+import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -29,42 +33,58 @@ public class StudentService {
 
     /**
      * Set up or update a student's profile information.
-     * Extracts the user's email from the provided JWT token and updates their details in the database.
-     * Only fields that are not null in the request will be updated.
+     * The student is resolved from the authenticated JWT security context.
      *
-     * @param request SetupStudentProfileRequest containing the JWT token and profile data to update.
-     * @return UserResponse containing the updated user's ID, full name, and role.
-     * @throws ResourceNotFoundException if the token is invalid or the user does not exist.
+     * @param request request body containing student profile fields
+     * @return StudentResponse containing the updated student profile
      */
     @Transactional
     public StudentResponse setupStudentProfile(SetupStudentProfileRequest request) {
-        log.info("Student Module: Setup Student Profile Request received");
+        log.info("Student profile setup request received");
 
+        // Step 1: Get or create the authenticated student for update
         Student student = authenticatedStudentHelper.getOrCreateStudentForUpdate();
+
+        // Step 2: Verify that the student belongs to an existing user
         User user = student.getUser();
         if (user == null) {
+            log.warn("Authenticated student does not have an associated user");
             throw new ResourceNotFoundException("User not found");
         }
 
-        if (request.getUniversity() != null) student.setUniversity(request.getUniversity());
+        // Step 3: Update only profile fields supplied by the client
+        if (request.getUniversity() != null) {
+            student.setUniversity(request.getUniversity());
+        }
+
         if (request.getYearOfAdmission() != null) {
             if (request.getYearOfAdmission().trim().isEmpty()) {
                 student.setYearOfAdmission(null);
             } else {
-                student.setYearOfAdmission(LocalDate.parse(request.getYearOfAdmission()));
+                student.setYearOfAdmission(parseIsoDate(request.getYearOfAdmission()));
             }
         }
-        if (request.getMajor() != null) student.setMajor(request.getMajor());
 
+        if (request.getMajor() != null) {
+            student.setMajor(request.getMajor());
+        }
+
+        // Step 4: Validate and update the career when careerId is supplied
         if (request.getCareerId() != null) {
             CareerRole career = careerRoleRepository.findByCareerId(request.getCareerId());
-            if(career != null) {
-                student.setCareerRole(career);
+            if (career == null) {
+                log.warn("Career role was not found: {}", request.getCareerId());
+                throw new ResourceNotFoundException("Career role not found");
             }
+            student.setCareerRole(career);
         }
+
+        // Step 5: Save the updated student profile
         studentRepository.save(student);
 
-        return studentMapper.toSetupProfileResponse(student);
+        // Step 6: Map the saved student entity to the API response
+        log.info("Student profile updated successfully for user: {}", user.getEmail());
+        return studentMapper.toProfileResponse(student);
     }
 
     /**
@@ -75,10 +95,62 @@ public class StudentService {
      */
     @Transactional
     public StudentResponse getStudentProfile() {
-        log.info("Student Module: Get Student Profile Request received");
+        log.info("Student profile retrieval request received");
 
-        Student student = authenticatedStudentHelper.getOrCreateStudent();
+        // Step 1: Get the authenticated student without creating profile data
+        Student student = authenticatedStudentHelper.getRequiredStudent();
 
+        // Step 2: Map the student entity to the API response
         return studentMapper.toProfileResponse(student);
+    }
+
+    /**
+     * Updates the authenticated student's target career.
+     * Business rule: careerId must be a real UUID that exists in career_roles.
+     *
+     * @param careerId target career UUID from request body
+     * @return updated student profile response
+     */
+    @Transactional
+    public StudentResponse updateTargetCareer(UUID careerId) {
+        log.info("Student target career update request received. careerId: {}", careerId);
+
+        // Step 1: Get or create the authenticated student for update
+        Student student = authenticatedStudentHelper.getOrCreateStudentForUpdate();
+
+        // Step 2: Verify that the requested career exists in the database
+        CareerRole career = careerRoleRepository.findByCareerId(careerId);
+        if (career == null) {
+            log.warn("Career role was not found: {}", careerId);
+            throw new ResourceNotFoundException("Career role not found");
+        }
+
+        // Step 3: Assign the validated career to the student
+        student.setCareerRole(career);
+
+        // Step 4: Save the updated student
+        studentRepository.save(student);
+
+        // Step 5: Return the updated student profile
+        log.info("Student target career updated successfully. careerId: {}", careerId);
+        return studentMapper.toProfileResponse(student);
+    }
+
+    /**
+     * Parse an ISO date without changing or guessing the client value.
+     *
+     * @param dateValue date value in yyyy-MM-dd format
+     * @return parsed LocalDate value
+     */
+    private LocalDate parseIsoDate(String dateValue) {
+        try {
+            return LocalDate.parse(dateValue);
+        } catch (DateTimeParseException exception) {
+            log.warn("Invalid yearOfAdmission format: {}", dateValue);
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "yearOfAdmission must use yyyy-MM-dd format"
+            );
+        }
     }
 }

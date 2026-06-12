@@ -1,6 +1,5 @@
 package com.inteliroadmap.backend.domain.dto.response;
 
-import com.inteliroadmap.backend.domain.entity.SkillNode;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -13,12 +12,16 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class CareerResponse {
-    private UUID careerId;
-    private String careerName;
-    private String prerequisite;
+public class StudentRoadmapNodeResponse {
+    private UUID id;
+    private String title;
+    private String status;
     private String description;
+    private Integer level;
 
     @Builder.Default
-    private List<SkillNode> skillNodes = List.of();
+    private List<StudentRoadmapResourceResponse> resources = List.of();
+
+    @Builder.Default
+    private List<StudentRoadmapNodeResponse> children = List.of();
 }

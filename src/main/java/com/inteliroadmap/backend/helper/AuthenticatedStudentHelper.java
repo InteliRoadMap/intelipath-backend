@@ -37,6 +37,20 @@ public class AuthenticatedStudentHelper {
     }
 
     /**
+     * Get the current authenticated student without creating missing profile data.
+     *
+     * @return current authenticated student
+     */
+    public Student getRequiredStudent() {
+        User user = getAuthenticatedUser();
+        Student student = studentRepository.findByUser(user);
+        if (student == null) {
+            throw new ResourceNotFoundException("Student profile not found");
+        }
+        return student;
+    }
+
+    /**
      * Get current authenticated student for update and create one if missing.
      *
      * @return locked current authenticated student
