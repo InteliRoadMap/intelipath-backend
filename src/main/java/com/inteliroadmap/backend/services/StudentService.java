@@ -10,6 +10,7 @@ import com.inteliroadmap.backend.helper.AuthenticatedStudentHelper;
 import com.inteliroadmap.backend.mappers.StudentMapper;
 import com.inteliroadmap.backend.repositories.CareerRoleRepository;
 import com.inteliroadmap.backend.repositories.StudentRepository;
+import com.inteliroadmap.backend.repositories.UserRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -26,6 +27,7 @@ import java.util.UUID;
 @Slf4j
 public class StudentService {
 
+    private final UserRepository userRepository;
     private final StudentRepository studentRepository;
     private final CareerRoleRepository careerRoleRepository;
     private final AuthenticatedStudentHelper authenticatedStudentHelper;
@@ -40,28 +42,20 @@ public class StudentService {
      */
     @Transactional
     public StudentResponse setupStudentProfile(SetupStudentProfileRequest request) {
-        log.info("Student profile setup request received");
+        log.info("Student Module: Setup Student Profile Request received");
 
-        // Step 1: Get or create the authenticated student for update
         Student student = authenticatedStudentHelper.getOrCreateStudentForUpdate();
-
-        // Step 2: Verify that the student belongs to an existing user
-        User user = student.getUser();
+        User user = userRepository.findByUserId(student.getUserId());
         if (user == null) {
-            log.warn("Authenticated student does not have an associated user");
             throw new ResourceNotFoundException("User not found");
         }
 
-        // Step 3: Update only profile fields supplied by the client
-        if (request.getUniversity() != null) {
-            student.setUniversity(request.getUniversity());
-        }
-
+        if (request.getUniversity() != null) student.setUniversity(request.getUniversity());
         if (request.getYearOfAdmission() != null) {
             if (request.getYearOfAdmission().trim().isEmpty()) {
                 student.setYearOfAdmission(null);
             } else {
-                student.setYearOfAdmission(parseIsoDate(request.getYearOfAdmission()));
+                student.setYearOfAdmission(LocalDate.parse(request.getYearOfAdmission()));
             }
         }
 
@@ -80,6 +74,25 @@ public class StudentService {
         }
 
         // Step 5: Save the updated student profile
+
+        boolean userChanged = false;
+        if (request.getBio() != null) {
+            user.setBio(request.getBio());
+            userChanged = true;
+        }
+        if (request.getYob() != null) {
+            if (request.getYob().trim().isEmpty()) {
+                user.setYob(null);
+            } else {
+                user.setYob(LocalDate.parse(request.getYob()));
+            }
+            userChanged = true;
+        }
+
+        if (userChanged) {
+            userRepository.save(user);
+        }
+
         studentRepository.save(student);
 
         // Step 6: Map the saved student entity to the API response

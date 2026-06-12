@@ -15,9 +15,16 @@ import java.util.UUID;
 public interface UserRepository extends JpaRepository<User, UUID> {
     User findByEmail(String email);
 
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select user from User user where user.email = :email")
     Optional<User> findByEmailForUpdate(String email);
 
     boolean existsByEmail(String email);
 
+    @Query("SELECT u FROM User u ORDER BY u.createAt DESC")
     List<User> findAllUsers();
+
+    User findByUserId(UUID userId);
+
+    User findByEmailContainingIgnoreCaseOrFullNameContainingIgnoreCase(String email, String fullName);
 }

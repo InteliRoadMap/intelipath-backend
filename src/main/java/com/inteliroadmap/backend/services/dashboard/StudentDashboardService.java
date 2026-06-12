@@ -5,6 +5,7 @@ import com.inteliroadmap.backend.domain.dto.response.student.*;
 import com.inteliroadmap.backend.domain.entity.*;
 import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
+import com.inteliroadmap.backend.helper.AuthenticatedStudentHelper;
 import com.inteliroadmap.backend.mappers.SkillMapper;
 import com.inteliroadmap.backend.mappers.StudentDashboardMapper;
 import com.inteliroadmap.backend.repositories.*;
@@ -37,6 +38,7 @@ public class StudentDashboardService {
     private final SkillTrendRepository skillTrendRepository;
     private final SkillMapper skillMapper;
     private final StudentDashboardMapper studentDashboardMapper;
+    private final AuthenticatedStudentHelper authenticatedStudentHelper;
 
     /**
      * Get roadmap progress for the current student dashboard.
@@ -64,7 +66,7 @@ public class StudentDashboardService {
                 .map(SkillNode::getNodeId)
                 .toList();
         List<StudentProgress> progresses = studentProgressRepository
-                .findByStudent_StudentIdAndSkillNode_NodeIdIn(student.getStudentId(), nodeIds);
+                .findByStudent_UserIdAndSkillNode_NodeIdIn(student.getUserId(), nodeIds);
         Map<UUID, StudentProgress> progressByNodeId = mapProgressByNodeId(progresses);
 
         boolean currentNodeAssigned = false;
@@ -115,7 +117,7 @@ public class StudentDashboardService {
             return SkillResponse.builder().build();
         }
 
-        List<StudentSkill> selectedSkills = studentSkillRepository.findByStudent_StudentId(student.getStudentId());
+        List<StudentSkill> selectedSkills = studentSkillRepository.findByStudent_UserId(student.getUserId());
         if (student.getCareerRole() == null) {
             return SkillResponse.builder()
                     .selectedSkills(skillMapper.toSelectedSkillResponses(selectedSkills))
@@ -260,23 +262,12 @@ public class StudentDashboardService {
     }
 
     private Student getCurrentStudent() {
-        User user = getCurrentUser();
-        return studentRepository.findByUser_UserId(user.getUserId());
+        return authenticatedStudentHelper.getOrCreateStudent();
     }
 
     private User getCurrentUser() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || authentication.getName() == null || authentication.getName().isBlank()) {
-            throw new ResourceNotFoundException("Cannot extract user from security context");
-        }
-
-        String email = authentication.getName();
-        User user = userRepository.findByEmail(email);
-        if (user == null) {
-            throw new ResourceNotFoundException("User not found from token");
-        }
-
-        return user;
+        Student student = authenticatedStudentHelper.getOrCreateStudent();
+        return userRepository.findByUserId(student.getUserId());
     }
 
     private Map<UUID, StudentProgress> mapProgressByNodeId(List<StudentProgress> progresses) {
@@ -295,7 +286,7 @@ public class StudentDashboardService {
             boolean currentNodeAssigned
     ) {
         StudentProgress progress = progressByNodeId.get(node.getNodeId());
-        if (progress != null && "COMPLETED".equalsIgnoreCase(progress.getStatus())) {
+        if (progress != null && "COMPLETED".equalsIgnoreCase(progress.getStatus().toString())) {
             return RoadmapStepStatus.COMPLETED;
         }
 
@@ -309,7 +300,7 @@ public class StudentDashboardService {
     private List<CareerRequiredSkill> findMissingRequiredSkills(Student student) {
         List<CareerRequiredSkill> requiredSkills = careerRequiredSkillRepository
                 .findByCareerRole_CareerId(student.getCareerRole().getCareerId());
-        List<StudentSkill> selectedSkills = studentSkillRepository.findByStudent_StudentId(student.getStudentId());
+        List<StudentSkill> selectedSkills = studentSkillRepository.findByStudent_UserId(student.getUserId());
         return filterMissingRequiredSkills(requiredSkills, selectedSkills);
     }
 

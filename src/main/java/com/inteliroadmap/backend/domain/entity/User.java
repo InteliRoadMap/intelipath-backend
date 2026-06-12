@@ -61,7 +61,7 @@ public class User {
     @com.fasterxml.jackson.annotation.JsonIgnore
     private List<OauthAccount> oauthAccounts;
 
-    //    // 1 User có nhiều records ở bảng con
+//    // 1 User có nhiều records ở bảng con
 //    // mappedBy = tên field trong class con trỏ ngược lại User
 //    // cascade = ALL: thao tác trên User sẽ ảnh hưởng luôn các bảng con
 //    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)

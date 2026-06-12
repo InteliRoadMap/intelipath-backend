@@ -19,4 +19,8 @@ public class SetupStudentProfileRequest {
     private String major;
 
     private UUID careerId;
+
+    private String bio;
+
+    private String yob;
 }

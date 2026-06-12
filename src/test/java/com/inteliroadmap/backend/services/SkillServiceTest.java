@@ -60,7 +60,7 @@ class SkillServiceTest {
 
     @Test
     void importStudentSkillsSavesUniqueNewSkills() {
-        Student student = Student.builder().studentId(UUID.randomUUID()).build();
+        Student student = Student.builder().userId(UUID.randomUUID()).build();
         Skill skill = skill("Java");
         ImportSkillsRequest request = request(skill.getSkillId(), skill.getSkillId());
 
@@ -82,7 +82,7 @@ class SkillServiceTest {
 
     @Test
     void importStudentSkillsDoesNotInsertExistingSkill() {
-        Student student = Student.builder().studentId(UUID.randomUUID()).build();
+        Student student = Student.builder().userId(UUID.randomUUID()).build();
         Skill skill = skill("Java");
         StudentSkill existing = StudentSkill.builder().student(student).skill(skill).build();
 
@@ -101,7 +101,7 @@ class SkillServiceTest {
 
     @Test
     void importStudentSkillsRejectsEntireRequestWhenSkillIsMissing() {
-        Student student = Student.builder().studentId(UUID.randomUUID()).build();
+        Student student = Student.builder().userId(UUID.randomUUID()).build();
         Skill skill = skill("Java");
         UUID missingSkillId = UUID.randomUUID();
         ImportSkillsRequest request = request(skill.getSkillId(), missingSkillId);
@@ -115,7 +115,7 @@ class SkillServiceTest {
 
     @Test
     void getStudentSkillsReturnsSelectedAndAllAvailableSkills() {
-        Student student = Student.builder().studentId(UUID.randomUUID()).build();
+        Student student = Student.builder().userId(UUID.randomUUID()).build();
         Skill selectedSkill = skill("Java");
         Skill availableSkill = skill("Python");
         StudentSkill selected = StudentSkill.builder().student(student).skill(selectedSkill).build();
@@ -133,7 +133,7 @@ class SkillServiceTest {
 
     @Test
     void getStudentSkillsReturnsEmptySelectedSkillsWhenStudentHasNone() {
-        Student student = Student.builder().studentId(UUID.randomUUID()).build();
+        Student student = Student.builder().userId(UUID.randomUUID()).build();
         Skill availableSkill = skill("Java");
 
         when(authenticatedStudentHelper.getOrCreateStudent()).thenReturn(student);

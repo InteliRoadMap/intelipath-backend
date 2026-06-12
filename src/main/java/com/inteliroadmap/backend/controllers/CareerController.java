@@ -7,7 +7,6 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
-import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -25,11 +24,10 @@ import java.util.UUID;
  * Provides functionality to fetch available career roles and their specific skill requirements.
  */
 @RestController
-@RequestMapping("/api/v1/career-roles")
+@RequestMapping("/api/v1/careers")
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Career services", description = "Career endpoints")
-@SecurityRequirement(name = "Bearer Authentication")
 public class CareerController {
 
     private final CareerService careerService;
@@ -64,6 +62,7 @@ public class CareerController {
     })
     public ResponseEntity<List<CareerResponse>> getAllCareers() {
         log.info("Fetching all career roles");
+        // Delegate to CareerService to retrieve all available careers
         return ResponseEntity.ok(careerService.getAllCareers());
     }
 
@@ -98,6 +97,7 @@ public class CareerController {
     })
     public ResponseEntity<CareerResponse> getCareerRequirements(@PathVariable("career_id") UUID careerId) {
         log.info("Fetching requirements for career role: {}", careerId);
+        // Delegate to CareerService to fetch skill node requirements for the specified career
         return ResponseEntity.ok(careerService.getCareerRequirements(careerId));
     }
 }

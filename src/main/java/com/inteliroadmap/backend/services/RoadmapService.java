@@ -47,6 +47,7 @@ public class RoadmapService {
     private static final String FRONTEND_COMPLETED_STATUS = "completed";
     private static final String FRONTEND_CURRENT_STATUS = "current";
     private static final String FRONTEND_LOCKED_STATUS = "locked";
+    private final com.inteliroadmap.backend.helper.AuthenticatedStudentHelper authenticatedStudentHelper;
 
     /**
      * Securely identifies the currently authenticated student.
@@ -56,16 +57,7 @@ public class RoadmapService {
      * @throws ResourceNotFoundException if the token is invalid or the student profile is missing
      */
     private Student getAuthenticatedStudent() {
-        String email = SecurityContextHolder.getContext().getAuthentication().getName();
-        User user = userRepository.findByEmail(email);
-        if (user == null) {
-            throw new ResourceNotFoundException("User not found from token");
-        }
-        Student student = studentRepository.findByUser(user);
-        if (student == null) {
-            throw new ResourceNotFoundException("Student profile not found");
-        }
-        return student;
+        return authenticatedStudentHelper.getOrCreateStudent();
     }
 
     /**
@@ -169,7 +161,9 @@ public class RoadmapService {
 
         long completedCount = progresses.stream()
                 .filter(p -> "COMPLETED".equals(p.getStatus()))
-                .filter(p -> p.getSkillNode().getCareerRole().getCareerId().equals(careerId))
+                .filter(p -> p.getSkillNode() != null &&
+                             p.getSkillNode().getCareerRole() != null &&
+                             p.getSkillNode().getCareerRole().getCareerId().equals(careerId))
                 .count();
 
         double percentage = ((double) completedCount / allNodes.size()) * 100.0;
@@ -228,12 +222,12 @@ public class RoadmapService {
 
         StudentProgress progress = progressOptional.get();
 
-        if("IN_PROGRESS".equals(progress.getStatus())){
-            progress.setStatus("COMPLETED");
+        if("IN_PROGRESS".equals(progress.getStatus().toString())){
+            progress.setStatus(RoadmapStepStatus.COMPLETED);
             progress.setCompleteAt(LocalDateTime.now());
             studentProgressRepository.save(progress);
         }
-
+        
         return RoadmapResponse.builder()
                 .updateStatus("Update Node status successfully")
                 .build();

@@ -18,13 +18,8 @@ import java.util.UUID;
 public class Student {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "student_id")
-    private UUID studentId;
-
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false, unique = true, foreignKey = @ForeignKey(name = "fk_st_user"))
-    private User user;
+    @Column(name = "user_id")
+    private UUID userId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "career_id", foreignKey = @ForeignKey(name = "fk_st_career"))
