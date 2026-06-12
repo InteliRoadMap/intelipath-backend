@@ -1,10 +1,9 @@
-package com.inteliroadmap.backend.services.dashboard;
+package com.inteliroadmap.backend.services;
 
 import com.inteliroadmap.backend.domain.dto.response.SkillResponse;
 import com.inteliroadmap.backend.domain.dto.response.student.*;
 import com.inteliroadmap.backend.domain.entity.*;
 import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
-import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.helper.AuthenticatedStudentHelper;
 import com.inteliroadmap.backend.mappers.SkillMapper;
 import com.inteliroadmap.backend.mappers.StudentDashboardMapper;
@@ -12,8 +11,6 @@ import com.inteliroadmap.backend.repositories.*;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;

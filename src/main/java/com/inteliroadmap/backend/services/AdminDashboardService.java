@@ -1,4 +1,4 @@
-package com.inteliroadmap.backend.services.dashboard;
+package com.inteliroadmap.backend.services;
 
 import com.inteliroadmap.backend.domain.dto.request.UpdateUserRoleRequest;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminCourseMetricResponse;

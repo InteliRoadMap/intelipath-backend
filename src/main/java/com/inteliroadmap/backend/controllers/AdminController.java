@@ -5,7 +5,7 @@ import com.inteliroadmap.backend.domain.dto.response.admin.AdminCourseMetricResp
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminSystemHealthResponse;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminUserListItemResponse;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminUserMetricResponse;
-import com.inteliroadmap.backend.services.dashboard.AdminDashboardService;
+import com.inteliroadmap.backend.services.AdminDashboardService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;

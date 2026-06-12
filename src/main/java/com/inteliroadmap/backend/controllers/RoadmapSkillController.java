@@ -1,7 +1,7 @@
 package com.inteliroadmap.backend.controllers;
 
 import com.inteliroadmap.backend.domain.dto.response.SkillResponse;
-import com.inteliroadmap.backend.services.dashboard.StudentDashboardService;
+import com.inteliroadmap.backend.services.StudentDashboardService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
