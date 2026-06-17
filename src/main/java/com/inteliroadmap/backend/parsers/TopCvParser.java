@@ -3,7 +3,7 @@ package com.inteliroadmap.backend.parsers;
 import com.inteliroadmap.backend.domain.entity.Company;
 import com.inteliroadmap.backend.domain.entity.Recruitment;
 import com.inteliroadmap.backend.domain.entity.RecruitmentPost;
-import com.inteliroadmap.backend.engines.JsoupEngine;
+import com.inteliroadmap.backend.engines.CurlEngine;
 import com.inteliroadmap.backend.exceptions.BlockedIpException;
 import com.inteliroadmap.backend.exceptions.ParsingException;
 import com.inteliroadmap.backend.repositories.CompanyRepository;
@@ -44,76 +44,82 @@ public class TopCvParser {
     private final DateTimeFormatter formatDate = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     public void parseTopCvJobs() {
-        int totalPage = 1, page = 1, count = 0;
-        boolean run;
-        do {
-            String url = TOPCV_TARGET + "?sort=new?page=" + page;
-            log.info("ScraperService: Parsing TopCv Jobs {}", url);
-            Document doc = JsoupEngine.getConnection(url);
+        try {
+            int totalPage = 1, page = 1, count = 0;
+            boolean run;
+            do {
+                String url = TOPCV_TARGET + "?sort=new&page=" + page;
+                log.info("ScraperService: Parsing TopCv Jobs {}", url);
+                Document doc = CurlEngine.getDocument(url);
 
-            run = page <= totalPage;
+                run = page <= totalPage;
 
-            if (doc != null) {
-                Element paginateText = doc.selectFirst("#job-listing-paginate-text");
+                if (doc != null) {
+                    Element paginateText = doc.selectFirst("#job-listing-paginate-text");
 
-                assert paginateText != null;
-                System.out.println(paginateText.text());
+                    if (paginateText == null) {
+                        log.warn("Could not find pagination text. The page layout may have changed or Cloudflare blocked the request.");
+                        break;
+                    }
+                    System.out.println(paginateText.text());
 
-                Pattern pattern = Pattern.compile("/\\s*(\\d+)");
-                Matcher m = pattern.matcher(paginateText.text());
-                if (m.find()) totalPage = Integer.parseInt(m.group(1));
-                log.info("Current page: {}/{}", page, totalPage);
+                    Pattern pattern = Pattern.compile("/\\s*(\\d+)");
+                    Matcher m = pattern.matcher(paginateText.text());
+                    if (m.find()) totalPage = Integer.parseInt(m.group(1));
+                    log.info("Current page: {}/{}", page, totalPage);
 
-                Elements jobs = doc.select(".job-item-search-result");
-                log.info("Found {} jobs on page {}. Starting scrape...", jobs.size(), page);
+                    Elements jobs = doc.select(".job-item-search-result");
+                    log.info("Found {} jobs on page {}. Starting scrape...", jobs.size(), page);
 
-                for (Element job : jobs) {
-//                    if (count >= 10) {
-//                        log.info("Reached scraper delimiter. Stopping scrape.");
-//                        run = false;
-//                        break;
-//                    }
-                    try {
-                        // Prevent too many requests error (InterruptedException)
-                        Thread.sleep(THREAD_SLEEP);
-
-                        count++;
-                        log.info("Scraping job No. {}...", count);
-
-                        String companyLink = job.select(".title-block").select(".company").attr("href");
-                        String companyId = "";
-                        Matcher matcher = Pattern.compile("(\\d+)").matcher(companyLink);
-                        if (matcher.find()) {
-                            companyId = "topcv.co" + matcher.group(1);
+                    for (Element job : jobs) {
+                        if (count >= 20) {
+                            log.info("Reached scraper delimiter. Stopping scrape.");
+                            run = false;
+                            break;
                         }
-                        log.info("Co. ID: {}", companyId);
-                        Company company = getCompanyDetail(companyLink, companyId);
+                        try {
+                            Thread.sleep(THREAD_SLEEP);
 
-                        String recruitmentLink = job.select(".title-block").select(".title").select("a").attr("href");
-                        String recruitmentId = "topcv.rec" + job.attr("data-job-id");
-                        log.info("Rec ID: {}", recruitmentId);
-                        Recruitment recruitment = getRecruitmentDetail(recruitmentLink, recruitmentId);
+                            count++;
+                            log.info("Scraping job No. {}...", count);
 
-                        if (company != null && recruitment != null) {
-                            RecruitmentPost post = RecruitmentPost.builder()
-                                    .company(company)
-                                    .recruitment(recruitment)
-                                    .build();
-                            recruitmentPostRepository.save(post);
+                            String companyLink = job.select(".title-block").select(".company").attr("href");
+                            String companyId = "";
+                            Matcher matcher = Pattern.compile("(\\d+)").matcher(companyLink);
+                            if (matcher.find()) {
+                                companyId = "topcv.co" + matcher.group(1);
+                            }
+                            log.info("Co. ID: {}", companyId);
+                            Company company = getCompanyDetail(companyLink, companyId);
+
+                            String recruitmentLink = job.select(".title-block").select(".title").select("a").attr("href");
+                            String recruitmentId = "topcv.rec" + job.attr("data-job-id");
+                            log.info("Rec ID: {}", recruitmentId);
+                            Recruitment recruitment = getRecruitmentDetail(recruitmentLink, recruitmentId);
+
+                            if (company != null && recruitment != null) {
+                                RecruitmentPost post = RecruitmentPost.builder()
+                                        .company(company)
+                                        .recruitment(recruitment)
+                                        .build();
+                                recruitmentPostRepository.save(post);
+                            }
+
+                        } catch (BlockedIpException e) {
+                            throw e;
+                        } catch (InterruptedException e) {
+                            Thread.currentThread().interrupt();
+                            throw new ParsingException("Interrupted", e);
+                        } catch (Exception e) {
+                            log.error("Error occurred while scraping a job. Continuing to next.", e);
                         }
-
-                    } catch (BlockedIpException e) {
-                        throw e;
-                    } catch (InterruptedException e) {
-                        Thread.currentThread().interrupt();
-                        throw new ParsingException("Interrupted", e);
-                    } catch (Exception e) {
-                        log.error("Error occurred while scraping a job. Continuing to next.", e);
                     }
                 }
-            }
-            page++;
-        } while (run);
+                page++;
+            } while (run);
+        } catch (Exception e) {
+            log.error("Error setting up parser", e);
+        }
     }
 
     private String convertToEng(String type){
@@ -145,9 +151,9 @@ public class TopCvParser {
 
     private final Map<String, String> normalCustom = Map.of(
             "jobTitle",".job-detail__info--title",
-            "jobBasicInfo",".job-detail__info--section",
+            "jobBasicInfos",".job-detail__info--section",
             "applicationDeadline",".job-detail__info--deadline-date",
-            "jobTags",".job-tags__group",                   // Same
+            "jobTags",".job-tags__group",
             "jobDescription",".job-description__item",
             "jobGeneralInfo",".box-general-group",
             "jobRelatedTags",".box-category"
@@ -155,25 +161,13 @@ public class TopCvParser {
 
     private final Map<String, String> premiumCustom = Map.of(
             "jobTitle",".premium-job-basic-information__content--title",
-            "jobBasicInfo",".basic-information-item",
+            "jobBasicInfos",".basic-information-item",
             "applicationDeadline",".job-detail__info--deadline-date",
-            "jobTags",".job-tags__group",                   // Same
+            "jobTags",".job-tags__group",
             "jobDescription",".premium-job-description__box",
             "jobGeneralInfo",".premium-job-general-information__content--row",
             "jobRelatedTags",".premium-job-related-tags__section"
     );
-
-//    private final Map<String, String> simpleCustom = Map.of(
-//            "jobTitle",".title",
-//            "jobSalary",".salary",
-//            "jobLocation", "box-address div",
-//            "applicationDeadline",".deadline",
-//            "jobTags",".job-tags__group",                   // Same
-//
-////            "jobDescription",".premium-job-description__box",
-////            "jobGeneralInfo",".premium-job-general-information__content--row",
-////            "jobRelatedTags",".premium-job-related-tags__section"
-//    );
 
     private List<String> getDescriptions(Elements items, List<String> list){
         if(list == null) list = new ArrayList<>();
@@ -191,8 +185,8 @@ public class TopCvParser {
         return list;
     }
 
-    private Company getCompanyDetail(String companyLink, String companyId) {
-        Document doc = JsoupEngine.getConnection(companyLink);
+    public Company getCompanyDetail(String companyLink, String companyId) {
+        Document doc = CurlEngine.getDocument(companyLink);
         Company company = null;
 
         if(doc != null) {
@@ -202,11 +196,9 @@ public class TopCvParser {
                 return company;
             }
 
-            // --------------------------------- Get Company Signature --------------------------------
             String companyLogo = doc.select(".company-logo").select("img").attr("src");
             String companyName = doc.select(".company-name").text();
 
-            // ------------------------------- Get Company Introduction -------------------------------
             Elements introContents;
             introContents = doc.select(".intro-content");
             if (introContents.isEmpty()) {
@@ -214,7 +206,6 @@ public class TopCvParser {
             }
             List<String> companyIntro = getDescriptions(introContents, null);
 
-            // ----------------------------------- Get Company Infos ----------------------------------
             Map<String, String> companyInfo = new LinkedHashMap<>();
             Elements infos = doc.select(".box-info-company-general-item__info");
             for (Element info : infos) {
@@ -225,7 +216,6 @@ public class TopCvParser {
                 companyInfo.put(infoTitle, infoValue);
             }
 
-            // ---------------------------------- Get Company Contacts --------------------------------
             Elements contacts;
             contacts = doc.select(".info-line");
             if (contacts.isEmpty()) {
@@ -234,25 +224,24 @@ public class TopCvParser {
             List<String> companyContact = getDescriptions(contacts, null);
 
             company = Company.builder()
-                    .topCvCompanyId(companyId)  // String
-                    .companyLink(companyLink)   // String
-                    .logo(companyLogo)          // String
-                    .name(companyName)          // String
-                    .introduction(companyIntro) // List
-                    .info(companyInfo)          // Map
-                    .contact(companyContact)    // List
+                    .topCvCompanyId(companyId)
+                    .companyLink(companyLink)
+                    .logo(companyLogo)
+                    .name(companyName)
+                    .introduction(companyIntro)
+                    .info(companyInfo)
+                    .contact(companyContact)
                     .build();
-            
+
             company = companyRepository.save(company);
         }
         return  company;
     }
 
-    private Recruitment getRecruitmentDetail(String recruitmentLink, String recruitmentId) {
-        Document doc = JsoupEngine.getConnection(recruitmentLink);
+    public Recruitment getRecruitmentDetail(String recruitmentLink, String recruitmentId) {
+        Document doc = CurlEngine.getDocument(recruitmentLink);
         Recruitment recruitment = null;
         boolean premium = false;
-        boolean simple = false;
 
         if (doc != null) {
             Element jobInfo = null;
@@ -270,12 +259,12 @@ public class TopCvParser {
                 jobInfo = doc.selectFirst(".premium-job-detail");
                 premium = true;
 
-                if (jobInfo == null){
-                    // Premium custom tags not found
-                    // Proceed to get Simple custom tags
-                    jobInfo = doc.selectFirst(".section-content-job-detail");
-                    simple = true;
-                }
+//                if (jobInfo == null){
+//                    // Premium custom tags not found
+//                    // Proceed to get Simple custom tags
+//                    jobInfo = doc.selectFirst(".section-content-job-detail");
+//                    simple = true;
+//                }
             }
 
             if (jobInfo == null) {
@@ -290,15 +279,9 @@ public class TopCvParser {
 
             // -------------------------- Normal & Premium Custom Tags -------------------------
             String jobTitle = jobDetail.get("jobTitle");
-
-            String jobBasicInfos;
-//            if(!simple)
-                jobBasicInfos = jobDetail.get("jobBasicInfos");
-
+            String jobBasicInfos = jobDetail.get("jobBasicInfos");
             String jobDeadline = jobDetail.get("applicationDeadline");
-
             String jobTags = jobDetail.get("jobTags");
-
             String jobDescriptions = jobDetail.get("jobDescription");
             String jobGeneralInfos = jobDetail.get("jobGeneralInfo");
             String jobRelatedTags = jobDetail.get("jobRelatedTags");
@@ -390,7 +373,7 @@ public class TopCvParser {
                     .generalInfos(recruitmentGeneralInfo)       // Map<String, String>
                     .relatedTags(recruitmentRelatedTag)         // Map<String, List<String>>
                     .build();
-            
+
             recruitment = recruitmentRepository.save(recruitment);
         }
         return recruitment;

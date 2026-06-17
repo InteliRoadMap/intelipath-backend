@@ -14,6 +14,7 @@ import static org.jsoup.Jsoup.connect;
 public class JsoupEngine {
 
     public static Document getConnection(String url) {
+        if (url == null || url.trim().isEmpty()) return null;
         int maxRetries = 3;
         for (int i = 0; i < maxRetries; i++) {
             try {
