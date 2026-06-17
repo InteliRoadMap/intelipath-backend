@@ -5,7 +5,7 @@ import com.inteliroadmap.backend.domain.entity.Skill;
 import com.inteliroadmap.backend.domain.entity.Student;
 import com.inteliroadmap.backend.domain.entity.StudentSkill;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
-import com.inteliroadmap.backend.helper.AuthenticatedStudentHelper;
+import com.inteliroadmap.backend.services.AuthenticatedStudentService;
 import com.inteliroadmap.backend.mappers.SkillMapper;
 import com.inteliroadmap.backend.repositories.CareerRequiredSkillRepository;
 import com.inteliroadmap.backend.repositories.CareerRoleRepository;
@@ -42,7 +42,7 @@ class SkillServiceTest {
     @Mock
     private CareerRequiredSkillRepository careerRequiredSkillRepository;
     @Mock
-    private AuthenticatedStudentHelper authenticatedStudentHelper;
+    private AuthenticatedStudentService authenticatedStudentService;
 
     private SkillService skillService;
 
@@ -53,7 +53,7 @@ class SkillServiceTest {
                 studentSkillRepository,
                 careerRoleRepository,
                 careerRequiredSkillRepository,
-                authenticatedStudentHelper,
+                authenticatedStudentService,
                 new SkillMapper()
         );
     }
@@ -64,7 +64,7 @@ class SkillServiceTest {
         Skill skill = skill("Java");
         ImportSkillsRequest request = request(skill.getSkillId(), skill.getSkillId());
 
-        when(authenticatedStudentHelper.getOrCreateStudentForUpdate()).thenReturn(student);
+        when(authenticatedStudentService.getOrCreateStudentForUpdate()).thenReturn(student);
         when(skillRepository.findAllById(anySet())).thenReturn(List.of(skill));
         when(studentSkillRepository.findByStudentAndSkill_SkillIdIn(student, List.of(skill.getSkillId())))
                 .thenReturn(List.of());
@@ -86,7 +86,7 @@ class SkillServiceTest {
         Skill skill = skill("Java");
         StudentSkill existing = StudentSkill.builder().student(student).skill(skill).build();
 
-        when(authenticatedStudentHelper.getOrCreateStudentForUpdate()).thenReturn(student);
+        when(authenticatedStudentService.getOrCreateStudentForUpdate()).thenReturn(student);
         when(skillRepository.findAllById(anySet())).thenReturn(List.of(skill));
         when(studentSkillRepository.findByStudentAndSkill_SkillIdIn(student, List.of(skill.getSkillId())))
                 .thenReturn(List.of(existing));
@@ -106,7 +106,7 @@ class SkillServiceTest {
         UUID missingSkillId = UUID.randomUUID();
         ImportSkillsRequest request = request(skill.getSkillId(), missingSkillId);
 
-        when(authenticatedStudentHelper.getOrCreateStudentForUpdate()).thenReturn(student);
+        when(authenticatedStudentService.getOrCreateStudentForUpdate()).thenReturn(student);
         when(skillRepository.findAllById(anySet())).thenReturn(List.of(skill));
 
         assertThrows(ResourceNotFoundException.class, () -> skillService.importStudentSkills(request));
@@ -120,7 +120,7 @@ class SkillServiceTest {
         Skill availableSkill = skill("Python");
         StudentSkill selected = StudentSkill.builder().student(student).skill(selectedSkill).build();
 
-        when(authenticatedStudentHelper.getOrCreateStudent()).thenReturn(student);
+        when(authenticatedStudentService.getOrCreateStudent()).thenReturn(student);
         when(studentSkillRepository.findByStudent(student)).thenReturn(List.of(selected));
         when(skillRepository.findAll()).thenReturn(List.of(selectedSkill, availableSkill));
 
@@ -136,7 +136,7 @@ class SkillServiceTest {
         Student student = Student.builder().userId(UUID.randomUUID()).build();
         Skill availableSkill = skill("Java");
 
-        when(authenticatedStudentHelper.getOrCreateStudent()).thenReturn(student);
+        when(authenticatedStudentService.getOrCreateStudent()).thenReturn(student);
         when(studentSkillRepository.findByStudent(student)).thenReturn(List.of());
         when(skillRepository.findAll()).thenReturn(List.of(availableSkill));
 

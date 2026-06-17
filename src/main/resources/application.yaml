@@ -2,9 +2,6 @@ spring:
   application:
     name: InteliPath
 
-  config:
-    import: optional:file:.env[.properties]
-
   profiles:
     active: prod
 
@@ -67,3 +64,13 @@ springdoc:
     path: /swagger-ui.html
   api-docs:
     path: /v3/api-docs
+    
+scraper:
+  thread-sleep: ${THREAD_SLEEP}
+
+  topcv:
+    url: ${TOPCV_TARGET}
+
+  linkedin:
+    url: ${LINKEDIN_TARGET}
+
