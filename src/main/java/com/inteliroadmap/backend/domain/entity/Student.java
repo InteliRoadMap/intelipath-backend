@@ -36,4 +36,10 @@ public class Student {
 
     @Column(name = "github_profile")
     private String githubProfile;
+
+    @Column(name = "transcript_url", columnDefinition = "TEXT")
+    private String transcriptUrl;
+
+    @Column(name = "portfolio_slug", length = 100, unique = true)
+    private String portfolioSlug;
 }

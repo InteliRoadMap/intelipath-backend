@@ -25,4 +25,5 @@ public class StudentResponse {
     private String githubProfile;
     private String role;
     private UUID careerId;
+    private String careerName;
 }

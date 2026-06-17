@@ -1,7 +1,6 @@
 package com.inteliroadmap.backend.services;
 
-import com.inteliroadmap.backend.domain.dto.response.SkillResponse;
-import com.inteliroadmap.backend.domain.dto.response.dashboard.*;
+import com.inteliroadmap.backend.domain.dto.response.student.*;
 import com.inteliroadmap.backend.domain.entity.*;
 import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
 import com.inteliroadmap.backend.domain.enums.ImportanceLevel;
@@ -9,7 +8,6 @@ import com.inteliroadmap.backend.helper.AuthenticatedStudentHelper;
 import com.inteliroadmap.backend.mappers.SkillMapper;
 import com.inteliroadmap.backend.mappers.StudentDashboardMapper;
 import com.inteliroadmap.backend.repositories.*;
-import com.inteliroadmap.backend.services.dashboard.StudentDashboardService;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;

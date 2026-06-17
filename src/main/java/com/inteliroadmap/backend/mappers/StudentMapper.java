@@ -36,6 +36,7 @@ public class StudentMapper {
                 .major(student.getMajor())
                 .githubProfile(student.getGithubProfile())
                 .careerId(student.getCareerRole() != null ? student.getCareerRole().getCareerId() : null)
+                .careerName(student.getCareerRole() != null ? student.getCareerRole().getCareerName() : null)
                 .build();
     }
 }

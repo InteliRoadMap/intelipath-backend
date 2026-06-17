@@ -145,6 +145,7 @@ public class OAuth2UserService extends DefaultOAuth2UserService {
         Student student = Student.builder()
                 .userId(savedUser.getUserId())
                 .githubProfile(userInfo.getHtmlUrl())
+                .portfolioSlug(com.inteliroadmap.backend.utils.SlugUtils.generateSlug(savedUser.getFullName(), savedUser.getUserId()))
                 .build();
         studentRepository.save(student);
 

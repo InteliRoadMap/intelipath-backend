@@ -1,22 +1,23 @@
-package com.inteliroadmap.backend.helper;
+package com.inteliroadmap.backend.services;
 
 import com.inteliroadmap.backend.domain.entity.Student;
 import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.repositories.StudentRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
+import com.inteliroadmap.backend.utils.SlugUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Component;
+import org.springframework.stereotype.Service;
 
 import java.util.Optional;
 
-@Component
+@Service
 @RequiredArgsConstructor
 @Slf4j
-public class AuthenticatedStudentHelper {
+public class AuthenticatedStudentService {
 
     private final UserRepository userRepository;
     private final StudentRepository studentRepository;
@@ -31,7 +32,29 @@ public class AuthenticatedStudentHelper {
         Student student = studentRepository.findById(user.getUserId()).orElse(null);
         if (student == null) {
             log.info("Student profile not found. Creating a new one for user: {}", user.getEmail());
-            student = studentRepository.save(Student.builder().userId(user.getUserId()).build());
+            student = studentRepository.save(Student.builder()
+                    .userId(user.getUserId())
+                    .portfolioSlug(SlugUtils.generateSlug(user.getFullName(), user.getUserId()))
+                    .build());
+        }
+        return student;
+    }
+
+    /**
+     * Get the current authenticated student without creating missing profile data.
+     *
+     * @return current authenticated student
+     */
+    public Student getRequiredStudent() {
+        User user = getAuthenticatedUser();
+        Student student = studentRepository.findById(user.getUserId()).orElse(null);
+        if (student == null) {
+            log.error("[AuthenticatedStudentService] Student profile not found for user ID: {}", user.getUserId());
+            throw new ResourceNotFoundException("Student profile not found");
+        }
+        if (student.getPortfolioSlug() == null || student.getPortfolioSlug().isBlank()) {
+            student.setPortfolioSlug(SlugUtils.generateSlug(user.getFullName(), user.getUserId()));
+            student = studentRepository.save(student);
         }
         return student;
     }
@@ -46,6 +69,7 @@ public class AuthenticatedStudentHelper {
 
         Optional<User> userOptional = userRepository.findByEmailForUpdate(email);
         if (userOptional.isEmpty()) {
+            log.error("[AuthenticatedStudentService] User not found from token: {}", email);
             throw new ResourceNotFoundException("User not found from token");
         }
 
@@ -57,6 +81,7 @@ public class AuthenticatedStudentHelper {
 
         Student student = Student.builder()
                 .userId(user.getUserId())
+                .portfolioSlug(SlugUtils.generateSlug(user.getFullName(), user.getUserId()))
                 .build();
 
         return studentRepository.save(student);
@@ -66,6 +91,7 @@ public class AuthenticatedStudentHelper {
         String email = getAuthenticatedEmail();
         User user = userRepository.findByEmail(email);
         if (user == null) {
+            log.error("[AuthenticatedStudentService] User not found from token: {}", email);
             throw new ResourceNotFoundException("User not found from token");
         }
         return user;
@@ -74,6 +100,7 @@ public class AuthenticatedStudentHelper {
     private String getAuthenticatedEmail() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
         if (authentication == null || authentication.getName() == null || authentication.getName().isBlank()) {
+            log.error("[AuthenticatedStudentService] Cannot extract user from security context");
             throw new ResourceNotFoundException("Cannot extract user from security context");
         }
         return authentication.getName();

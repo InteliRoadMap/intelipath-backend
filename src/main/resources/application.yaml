@@ -31,7 +31,7 @@ spring:
         format_sql: true
 
   flyway:
-    enabled: true
+    enabled: false
     baseline-on-migrate: true
     baseline-version: 0
     connect-retries: 10
@@ -57,6 +57,10 @@ spring:
 jwt:
   secret: ${JWT_SECRET}
   expiration: ${JWT_EXPIRATION:86400000}
+
+supabase:
+  url: ${SUPABASE_URL}
+  key: ${SUPABASE_KEY}
 
 springdoc:
   swagger-ui:

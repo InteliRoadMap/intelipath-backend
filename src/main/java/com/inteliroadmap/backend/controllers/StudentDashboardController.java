@@ -1,10 +1,18 @@
 package com.inteliroadmap.backend.controllers;
 
-import com.inteliroadmap.backend.domain.dto.response.dashboard.*;
-import com.inteliroadmap.backend.services.dashboard.StudentDashboardService;
+import com.inteliroadmap.backend.domain.dto.response.student.*;
+import com.inteliroadmap.backend.services.StudentService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
@@ -15,9 +23,12 @@ import java.util.List;
 @RequestMapping("/api/v1/student/dashboard")
 @RequiredArgsConstructor
 @Slf4j
+@Tag(name = "Student Dashboard", description = "Authenticated student dashboard endpoints")
+@SecurityRequirement(name = "Bearer Authentication")
+@PreAuthorize("hasRole('STUDENT')")
 public class StudentDashboardController {
 
-    private final StudentDashboardService studentDashboardService;
+    private final StudentService studentService;
 
     /**
      * Get roadmap progress for the authenticated student.
@@ -25,9 +36,31 @@ public class StudentDashboardController {
      * @return roadmap progress response
      */
     @GetMapping("/roadmap-progress")
+    @Operation(
+            summary = "Get roadmap progress",
+            description = "Get roadmap steps, current progress, and AI guidance for the authenticated student"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Roadmap progress fetched successfully",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = DashboardRoadmapProgressResponse.class)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized or invalid access token"
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Student or roadmap not found"
+            )
+    })
     public ResponseEntity<DashboardRoadmapProgressResponse> getRoadmapProgress() {
         log.info("Student Dashboard API: Get roadmap progress request received");
-        return ResponseEntity.ok(studentDashboardService.getRoadmapProgress());
+        return ResponseEntity.ok(studentService.getRoadmapProgress());
     }
 
     /**
@@ -36,9 +69,31 @@ public class StudentDashboardController {
      * @return skill gap list
      */
     @GetMapping("/skill-gaps")
+    @Operation(
+            summary = "Get skill gaps",
+            description = "Get skills that the authenticated student is missing for the target career"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Skill gaps fetched successfully",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = SkillGapItemResponse.class)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized or invalid access token"
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Student or target career not found"
+            )
+    })
     public ResponseEntity<List<SkillGapItemResponse>> getSkillGaps() {
         log.info("Student Dashboard API: Get skill gaps request received");
-        return ResponseEntity.ok(studentDashboardService.getSkillGaps());
+        return ResponseEntity.ok(studentService.getSkillGaps());
     }
 
     /**
@@ -47,9 +102,27 @@ public class StudentDashboardController {
      * @return feedback list
      */
     @GetMapping("/mentor-feedback")
+    @Operation(
+            summary = "Get mentor feedback",
+            description = "Get the latest mentor feedback for the authenticated student"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Mentor feedback fetched successfully",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = MentorFeedbackItemResponse.class)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized or invalid access token"
+            )
+    })
     public ResponseEntity<List<MentorFeedbackItemResponse>> getMentorFeedback() {
         log.info("Student Dashboard API: Get mentor feedback request received");
-        return ResponseEntity.ok(studentDashboardService.getMentorFeedback());
+        return ResponseEntity.ok(studentService.getMentorFeedback());
     }
 
     /**
@@ -58,9 +131,27 @@ public class StudentDashboardController {
      * @return AI history list
      */
     @GetMapping("/ai-history")
+    @Operation(
+            summary = "Get AI history",
+            description = "Get AI interaction history for the authenticated student"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "AI history fetched successfully",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = AiHistoryItemResponse.class)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized or invalid access token"
+            )
+    })
     public ResponseEntity<List<AiHistoryItemResponse>> getAiHistory() {
         log.info("Student Dashboard API: Get AI history request received");
-        return ResponseEntity.ok(studentDashboardService.getAiHistory());
+        return ResponseEntity.ok(studentService.getAiHistory());
     }
 
     /**
@@ -69,9 +160,31 @@ public class StudentDashboardController {
      * @return market demand response or null
      */
     @GetMapping("/market-demand")
+    @Operation(
+            summary = "Get market demand",
+            description = "Get market demand information for the authenticated student's target career"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Market demand fetched successfully",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = MarketDemandResponse.class)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized or invalid access token"
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Student or target career not found"
+            )
+    })
     public ResponseEntity<MarketDemandResponse> getMarketDemand() {
         log.info("Student Dashboard API: Get market demand request received");
-        return ResponseEntity.ok(studentDashboardService.getMarketDemand());
+        return ResponseEntity.ok(studentService.getMarketDemand());
     }
 
     /**
@@ -80,8 +193,30 @@ public class StudentDashboardController {
      * @return recommendation list
      */
     @GetMapping("/recommendations")
+    @Operation(
+            summary = "Get recommendations",
+            description = "Get learning recommendations generated from the authenticated student's missing skills"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Recommendations fetched successfully",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = RecommendationItemResponse.class)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized or invalid access token"
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Student or target career not found"
+            )
+    })
     public ResponseEntity<List<RecommendationItemResponse>> getRecommendations() {
         log.info("Student Dashboard API: Get recommendations request received");
-        return ResponseEntity.ok(studentDashboardService.getRecommendations());
+        return ResponseEntity.ok(studentService.getRecommendations());
     }
 }

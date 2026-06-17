@@ -30,4 +30,6 @@ public interface StudentRepository extends JpaRepository<Student, UUID> {
     @Query("select student from Student student where student.userId = :userId")
     Optional<Student> findByIdForUpdate(@Param("userId") UUID userId);
 
+    boolean existsByPortfolioSlug(String portfolioSlug);
+    Optional<Student> findByPortfolioSlug(String portfolioSlug);
 }

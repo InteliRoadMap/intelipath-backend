@@ -29,4 +29,10 @@ public class StudentSkill {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "skill_id", nullable = false, foreignKey = @ForeignKey(name = "fk_ss_skill"))
     private Skill skill;
+
+    @Column(name = "custom_description", columnDefinition = "TEXT")
+    private String customDescription;
+
+    @Column(name = "tech_stack")
+    private String techStack;
 }

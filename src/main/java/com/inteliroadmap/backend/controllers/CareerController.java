@@ -52,6 +52,10 @@ public class CareerController {
                     )
             ),
             @ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized or invalid access token"
+            ),
+            @ApiResponse(
                     responseCode = "404",
                     description = "No Career role available"
             )
@@ -81,6 +85,10 @@ public class CareerController {
                             mediaType = "application/json",
                             schema = @Schema(implementation = CareerResponse.class)
                     )
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized or invalid access token"
             ),
             @ApiResponse(
                     responseCode = "404",
