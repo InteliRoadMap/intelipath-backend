@@ -17,6 +17,8 @@ public interface StudentSkillRepository extends JpaRepository<StudentSkill, UUID
 
     List<StudentSkill> findByStudentAndSkill_SkillIdIn(Student student, List<UUID> skillIds);
 
+    boolean existsByStudentAndSkill(Student student, com.inteliroadmap.backend.domain.entity.Skill skill);
+
     @Query(value = "SELECT " +
             "CAST(st.user_id AS VARCHAR) as studentId, " +
             "u.full_name as fullName, " +

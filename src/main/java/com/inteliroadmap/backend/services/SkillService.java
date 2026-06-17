@@ -5,7 +5,7 @@ import com.inteliroadmap.backend.domain.dto.request.ImportSkillsRequest;
 import com.inteliroadmap.backend.domain.dto.response.SkillResponse;
 import com.inteliroadmap.backend.domain.entity.*;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
-import com.inteliroadmap.backend.helper.AuthenticatedStudentHelper;
+import com.inteliroadmap.backend.services.AuthenticatedStudentService;
 import com.inteliroadmap.backend.mappers.SkillMapper;
 import com.inteliroadmap.backend.repositories.*;
 import jakarta.transaction.Transactional;
@@ -13,6 +13,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
@@ -28,7 +29,7 @@ public class SkillService {
     private final StudentSkillRepository studentSkillRepository;
     private final CareerRoleRepository careerRoleRepository;
     private final CareerRequiredSkillRepository careerRequiredSkillRepository;
-    private final AuthenticatedStudentHelper authenticatedStudentHelper;
+    private final AuthenticatedStudentService AuthenticatedStudentService;
     private final SkillMapper skillMapper;
 
     /**
@@ -41,7 +42,7 @@ public class SkillService {
         log.info("Student skill retrieval request received");
 
         // Step 1: Get or create the authenticated student
-        Student student = authenticatedStudentHelper.getOrCreateStudent();
+        Student student = AuthenticatedStudentService.getOrCreateStudent();
 
         // Step 2: Load the student's selected skills and all available skills
         List<StudentSkill> selectedSkills = studentSkillRepository.findByStudent(student);
@@ -102,7 +103,7 @@ public class SkillService {
         log.info("Student skill selection request received");
 
         // Step 1: Get the authenticated student and lock profile data for update
-        Student student = authenticatedStudentHelper.getOrCreateStudentForUpdate();
+        Student student = AuthenticatedStudentService.getOrCreateStudentForUpdate();
 
         // Step 2: Remove duplicate skill IDs while preserving request order
         Set<UUID> requestedSkillIds = new LinkedHashSet<>(request.getSkillIds());
@@ -169,7 +170,7 @@ public class SkillService {
         log.info("Student skill comparison request received. careerId: {}", request.getCareerId());
 
         // Step 1: Get or create the authenticated student
-        Student student = authenticatedStudentHelper.getOrCreateStudent();
+        Student student = AuthenticatedStudentService.getOrCreateStudent();
 
         // Step 2: Verify that the requested career exists
         Optional<CareerRole> careerOptional = careerRoleRepository.findById(request.getCareerId());

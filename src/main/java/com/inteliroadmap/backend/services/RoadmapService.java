@@ -42,13 +42,15 @@ public class RoadmapService {
     private final StudentProgressRepository studentProgressRepository;
     private final StudentSkillRepository studentSkillRepository;
     private final CareerRequiredSkillRepository careerRequiredSkillRepository;
+    private final SkillRepository skillRepository;
     private final JwtService jwtService;
 
     private static final String COMPLETED_STATUS = "COMPLETED";
     private static final String FRONTEND_COMPLETED_STATUS = "completed";
+    private static final String FRONTEND_IN_PROGRESS_STATUS = "in_progress";
     private static final String FRONTEND_CURRENT_STATUS = "current";
     private static final String FRONTEND_LOCKED_STATUS = "locked";
-    private final com.inteliroadmap.backend.helper.AuthenticatedStudentHelper authenticatedStudentHelper;
+    private final com.inteliroadmap.backend.services.AuthenticatedStudentService AuthenticatedStudentService;
 
     /**
      * Securely identifies the currently authenticated student.
@@ -58,7 +60,7 @@ public class RoadmapService {
      * @throws ResourceNotFoundException if the token is invalid or the student profile is missing
      */
     private Student getAuthenticatedStudent() {
-        return authenticatedStudentHelper.getOrCreateStudent();
+        return AuthenticatedStudentService.getOrCreateStudent();
     }
 
     /**
@@ -124,8 +126,8 @@ public class RoadmapService {
         }
 
         Map<UUID, StudentProgress> progressByNodeId = mapProgressByNodeId(
-                studentProgressRepository.findByStudent_StudentIdAndSkillNode_NodeIdIn(
-                        student.getStudentId(),
+                studentProgressRepository.findByStudent_UserIdAndSkillNode_NodeIdIn(
+                        student.getUserId(),
                         nodes.stream().map(SkillNode::getNodeId).toList()
                 )
         );
@@ -321,8 +323,8 @@ public class RoadmapService {
                 .map(SkillNode::getNodeId)
                 .toList();
         List<StudentProgress> progressList =
-                studentProgressRepository.findByStudent_StudentIdAndSkillNode_NodeIdIn(
-                        student.getStudentId(),
+                studentProgressRepository.findByStudent_UserIdAndSkillNode_NodeIdIn(
+                        student.getUserId(),
                         nodeIds
                 );
 
@@ -388,7 +390,23 @@ public class RoadmapService {
         progress.setStatus(newStatus);
         if (RoadmapStepStatus.COMPLETED == newStatus
                 && progress.getCompleteAt() == null) {
-            progress.setCompleteAt(LocalDateTime.now());
+            progress.setCompleteAt(java.time.LocalDateTime.now());
+            
+            // Auto-sync skill to profile
+            if (node.getSkillId() != null) {
+                Skill skill = skillRepository.findById(node.getSkillId()).orElse(null);
+                if (skill != null) {
+                    boolean hasSkill = studentSkillRepository.existsByStudentAndSkill(student, skill);
+                    if (!hasSkill) {
+                        StudentSkill newSkill = StudentSkill.builder()
+                                .student(student)
+                                .skill(skill)
+                                .build();
+                        studentSkillRepository.save(newSkill);
+                        log.info("Auto-synced skill {} to student {}", skill.getSkillName(), student.getUserId());
+                    }
+                }
+            }
         }
         studentProgressRepository.save(progress);
     }
@@ -437,7 +455,7 @@ public class RoadmapService {
             throw new ResourceNotFoundException("User not found");
         }
 
-        Student student = studentRepository.findByUser(user);
+        Student student = studentRepository.findByUserId(user.getUserId());
         if (student == null) {
             throw new ResourceNotFoundException("Student profile not found");
         }
@@ -475,23 +493,31 @@ public class RoadmapService {
             List<SkillNode> nodes,
             Map<UUID, StudentProgress> progressByNodeId
     ) {
-        boolean currentNodeAssigned = false;
         Map<UUID, String> statusByNodeId = new HashMap<>();
 
         for (SkillNode node : nodes) {
             StudentProgress progress = progressByNodeId.get(node.getNodeId());
-            if (progress != null && RoadmapStepStatus.COMPLETED == progress.getStatus()) {
-                statusByNodeId.put(node.getNodeId(), FRONTEND_COMPLETED_STATUS);
-                continue;
+            if (progress != null) {
+                if (RoadmapStepStatus.COMPLETED == progress.getStatus()) {
+                    statusByNodeId.put(node.getNodeId(), FRONTEND_COMPLETED_STATUS);
+                    continue;
+                }
+                if (RoadmapStepStatus.IN_PROGRESS == progress.getStatus()) {
+                    statusByNodeId.put(node.getNodeId(), FRONTEND_IN_PROGRESS_STATUS);
+                    continue;
+                }
             }
 
-            if (!currentNodeAssigned) {
+            if (node.getChildNodeOf() == null) {
                 statusByNodeId.put(node.getNodeId(), FRONTEND_CURRENT_STATUS);
-                currentNodeAssigned = true;
-                continue;
+            } else {
+                String parentStatus = statusByNodeId.get(node.getChildNodeOf().getNodeId());
+                if (FRONTEND_COMPLETED_STATUS.equals(parentStatus)) {
+                    statusByNodeId.put(node.getNodeId(), FRONTEND_CURRENT_STATUS);
+                } else {
+                    statusByNodeId.put(node.getNodeId(), FRONTEND_LOCKED_STATUS);
+                }
             }
-
-            statusByNodeId.put(node.getNodeId(), FRONTEND_LOCKED_STATUS);
         }
 
         return statusByNodeId;
@@ -551,6 +577,7 @@ public class RoadmapService {
                 .status(statusByNodeId.getOrDefault(node.getNodeId(), FRONTEND_LOCKED_STATUS))
                 .description(node.getDescription())
                 .level(node.getLevel())
+                .childNodeOf(node.getChildNodeOf() != null ? node.getChildNodeOf().getNodeId() : null)
                 .resources(toResourceResponses(node.getResource()))
                 .children(children)
                 .build();
@@ -571,9 +598,15 @@ public class RoadmapService {
 
         if (resource instanceof List<?> resourceList) {
             return resourceList.stream()
-                    .filter(Map.class::isInstance)
-                    .map(Map.class::cast)
-                    .map(this::toResourceResponse)
+                    .map(obj -> {
+                        if (obj instanceof Map<?, ?> map) {
+                            return toResourceResponse(map);
+                        } else if (obj instanceof String url) {
+                            return toResourceResponse(url);
+                        }
+                        return null;
+                    })
+                    .filter(Objects::nonNull)
                     .toList();
         }
 

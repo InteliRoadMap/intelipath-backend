@@ -18,6 +18,7 @@ public class StudentRoadmapNodeResponse {
     private String status;
     private String description;
     private Integer level;
+    private UUID childNodeOf;
 
     @Builder.Default
     private List<StudentRoadmapResourceResponse> resources = List.of();

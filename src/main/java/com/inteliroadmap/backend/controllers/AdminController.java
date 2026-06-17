@@ -5,7 +5,7 @@ import com.inteliroadmap.backend.domain.dto.response.admin.AdminCourseMetricResp
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminSystemHealthResponse;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminUserListItemResponse;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminUserMetricResponse;
-import com.inteliroadmap.backend.services.AdminDashboardService;
+import com.inteliroadmap.backend.services.AdminService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -41,7 +41,7 @@ import java.util.List;
 @PreAuthorize("hasRole('ADMIN')")
 public class AdminController {
 
-    private final AdminDashboardService adminDashboardService;
+    private final AdminService adminService;
 
     /**
      * GET /admin/dashboard/metrics/users - Get total users metric.
@@ -77,7 +77,7 @@ public class AdminController {
     ) {
         log.info("Admin Dashboard Controller: User metric request received");
         return ResponseEntity.ok(
-                adminDashboardService.getUserMetrics(authorizationHeader)
+                adminService.getUserMetrics(authorizationHeader)
         );
     }
 
@@ -115,7 +115,7 @@ public class AdminController {
     ) {
         log.info("Admin Dashboard Controller: Course metric request received");
         return ResponseEntity.ok(
-                adminDashboardService.getCourseMetrics(authorizationHeader)
+                adminService.getCourseMetrics(authorizationHeader)
         );
     }
 
@@ -153,7 +153,7 @@ public class AdminController {
     ) {
         log.info("Admin Dashboard Controller: System health request received");
         return ResponseEntity.ok(
-                adminDashboardService.getSystemHealth(authorizationHeader)
+                adminService.getSystemHealth(authorizationHeader)
         );
     }
 
@@ -191,7 +191,7 @@ public class AdminController {
     ) {
         log.info("Admin Dashboard Controller: Users list request received");
         return ResponseEntity.ok(
-                adminDashboardService.getUsers(authorizationHeader)
+                adminService.getUsers(authorizationHeader)
         );
     }
 
@@ -249,7 +249,7 @@ public class AdminController {
     ) {
         log.info("Admin Dashboard Controller: Update user role request received. userId: {}", userId);
         return ResponseEntity.ok(
-                adminDashboardService.updateUserRole(authorizationHeader, userId, request)
+                adminService.updateUserRole(authorizationHeader, userId, request)
         );
     }
 
@@ -292,7 +292,7 @@ public class AdminController {
             @PathVariable String userId
     ) {
         log.info("Admin Dashboard Controller: Delete user request received. userId: {}", userId);
-        adminDashboardService.deleteUser(authorizationHeader, userId);
+        adminService.deleteUser(authorizationHeader, userId);
         return ResponseEntity.noContent().build();
     }
 }

@@ -1,7 +1,7 @@
 package com.inteliroadmap.backend.controllers;
 
 import com.inteliroadmap.backend.domain.dto.response.student.*;
-import com.inteliroadmap.backend.services.StudentDashboardService;
+import com.inteliroadmap.backend.services.StudentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -28,7 +28,7 @@ import java.util.List;
 @PreAuthorize("hasRole('STUDENT')")
 public class StudentDashboardController {
 
-    private final StudentDashboardService studentDashboardService;
+    private final StudentService studentService;
 
     /**
      * Get roadmap progress for the authenticated student.
@@ -60,7 +60,7 @@ public class StudentDashboardController {
     })
     public ResponseEntity<DashboardRoadmapProgressResponse> getRoadmapProgress() {
         log.info("Student Dashboard API: Get roadmap progress request received");
-        return ResponseEntity.ok(studentDashboardService.getRoadmapProgress());
+        return ResponseEntity.ok(studentService.getRoadmapProgress());
     }
 
     /**
@@ -93,7 +93,7 @@ public class StudentDashboardController {
     })
     public ResponseEntity<List<SkillGapItemResponse>> getSkillGaps() {
         log.info("Student Dashboard API: Get skill gaps request received");
-        return ResponseEntity.ok(studentDashboardService.getSkillGaps());
+        return ResponseEntity.ok(studentService.getSkillGaps());
     }
 
     /**
@@ -122,7 +122,7 @@ public class StudentDashboardController {
     })
     public ResponseEntity<List<MentorFeedbackItemResponse>> getMentorFeedback() {
         log.info("Student Dashboard API: Get mentor feedback request received");
-        return ResponseEntity.ok(studentDashboardService.getMentorFeedback());
+        return ResponseEntity.ok(studentService.getMentorFeedback());
     }
 
     /**
@@ -151,7 +151,7 @@ public class StudentDashboardController {
     })
     public ResponseEntity<List<AiHistoryItemResponse>> getAiHistory() {
         log.info("Student Dashboard API: Get AI history request received");
-        return ResponseEntity.ok(studentDashboardService.getAiHistory());
+        return ResponseEntity.ok(studentService.getAiHistory());
     }
 
     /**
@@ -184,7 +184,7 @@ public class StudentDashboardController {
     })
     public ResponseEntity<MarketDemandResponse> getMarketDemand() {
         log.info("Student Dashboard API: Get market demand request received");
-        return ResponseEntity.ok(studentDashboardService.getMarketDemand());
+        return ResponseEntity.ok(studentService.getMarketDemand());
     }
 
     /**
@@ -217,6 +217,6 @@ public class StudentDashboardController {
     })
     public ResponseEntity<List<RecommendationItemResponse>> getRecommendations() {
         log.info("Student Dashboard API: Get recommendations request received");
-        return ResponseEntity.ok(studentDashboardService.getRecommendations());
+        return ResponseEntity.ok(studentService.getRecommendations());
     }
 }

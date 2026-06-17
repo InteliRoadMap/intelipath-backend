@@ -43,6 +43,9 @@ public class SkillNode {
     @Column(name = "level")
     private Integer level;
 
+    @Column(name = "skill_id")
+    private UUID skillId;
+
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 

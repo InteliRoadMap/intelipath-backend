@@ -24,7 +24,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class AdminDashboardService {
+public class AdminService {
 
     private final UserRepository userRepository;
     private final CareerRoleRepository careerRoleRepository;

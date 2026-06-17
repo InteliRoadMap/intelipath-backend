@@ -1,7 +1,7 @@
 package com.inteliroadmap.backend.controllers;
 
 import com.inteliroadmap.backend.domain.dto.response.SkillResponse;
-import com.inteliroadmap.backend.services.StudentDashboardService;
+import com.inteliroadmap.backend.services.StudentService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -26,7 +26,7 @@ import org.springframework.web.bind.annotation.RestController;
 @PreAuthorize("hasRole('STUDENT')")
 public class RoadmapSkillController {
 
-    private final StudentDashboardService studentDashboardService;
+    private final StudentService studentService;
 
     /**
      * Compare authenticated student's selected skills with required career skills.
@@ -58,6 +58,6 @@ public class RoadmapSkillController {
     })
     public ResponseEntity<SkillResponse> compareSkills() {
         log.info("Roadmap Skills API: Compare skills request received");
-        return ResponseEntity.ok(studentDashboardService.compareCurrentStudentSkills());
+        return ResponseEntity.ok(studentService.compareCurrentStudentSkills());
     }
 }

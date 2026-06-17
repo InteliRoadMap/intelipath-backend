@@ -12,6 +12,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -43,9 +44,8 @@ public class RoadmapController {
             @ApiResponse(responseCode = "401", description = "Unauthorized - Not logged in or invalid token"),
             @ApiResponse(responseCode = "404", description = "Not Found - Student not found or student does not have a Career")
     })
-    public ResponseEntity<StudentRoadmapResponse> getStudentRoadmap(
-            @RequestHeader("Authorization") String authHeader) {
-        return ResponseEntity.ok(roadmapService.getStudentRoadmap(authHeader));
+    public ResponseEntity<com.inteliroadmap.backend.domain.dto.response.StudentRoadmapResponse> getStudentRoadmap() {
+        return ResponseEntity.ok(roadmapService.getStudentRoadmap());
     }
 
     @GetMapping("/{careerId}")
@@ -87,7 +87,7 @@ public class RoadmapController {
         return ResponseEntity.ok(roadmapService.getNodeDetail(nodeId));
     }
 
-    @PatchMapping("/nodes/progress")
+    @PutMapping("/nodes/progress")
     @Operation(summary = "Update node progress", description = "Update the status of a Node (e.g., 'completed', 'in_progress').")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Successful"),

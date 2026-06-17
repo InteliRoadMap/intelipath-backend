@@ -151,4 +151,15 @@ public class UserController {
         log.info("User profile setup request received");
         return ResponseEntity.ok(userService.setupUserProfile(request));
     }
+
+    @PatchMapping(value = "/profile/avatar", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(
+            summary = "Update user avatar",
+            description = "Upload and update the avatar image for the authenticated user"
+    )
+    public ResponseEntity<UserResponse> updateAvatar(
+            @org.springframework.web.bind.annotation.RequestParam("file") org.springframework.web.multipart.MultipartFile file
+    ) {
+        return ResponseEntity.ok(userService.updateAvatar(file));
+    }
 }

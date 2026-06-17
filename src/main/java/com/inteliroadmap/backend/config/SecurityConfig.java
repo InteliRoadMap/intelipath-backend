@@ -47,6 +47,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(
                                 "/api/v1/auth/**",
+                                "/api/v1/public/**",
                                 "/oauth2/**",
                                 "/login/oauth2/**"
                         ).permitAll()
@@ -68,7 +69,7 @@ public class SecurityConfig {
                 )
                 .oauth2Login(oauth2 -> oauth2
                         .authorizationEndpoint(authorization -> authorization
-                                .baseUri("/oauth2/authorize")
+                                .baseUri("/oauth2/authorization")
                                 .authorizationRequestRepository(httpCookieOAuth2AuthorizationRequestRepository)
                         )
                         .userInfoEndpoint(userInfo -> userInfo
