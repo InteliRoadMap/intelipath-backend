@@ -54,16 +54,22 @@ spring:
               - user:email
               - read:user
 
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY}
+      chat:
+        options:
+          model: ${OPENAI_MODEL}
+    vectorstore:
+      pgvector:
+        initialize-schema: true
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+        dimensions: 1536
+
 jwt:
   secret: ${JWT_SECRET}
   expiration: ${JWT_EXPIRATION:86400000}
-
-spring.ai.openai.api-key: ${OPENAI_API_KEY}
-spring.ai.openai.chat.options.model: ${OPENAI_MODEL}
-spring.ai.vectorstore.pgvector.initialize-schema: true
-spring.ai.vectorstore.pgvector.index-type: HNSW
-spring.ai.vectorstore.pgvector.distance-type: COSINE_DISTANCE
-spring.ai.vectorstore.pgvector.dimensions: 1536
 
 supabase:
   url: ${SUPABASE_URL}
@@ -74,3 +80,8 @@ springdoc:
     path: /swagger-ui.html
   api-docs:
     path: /v3/api-docs
+
+scraper:
+  thread-sleep: ${THREAD_SLEEP:2000}
+  topcv:
+    url: ${TOPCV_TARGET}

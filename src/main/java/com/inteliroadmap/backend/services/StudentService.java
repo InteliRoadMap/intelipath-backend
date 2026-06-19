@@ -110,7 +110,6 @@ public class StudentService {
         return studentMapper.toProfileResponse(student);
     }
 
-
     /**
      * Compare the current student's selected skills with required career skills.
      *
@@ -139,19 +138,24 @@ public class StudentService {
                 .map(CareerRequiredSkill::getSkill)
                 .toList();
 
+        List<com.inteliroadmap.backend.domain.dto.response.RequiredSkillResponse> requiredSkillResponses = skillMapper.toRequiredSkillResponses(requiredSkills);
+        requiredSkillResponses.forEach(res -> {
+            requiredSkills.stream()
+                .filter(r -> r.getSkill().getSkillId().equals(res.getSkill().getSkillId()))
+                .findFirst()
+                .ifPresent(r -> res.setProgress(calculateSkillProgress(student, r.getSkill())));
+        });
+
         return SkillResponse.builder()
                 .selectedSkills(skillMapper.toSelectedSkillResponses(selectedSkills))
-                .requiredSkills(skillMapper.toRequiredSkillResponses(requiredSkills))
+                .requiredSkills(requiredSkillResponses)
                 .missingSkills(skillMapper.toSkillItemResponses(missingSkills))
                 .build();
     }
 
-
     private Student getCurrentStudent() {
         return AuthenticatedStudentService.getOrCreateStudent();
     }
-
-
 
     public List<CareerRequiredSkill> findMissingRequiredSkills(Student student) {
         List<CareerRequiredSkill> requiredSkills = careerRequiredSkillRepository
@@ -176,5 +180,21 @@ public class StudentService {
                 .toList();
     }
 
-
+    public Integer calculateSkillProgress(Student student, Skill skill) {
+        if (studentSkillRepository.existsByStudentAndSkill(student, skill)) {
+            return 100;
+        }
+        List<SkillNode> allNodesForSkill = skillNodeRepository.findBySkillIdAndCareerRole_CareerId(skill.getSkillId(), student.getCareerRole().getCareerId());
+        if (allNodesForSkill.isEmpty()) {
+            return 0;
+        }
+        int completedCount = 0;
+        for (SkillNode skillNode : allNodesForSkill) {
+            StudentProgress nodeProgress = studentProgressRepository.findByStudentAndSkillNode(student, skillNode).orElse(null);
+            if (nodeProgress != null && nodeProgress.getStatus() == RoadmapStepStatus.COMPLETED) {
+                completedCount++;
+            }
+        }
+        return (int) Math.round((double) completedCount / allNodesForSkill.size() * 100);
+    }
 }

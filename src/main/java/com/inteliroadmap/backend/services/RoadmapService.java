@@ -398,12 +398,28 @@ public class RoadmapService {
                 if (skill != null) {
                     boolean hasSkill = studentSkillRepository.existsByStudentAndSkill(student, skill);
                     if (!hasSkill) {
-                        StudentSkill newSkill = StudentSkill.builder()
-                                .student(student)
-                                .skill(skill)
-                                .build();
-                        studentSkillRepository.save(newSkill);
-                        log.info("Auto-synced skill {} to student {}", skill.getSkillName(), student.getUserId());
+                        List<SkillNode> allNodesForSkill = skillNodeRepository.findBySkillIdAndCareerRole_CareerId(skill.getSkillId(), student.getCareerRole().getCareerId());
+                        boolean allCompleted = true;
+                        
+                        for (SkillNode skillNode : allNodesForSkill) {
+                            if (skillNode.getNodeId().equals(node.getNodeId())) {
+                                continue;
+                            }
+                            StudentProgress nodeProgress = studentProgressRepository.findByStudentAndSkillNode(student, skillNode).orElse(null);
+                            if (nodeProgress == null || nodeProgress.getStatus() != RoadmapStepStatus.COMPLETED) {
+                                allCompleted = false;
+                                break;
+                            }
+                        }
+
+                        if (allCompleted) {
+                            StudentSkill newSkill = StudentSkill.builder()
+                                    .student(student)
+                                    .skill(skill)
+                                    .build();
+                            studentSkillRepository.save(newSkill);
+                            log.info("Auto-synced skill {} to student {} after all required nodes were completed", skill.getSkillName(), student.getUserId());
+                        }
                     }
                 }
             }

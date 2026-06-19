@@ -3,18 +3,15 @@ package com.inteliroadmap.backend.services;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
-import org.springframework.ai.reader.ExtractedTextFormatter;
-import org.springframework.ai.reader.pdf.PagePdfDocumentReader;
-import org.springframework.ai.reader.pdf.config.PdfDocumentReaderConfig;
 import org.springframework.ai.transformer.splitter.TokenTextSplitter;
 import org.springframework.ai.vectorstore.VectorStore;
-import org.springframework.core.io.ByteArrayResource;
-import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 @Service
 @RequiredArgsConstructor
@@ -22,66 +19,77 @@ import java.util.List;
 public class DocumentIngestionService {
 
     private final VectorStore vectorStore;
+    private final PdfToMarkdownService pdfToMarkdownService;
 
     /**
-     * Ingest a PDF file into the Vector DB.
-     * It reads the PDF, splits it into chunks, and saves to VectorStore.
-     *
+     * Ingest a PDF file into the Vector DB
      * @param file The PDF file
      * @throws IOException If file reading fails
      */
     public void ingestPdfDocument(MultipartFile file) throws IOException {
         log.info("Starting ingestion for PDF document: {}", file.getOriginalFilename());
 
-        Resource resource = new ByteArrayResource(file.getBytes()) {
-            @Override
-            public String getFilename() {
-                return file.getOriginalFilename();
-            }
-        };
+        // BƯỚC 1: Dùng GPT-4o-mini Vision để parse PDF → Markdown
+        // Thay vì dùng PagePdfDocumentReader (chỉ bóc text thô, mất hết bảng biểu),
+        // giờ ta dùng Vision AI để "nhìn" từng trang PDF và xuất ra Markdown chuẩn.
+        String markdown = pdfToMarkdownService.convertToMarkdown(file);
+        log.info("Converted PDF to Markdown. Length: {} chars", markdown.length());
 
-        // [CHỈNH SỬA TẠI ĐÂY - BƯỚC 1: ĐỌC FILE TÀI LIỆU]
-        // Mặc định đang dùng PagePdfDocumentReader của Spring AI (chỉ bóc chữ thô - plain text).
-        // NẾU MUỐN DÙNG LLAMAPARSE, TIKA, HOẶC MARKITDOWN:
-        // Bạn hãy xóa đoạn cấu hình PdfDocumentReaderConfig và pdfReader này đi, 
-        // gọi API/thư viện của bên thứ 3 để lấy file Markdown về.
-        PdfDocumentReaderConfig config = PdfDocumentReaderConfig.builder()
-                .withPageExtractedTextFormatter(new ExtractedTextFormatter.Builder()
-                        .withNumberOfBottomTextLinesToDelete(0)
-                        .withNumberOfTopPagesToSkipBeforeDelete(0)
-                        .build())
-                .withPagesPerDocument(1) // 1 document per page initially
-                .build();
+        // BƯỚC 2: Tách Markdown thành các Document để chunking
+        // Mỗi trang PDF đã được phân tách bằng comment <!-- page: X -->
+        // Ta split theo page separator trước, rồi mới chunk nhỏ hơn nếu cần
+        List<Document> documents = splitMarkdownIntoDocuments(markdown, file.getOriginalFilename());
+        log.info("Split Markdown into {} page-level documents.", documents.size());
 
-        PagePdfDocumentReader pdfReader = new PagePdfDocumentReader(resource, config);
-        
-        // Read the entire PDF into a list of Documents (1 per page)
-        List<Document> documents = pdfReader.get();
-        log.info("Read {} pages from PDF.", documents.size());
-
-        // [CHỈNH SỬA TẠI ĐÂY - BƯỚC 2: CẮT NHỎ TÀI LIỆU (CHUNKING)]
-        // Mặc định đang dùng TokenTextSplitter cắt theo độ dài token (max 800 tokens).
-        // NẾU BẠN CHUYỂN SANG DÙNG MARKDOWN TỪ BƯỚC 1:
-        // Hãy đổi class này thành MarkdownSplitter (để nó cắt theo thẻ Heading, Paragraph)
-        // chứ đừng dùng TokenTextSplitter sẽ bị đứt gãy cấu trúc bảng biểu.
+        // BƯỚC 3: Cắt nhỏ thêm nếu một trang quá dài (> 800 tokens)
         TokenTextSplitter tokenTextSplitter = new TokenTextSplitter(800, 200, 5, 10000, true);
         List<Document> chunkedDocuments = tokenTextSplitter.apply(documents);
-        
-        // Add metadata to each chunk
+
+        // Thêm metadata
         for (Document doc : chunkedDocuments) {
             doc.getMetadata().put("file_name", file.getOriginalFilename());
+            doc.getMetadata().put("content_type", "markdown");
         }
 
-        log.info("Split into {} chunks. Saving to Vector DB...", chunkedDocuments.size());
+        log.info("Split into {} final chunks. Saving to Vector DB...", chunkedDocuments.size());
 
-        // [CHỈNH SỬA TẠI ĐÂY - BƯỚC 3: NHÚNG (EMBEDDING) & LƯU LÊN VECTOR DB]
-        // Hàm vectorStore.accept() này thực chất làm 2 việc ẩn bên trong:
-        // 1. Gọi EmbeddingModel (như OpenAI text-embedding-3-small đã cấu hình trong .env) biến text thành Vector.
-        // 2. Lưu Vector đó xuống PostgreSQL (bảng vector_store).
-        // Nếu bạn muốn đổi model Embedding, chỉ cần sửa tên model trong file application.yml (hoặc .env) là xong,
-        // không cần sửa code ở đây.
+        // BƯỚC 4: Lưu vào VectorStore (tự động gọi EmbeddingModel)
         vectorStore.accept(chunkedDocuments);
 
         log.info("Successfully ingested PDF document: {}", file.getOriginalFilename());
+    }
+
+    /**
+     * Tách chuỗi Markdown thành danh sách Document theo page separator.
+     * Mỗi page separator có dạng: <!-- page: X -->
+     */
+    private List<Document> splitMarkdownIntoDocuments(String markdown, String fileName) {
+        List<Document> documents = new ArrayList<>();
+
+        // Split theo page separator
+        String[] pages = markdown.split("(?=<!-- page: \\d+ -->)");
+
+        int pageNumber = 0;
+        for (String page : pages) {
+            String trimmed = page.trim();
+            if (trimmed.isEmpty()) continue;
+
+            pageNumber++;
+            Document doc = new Document(trimmed, Map.of(
+                    "page_number", pageNumber,
+                    "source", fileName
+            ));
+            documents.add(doc);
+        }
+
+        // Nếu không có page separator (PDF chỉ 1 trang), tạo 1 document duy nhất
+        if (documents.isEmpty() && !markdown.isBlank()) {
+            documents.add(new Document(markdown.trim(), Map.of(
+                    "page_number", 1,
+                    "source", fileName
+            )));
+        }
+
+        return documents;
     }
 }

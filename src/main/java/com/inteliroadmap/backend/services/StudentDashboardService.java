@@ -91,7 +91,7 @@ public class StudentDashboardService {
 
         List<CareerRequiredSkill> missingSkills = studentService.findMissingRequiredSkills(student);
         return missingSkills.stream()
-                .map(studentDashboardMapper::toSkillGapItemResponse)
+                .map(req -> studentDashboardMapper.toSkillGapItemResponse(req, studentService.calculateSkillProgress(student, req.getSkill())))
                 .toList();
     }
 

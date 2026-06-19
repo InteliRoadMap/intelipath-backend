@@ -1,17 +1,18 @@
 package com.inteliroadmap.backend.domain.dto.response;
 
-import com.inteliroadmap.backend.domain.enums.ImportanceLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class RequiredSkillResponse {
-    private SkillItemResponse skill;
-    private ImportanceLevel importanceLevel;
-    private Integer progress;
+public class RecruitmentPostResponse {
+    private Map<UUID, List<Object>> postDetails;
 }

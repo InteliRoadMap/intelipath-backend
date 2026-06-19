@@ -18,4 +18,5 @@ public class SkillGapItemResponse {
     private String title;
     private String description;
     private ImportanceLevel severity;
+    private Integer progress;
 }

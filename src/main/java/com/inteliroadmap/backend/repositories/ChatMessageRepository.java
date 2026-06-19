@@ -12,5 +12,6 @@ import java.util.UUID;
 public interface ChatMessageRepository extends JpaRepository<ChatMessage, UUID> {
     List<ChatMessage> findByChatSessionInOrderByCreateAtAsc(List<ChatSession> chatSessions);
     List<ChatMessage> findByChatSession_SessionIdOrderByCreateAtAsc(UUID sessionId);
+    List<ChatMessage> findTop10ByChatSession_SessionIdOrderByCreateAtDesc(UUID sessionId);
     void deleteByChatSession_SessionId(UUID sessionId);
 }

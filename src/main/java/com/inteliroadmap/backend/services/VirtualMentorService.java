@@ -140,32 +140,7 @@ public class VirtualMentorService {
         // 1. System Prompt (Context)
         Student student = studentRepository.findById(user.getUserId()).orElse(null);
         String systemPrompt = buildSystemPrompt(user, student);
-        
-        // Check for PDF URL in the message to extract text
-        String userMsgText = request.getMessage();
-        java.util.regex.Pattern pattern = java.util.regex.Pattern.compile("(https?://[^\\s\\)]+\\.pdf)");
-        java.util.regex.Matcher matcher = pattern.matcher(userMsgText);
-        if (matcher.find()) {
-            String pdfUrl = matcher.group(1);
-            try {
-                // [CHỈNH SỬA TẠI ĐÂY - TRÍCH XUẤT TÀI LIỆU CHAT TRỰC TIẾP]
-                // Chỗ này cũng đang dùng PagePdfDocumentReader để đọc file đính kèm trong lúc chat.
-                // Nếu bạn đã cài đặt LlamaParse/Tika ở bước Ingestion, bạn CŨNG PHẢI thay thế hàm đọc PDF ở đây 
-                // để AI nhận được Markdown thay vì text thô.
-                org.springframework.core.io.UrlResource resource = new org.springframework.core.io.UrlResource(pdfUrl);
-                org.springframework.ai.reader.pdf.PagePdfDocumentReader pdfReader = new org.springframework.ai.reader.pdf.PagePdfDocumentReader(resource);
-                java.util.List<org.springframework.ai.document.Document> docs = pdfReader.get();
-                StringBuilder sb = new StringBuilder();
-                for (org.springframework.ai.document.Document doc : docs) {
-                    sb.append(doc.getContent()).append("\n");
-                }
-                systemPrompt += "\n\n[ATTACHED PDF CONTENT]\nThe user has attached a PDF file. Here is the extracted text from the PDF:\n" + sb.toString() + "\n[END OF PDF CONTENT]\nPlease base your analysis and advice on this content.";
-                log.info("Successfully extracted text from PDF URL: {}", pdfUrl);
-            } catch (Exception e) {
-                log.error("Failed to read PDF from URL: " + pdfUrl, e);
-            }
-        }
-        
+        // System prompt already built
         // 2. Build Message List
         List<org.springframework.ai.chat.messages.Message> messageHistory = new ArrayList<>();
         
@@ -197,7 +172,16 @@ public class VirtualMentorService {
                 // Advisor này tự động biến câu hỏi của User thành Vector (dùng EmbeddingModel) 
                 // rồi tìm kiếm trong PostgreSQL những đoạn text giống nhất.
                 // Nếu bạn muốn đổi thuật toán tìm kiếm (vd: chỉnh k=5, threshold=0.8), bạn sửa ở SearchRequest.defaults().
-                .advisors(new org.springframework.ai.chat.client.advisor.QuestionAnswerAdvisor(vectorStore, org.springframework.ai.vectorstore.SearchRequest.defaults()))
+                .advisors(new org.springframework.ai.chat.client.advisor.QuestionAnswerAdvisor(
+                        vectorStore, 
+                        org.springframework.ai.vectorstore.SearchRequest.defaults(),
+                        "\n\n[OPTIONAL RETRIEVED CONTEXT]\n" +
+                        "---------------------\n" +
+                        "{question_answer_context}\n" +
+                        "---------------------\n" +
+                        "If the above context is relevant to the user's question, use it. Otherwise, ignore it and rely completely on the conversation history, the attached PDF (if any), and your own knowledge. DO NOT say you cannot answer just because the context is empty or irrelevant."
+                ))
+                .functions("jobMarketTool", "studentProgressTool", "markItDownTool")
                 .stream()
                 .content()
                 .doOnNext(fullResponse::append)
