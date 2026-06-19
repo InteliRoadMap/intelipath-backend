@@ -8,4 +8,5 @@ import org.springframework.stereotype.Repository;
 public interface RecruitmentRepository extends JpaRepository<Recruitment, String> {
     boolean existsByTopCvRecruitmentId(String topCvRecruitmentId);
     Recruitment findByTopCvRecruitmentId(String topCvRecruitmentId);
+    void removeByTopCvRecruitmentId(String topCvRecruitmentId);
 }

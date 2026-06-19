@@ -10,5 +10,6 @@ import java.util.UUID;
 
 @Repository
 public interface RecruitmentPostRepository extends JpaRepository<RecruitmentPost, UUID> {
-    RecruitmentPost findByCompanyAndRecruitment(Company company, Recruitment recruitment);
+    void removeByRecruitment(Recruitment recruitment);
+    boolean existsByCompanyAndRecruitment(Company company, Recruitment recruitment);
 }

@@ -11,6 +11,7 @@ import com.inteliroadmap.backend.repositories.RecruitmentPostRepository;
 import com.inteliroadmap.backend.repositories.RecruitmentRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.commons.lang3.RandomUtils;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
@@ -19,10 +20,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -44,15 +42,20 @@ public class TopCvParser {
     private final DateTimeFormatter formatDate = DateTimeFormatter.ofPattern("dd/MM/yyyy");
 
     public void parseTopCvJobs() {
+        // -------------------------- LIMITER -------------------------- //
+        int limiter = 20;               // Set this value to 0 or below to remove limiter
+        boolean limitOn = limiter > 0;  // Turn on limiter if its value is > 0
+        // -------------------------- LIMITER -------------------------- //
+
         try {
-            int totalPage = 1, page = 1, count = 0;
+            int totalPage = 1, currentPage = 1, count = 0;
             boolean run;
             do {
-                String url = TOPCV_TARGET + "?sort=new&page=" + page;
+                String url = TOPCV_TARGET + "?sort=new&page=" + currentPage;
                 log.info("ScraperService: Parsing TopCv Jobs {}", url);
                 Document doc = CurlEngine.getDocument(url);
 
-                run = page <= totalPage;
+                run = currentPage <= totalPage; // Continue scraping next page if available
 
                 if (doc != null) {
                     Element paginateText = doc.selectFirst("#job-listing-paginate-text");
@@ -61,48 +64,59 @@ public class TopCvParser {
                         log.warn("Could not find pagination text. The page layout may have changed or Cloudflare blocked the request.");
                         break;
                     }
-                    System.out.println(paginateText.text());
 
-                    Pattern pattern = Pattern.compile("/\\s*(\\d+)");
-                    Matcher m = pattern.matcher(paginateText.text());
+                    Matcher m = Pattern.compile("/\\s*(\\d+)").matcher(paginateText.text());
                     if (m.find()) totalPage = Integer.parseInt(m.group(1));
-                    log.info("Current page: {}/{}", page, totalPage);
+                    log.info("Current page: {}/{}", currentPage, totalPage);
 
                     Elements jobs = doc.select(".job-item-search-result");
-                    log.info("Found {} jobs on page {}. Starting scrape...", jobs.size(), page);
+                    log.info("Found {} jobs on page {}. Starting scrape...", jobs.size(), currentPage);
 
                     for (Element job : jobs) {
-                        if (count >= 20) {
-                            log.info("Reached scraper delimiter. Stopping scrape.");
+                        // -------------------------- LIMITER -------------------------- //
+                        if (limitOn && count >= limiter) {
+                            log.info("Reached Scraping Limiter. Stopping scrape.");
                             run = false;
                             break;
                         }
+                        // -------------------------- LIMITER -------------------------- //
                         try {
-                            Thread.sleep(THREAD_SLEEP);
+                            // ------------------------ THREAD SLEEP ----------------------- //
+                            // Thread Sleep to prevent expected IP Blocked by CloudFlare due to abnormal activities
+                            Thread.sleep(THREAD_SLEEP + RandomUtils.nextInt(0, 2000));
+                            // ------------------------ THREAD SLEEP ----------------------- //
 
                             count++;
                             log.info("Scraping job No. {}...", count);
 
+                            // Get Company Link
                             String companyLink = job.select(".title-block").select(".company").attr("href");
                             String companyId = "";
-                            Matcher matcher = Pattern.compile("(\\d+)").matcher(companyLink);
+                            Matcher matcher = Pattern.compile("(?:/|id=)(\\d+)(?:\\.html|&|$)").matcher(companyLink);
                             if (matcher.find()) {
                                 companyId = "topcv.co" + matcher.group(1);
                             }
                             log.info("Co. ID: {}", companyId);
                             Company company = getCompanyDetail(companyLink, companyId);
 
+                            // Get Recruitment Link
                             String recruitmentLink = job.select(".title-block").select(".title").select("a").attr("href");
                             String recruitmentId = "topcv.rec" + job.attr("data-job-id");
                             log.info("Rec ID: {}", recruitmentId);
                             Recruitment recruitment = getRecruitmentDetail(recruitmentLink, recruitmentId);
 
+                            // Create Recruitment Post
                             if (company != null && recruitment != null) {
-                                RecruitmentPost post = RecruitmentPost.builder()
-                                        .company(company)
-                                        .recruitment(recruitment)
-                                        .build();
-                                recruitmentPostRepository.save(post);
+                                if (!recruitmentPostRepository.existsByCompanyAndRecruitment(company, recruitment)) {
+                                    RecruitmentPost post = RecruitmentPost.builder()
+                                            .company(company)
+                                            .recruitment(recruitment)
+                                            .expireAt(recruitment.getApplicationDeadline())
+                                            .build();
+                                    recruitmentPostRepository.save(post);
+                                } else {
+                                    log.info("RecruitmentPost already exists. Skipping save.");
+                                }
                             }
 
                         } catch (BlockedIpException e) {
@@ -115,7 +129,7 @@ public class TopCvParser {
                         }
                     }
                 }
-                page++;
+                currentPage++;
             } while (run);
         } catch (Exception e) {
             log.error("Error setting up parser", e);
@@ -132,6 +146,7 @@ public class TopCvParser {
         if(type.contains("Yêu cầu")) return "Requirements";
         if(type.contains("Quyền lợi")) return "Benefits";
         if(type.contains("Chuyên môn")) return "Specialize";
+        if(type.contains("Thu nhập")) return "Salary";
         if(type.contains("Mô tả")) return "Job Description";
         if(type.contains("Địa điểm")) return "Location";
         if(type.contains("Thời gian")) return "Work Time";
@@ -169,16 +184,32 @@ public class TopCvParser {
             "jobRelatedTags",".premium-job-related-tags__section"
     );
 
+    private final Map<String, String> simpleCustom = Map.of(
+            "jobHeader",".box-header",
+            "jobTags",".job-tags__group",
+            "jobLocation", ".box-address",
+            "jobDescription",".box-info",
+            "jobRelatedTag1",".box-career",
+            "jobRelatedTag2",".box-category-city",
+            "jobGeneralInfo",".box-general-group"
+    );
+
     private List<String> getDescriptions(Elements items, List<String> list){
         if(list == null) list = new ArrayList<>();
+
+        // Change <br/> elements to "\\n"
         items.select("br").append("\\n");
-        for(Element e : items){
-            if(e.children().size() > 1 && !(e.children().select("br").size() > 1)) {
-                getDescriptions(e.children(), list);
-            }
-            else {
-                if(e.text().isEmpty()) continue;
-                String line = e.text().replace("\\n", "\n");
+
+        for(Element item : items){
+            if(item.children().size() > 1 && !(item.children().select("br").size() > 1)) {
+                // Recursive search if found child element(s)
+                getDescriptions(item.children(), list);
+            } else {
+                // Skip empty element
+                if(item.text().isEmpty()) continue;
+
+                // Change "\\n" to "\n" for line break
+                String line = item.text().replace("\\n", "\n");
                 list.add(line);
             }
         }
@@ -196,9 +227,11 @@ public class TopCvParser {
                 return company;
             }
 
+            // ------------------------------- COMPANY SIGNATURES ------------------------------ //
             String companyLogo = doc.select(".company-logo").select("img").attr("src");
             String companyName = doc.select(".company-name").text();
 
+            // ------------------------------ COMPANY INTRODUCTIONS ---------------------------- //
             Elements introContents;
             introContents = doc.select(".intro-content");
             if (introContents.isEmpty()) {
@@ -206,6 +239,7 @@ public class TopCvParser {
             }
             List<String> companyIntro = getDescriptions(introContents, null);
 
+            // ----------------------------- COMPANY GENERAL INFOS ----------------------------- //
             Map<String, String> companyInfo = new LinkedHashMap<>();
             Elements infos = doc.select(".box-info-company-general-item__info");
             for (Element info : infos) {
@@ -216,6 +250,7 @@ public class TopCvParser {
                 companyInfo.put(infoTitle, infoValue);
             }
 
+            // -------------------------------- COMPANY CONTACTS -------------------------------- //
             Elements contacts;
             contacts = doc.select(".info-line");
             if (contacts.isEmpty()) {
@@ -242,9 +277,10 @@ public class TopCvParser {
         Document doc = CurlEngine.getDocument(recruitmentLink);
         Recruitment recruitment = null;
         boolean premium = false;
+        boolean simple = false;
 
         if (doc != null) {
-            Element jobInfo = null;
+            Element jobInfo;
 
             if(recruitmentRepository.existsByTopCvRecruitmentId(recruitmentId)) {
                 log.info("Rec ID existed. Skipping...");
@@ -257,14 +293,17 @@ public class TopCvParser {
                 // Normal custom tags not found
                 // Proceed to get Premium custom tags
                 jobInfo = doc.selectFirst(".premium-job-detail");
-                premium = true;
-
-//                if (jobInfo == null){
-//                    // Premium custom tags not found
-//                    // Proceed to get Simple custom tags
-//                    jobInfo = doc.selectFirst(".section-content-job-detail");
-//                    simple = true;
-//                }
+                
+                if (jobInfo != null) {
+                    premium = true;
+                } else {
+                    // Premium custom tags not found
+                    // Proceed to get Simple custom tags
+                    jobInfo = doc.selectFirst(".section-content-job-detail");
+                    if (jobInfo != null) {
+                        simple = true;
+                    }
+                }
             }
 
             if (jobInfo == null) {
@@ -273,32 +312,62 @@ public class TopCvParser {
 
             Map<String, String> jobDetail;
 
-//            if (simple) jobDetail = simpleCustom;
-            if (premium) jobDetail = premiumCustom;
+            if (simple) jobDetail = simpleCustom;
+            else if (premium) jobDetail = premiumCustom;
             else jobDetail = normalCustom;
 
-            // -------------------------- Normal & Premium Custom Tags -------------------------
-            String jobTitle = jobDetail.get("jobTitle");
-            String jobBasicInfos = jobDetail.get("jobBasicInfos");
-            String jobDeadline = jobDetail.get("applicationDeadline");
-            String jobTags = jobDetail.get("jobTags");
-            String jobDescriptions = jobDetail.get("jobDescription");
-            String jobGeneralInfos = jobDetail.get("jobGeneralInfo");
-            String jobRelatedTags = jobDetail.get("jobRelatedTags");
+            // -------------------------- Normal & Premium Custom Tags ------------------------- //
+            String jobTitle = jobDetail.get("jobTitle");                // Title
+            String jobBasicInfos = jobDetail.get("jobBasicInfos");      // Salary | Location | Experience
+            String jobDeadline = jobDetail.get("applicationDeadline");  // Application deadline
+            String jobRelatedTags = jobDetail.get("jobRelatedTags");    // Related tags
 
-            // ----------------------------------- JOB HEADER ----------------------------------
-            String recruitmentTitle = jobInfo.select(jobTitle).text();
-            String recruitmentSalary = jobInfo.select(jobBasicInfos).getFirst().text();
-            String recruitmentLocation = jobInfo.select(jobBasicInfos).get(1).text();
-            String recruitmentExperience = jobInfo.select(jobBasicInfos).getLast().text();
+            // ------------------------------- Simple Custom Tags ------------------------------ //
+            String jobHeader = jobDetail.get("jobHeader");              // Title | Salary | Application deadline
+            String jobLocation = jobDetail.get("jobLocation");          // Location
+            String jobRelatedTag1 = jobDetail.get("jobRelatedTag1");    // | Same part but different div class
+            String jobRelatedTag2 = jobDetail.get("jobRelatedTag2");    // |
 
-            // Get application deadline date
-            LocalDate recruitmentDeadline = LocalDate.parse(
-                    jobInfo.select(jobDeadline).text(),
-                    formatDate
-            );
+            // ----------------------------- Same for all 3 Customs ---------------------------- //
+            String jobGeneralInfos = jobDetail.get("jobGeneralInfo");   // General infos
+            String jobDescriptions = jobDetail.get("jobDescription");   // Descriptions
+            String jobTags = jobDetail.get("jobTags");                  // Job tags
 
-            // ------------------------------------ JOB TAGS -----------------------------------
+
+            // ----------------------------------- JOB HEADER ---------------------------------- //
+            String recruitmentTitle;
+            String recruitmentSalary;
+            String recruitmentLocation = "";    // | Is empty when parsing Simple custom
+            String recruitmentExperience = "";  // |
+            LocalDate recruitmentDeadline;
+
+            if(simple) {
+                Elements header = jobInfo.select(jobHeader);
+                recruitmentTitle = header.select(".title").text();
+                recruitmentSalary = header.select(".salary").text();
+
+                String dayTxt = header.select(".deadline").text().replaceAll("\\D+", "");
+                int days = dayTxt.isEmpty() ? 30 : Integer.parseInt(dayTxt);
+
+                recruitmentDeadline = LocalDate.now().plusDays(days);
+
+            } else {
+                recruitmentTitle = jobInfo.select(jobTitle).text();
+                Elements basicInfos = jobInfo.select(jobBasicInfos);
+                recruitmentSalary = !basicInfos.isEmpty() ? basicInfos.getFirst().text() : "N/A";
+                recruitmentLocation = basicInfos.size() > 1 ? basicInfos.get(1).text() : "N/A";
+                recruitmentExperience = basicInfos.size() > 2 ? basicInfos.getLast().text() : "N/A";
+
+                // Get application deadline date
+                String deadlineTxt = jobInfo.select(jobDeadline).text();
+                if (!deadlineTxt.isEmpty()) {
+                    recruitmentDeadline = LocalDate.parse(deadlineTxt, formatDate);
+                } else {
+                    recruitmentDeadline = LocalDate.now().plusDays(30);
+                }
+            }
+
+            // ------------------------------------ JOB TAGS ----------------------------------- //
             Map<String, List<String>> recruitmentTag = new LinkedHashMap<>();
             Elements tags = jobInfo.select(jobTags);
             for (Element tag : tags) {
@@ -312,12 +381,21 @@ public class TopCvParser {
                 recruitmentTag.put(convertToEng(tagName), tagList);
             }
 
-            // -------------------------------- JOB DESCRIPTIONS -------------------------------
+            // -------------------------------- JOB DESCRIPTIONS ------------------------------- //
             Map<String, List<String>> recruitmentDescription = new LinkedHashMap<>();
             Elements descriptions = jobInfo.select(jobDescriptions);
 
-            // Remove job application area
-            descriptions.removeLast();
+            if(simple) { // Simple custom
+                // Recruitment Tags Section
+                descriptions.removeFirst();
+
+                // Work Location Section
+                descriptions.addAll(jobInfo.select(jobLocation));
+
+            } else {
+                // Remove job application area
+                descriptions.removeLast();
+            }
 
             for(Element desc : descriptions) {
                 String descName = convertToEng(desc.child(0).text());
@@ -327,7 +405,7 @@ public class TopCvParser {
                 recruitmentDescription.put(descName, descLine);
             }
 
-            // ------------------------------- JOB GENERAL INFOS -------------------------------
+            // ------------------------------- JOB GENERAL INFOS ------------------------------- //
             Map<String, String> recruitmentGeneralInfo = new LinkedHashMap<>();
             Elements generalInfos = jobInfo.select(jobGeneralInfos);
 
@@ -345,14 +423,21 @@ public class TopCvParser {
                 }
             }
 
-            // -------------------------------- JOB RELATED TAGS -------------------------------
+            // -------------------------------- JOB RELATED TAGS ------------------------------- //
             Map<String, List<String>> recruitmentRelatedTag = new LinkedHashMap<>();
-            Elements relatedTags = jobInfo.select(jobRelatedTags);
+            Elements relatedTags;
+
+            if(simple) { // Simple Custom edition
+                relatedTags = jobInfo.select(jobRelatedTag1);
+                relatedTags.addAll(jobInfo.select(jobRelatedTag2));
+            } else {
+                relatedTags = jobInfo.select(jobRelatedTags);
+            }
+
             for(Element relatedTag : relatedTags) {
                 String tagName = convertToEng(relatedTag.child(0).text());
 
                 Elements tagList = relatedTag.child(1).children();
-                int i = 0;
                 List<String> tagItem = new ArrayList<>();
                 for (Element tag : tagList) {
                     tagItem.add(tag.text());
@@ -360,6 +445,7 @@ public class TopCvParser {
                 recruitmentRelatedTag.put(tagName, tagItem);
             }
 
+            // ------------------------ END RETRIEVING RECRUITMENT INFOS ----------------------- //
             recruitment = Recruitment.builder()
                     .topCvRecruitmentId(recruitmentId)          // String
                     .recruitmentLink(recruitmentLink)           // String

@@ -3,6 +3,7 @@ package com.inteliroadmap.backend.domain.entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
@@ -28,20 +29,6 @@ public class RecruitmentPost {
     @JoinColumn(name = "recruitment_id", nullable = false, foreignKey = @ForeignKey(name = "fk_rp_recruitment"))
     private Recruitment recruitment;
 
-    @Column(name = "create_at")
-    private LocalDateTime createAt;
-
-    @Column(name = "update_at")
-    private LocalDateTime updateAt;
-
-    @PrePersist
-    public void prePersist() {
-        createAt = LocalDateTime.now();
-        updateAt = LocalDateTime.now();
-    }
-
-    @PreUpdate
-    public void preUpdate() {
-        updateAt = LocalDateTime.now();
-    }
+    @Column(name = "expire_at")
+    private LocalDate expireAt;
 }

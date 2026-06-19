@@ -7,6 +7,7 @@ import com.inteliroadmap.backend.domain.entity.Company;
 import com.inteliroadmap.backend.domain.entity.Recruitment;
 import com.inteliroadmap.backend.domain.entity.RecruitmentPost;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
+import com.inteliroadmap.backend.mappers.ScraperMapper;
 import com.inteliroadmap.backend.repositories.CompanyRepository;
 import com.inteliroadmap.backend.repositories.RecruitmentPostRepository;
 import com.inteliroadmap.backend.repositories.RecruitmentRepository;
@@ -14,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDate;
 import java.util.*;
 
 @Slf4j
@@ -21,6 +23,7 @@ import java.util.*;
 @RequiredArgsConstructor
 public class ScraperService {
 
+    public final ScraperMapper scraperMapper;
     private final CompanyRepository companyRepository;
     private final RecruitmentRepository recruitmentRepository;
     private final RecruitmentPostRepository recruitmentPostRepository;
@@ -56,9 +59,7 @@ public class ScraperService {
         }
 
         log.info("ScraperService: Recruitment Posts Retrieved");
-        return RecruitmentPostResponse.builder()
-                .postDetails(postDetails)
-                .build();
+        return scraperMapper.toRecruitmentPostsResponse(postDetails);
     }
 
     public CompanyResponse getCompanyInfos(String companyId) {
@@ -69,15 +70,7 @@ public class ScraperService {
         }
 
         log.info("ScraperService: Company Infos Retrieved");
-        return CompanyResponse.builder()
-                .companyId(company.getTopCvCompanyId())
-                .companyLink(company.getCompanyLink())
-                .name(company.getName())
-                .logo(company.getLogo())
-                .introductions(company.getIntroduction())
-                .infos(company.getInfo())
-                .contacts(company.getContact())
-                .build();
+        return scraperMapper.toCompanyResponse(company);
     }
 
     public RecruitmentResponse getRecruitmentInfos(String recruitmentId) {
@@ -88,18 +81,24 @@ public class ScraperService {
         }
 
         log.info("ScraperService: Recruitment Infos Retrieved");
-        return RecruitmentResponse.builder()
-                .topCvRecruitmentId(recruitment.getTopCvRecruitmentId())
-                .recruitmentLink(recruitment.getRecruitmentLink())
-                .title(recruitment.getTitle())
-                .salary(recruitment.getSalary())
-                .location(recruitment.getLocation())
-                .experience(recruitment.getExperience())
-                .applicationDeadline(recruitment.getApplicationDeadline())
-                .tags(recruitment.getTags())
-                .descriptions(recruitment.getDescriptions())
-                .generalInfos(recruitment.getGeneralInfos())
-                .relatedTags(recruitment.getRelatedTags())
-                .build();
+        return scraperMapper.toRecruitmentResponse(recruitment);
+    }
+
+    public void removeOverdueRecruitmentPosts() {
+        log.info("ScraperService: Removing Overdue Recruitment Posts...");
+        List<RecruitmentPost> posts = recruitmentPostRepository.findAll();
+
+        int count = 0;
+        LocalDate today = LocalDate.now();
+        for (RecruitmentPost post : posts) {
+            if (post.getExpireAt().isBefore(today)) {
+                Recruitment recruitment = post.getRecruitment();
+                recruitmentPostRepository.removeByRecruitment(recruitment);
+                recruitmentRepository.removeByTopCvRecruitmentId(recruitment.getTopCvRecruitmentId());
+                count ++;
+            }
+        }
+
+        log.info("ScraperService: {} Overdue Recruitment Posts Found And Removed", count);
     }
 }
