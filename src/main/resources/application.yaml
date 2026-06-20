@@ -66,11 +66,5 @@ springdoc:
     path: /v3/api-docs
     
 scraper:
-  thread-sleep: ${THREAD_SLEEP}
-
-  topcv:
-    url: ${TOPCV_TARGET}
-
-  linkedin:
-    url: ${LINKEDIN_TARGET}
+  url: ${SCRAPER_API}
 
