@@ -12,7 +12,6 @@ import java.util.Map;
 public class CounselorMapper {
     public CounselorResponse toRoadmapStatisticResponse(int total, Map<String, Integer> careerStatistics) {
         return CounselorResponse.builder()
-                .total(total)
                 .careerStatistics(careerStatistics)
                 .build();
     }
@@ -34,7 +33,6 @@ public class CounselorMapper {
     public CounselorResponse toGetFeedbacksResponse(List<Feedback> feedbacks, int total) {
         return CounselorResponse.builder()
                 .feedbacks(feedbacks)
-                .total(total)
                 .build();
     }
 

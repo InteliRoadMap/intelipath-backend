@@ -13,8 +13,9 @@ import java.util.Map;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
+@com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
 public class CounselorResponse {
-    private int total;
+    private Integer total;
     private Map<String, Integer> careerStatistics;
     private Map<String, Integer> missingSkills;
     private String careerName;
