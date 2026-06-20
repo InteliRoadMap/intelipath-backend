@@ -68,7 +68,7 @@ public class JobScrapingScheduler {
                 company.setLogo(cDto.getLogo());
                 company.setName(cDto.getName());
                 company.setIntroduction(cDto.getIntroduction());
-                company.setInfo(cDto.getInfo());
+                company.setInfo((java.util.Map<String, Object>)(java.util.Map) cDto.getInfo());
                 company.setContact(cDto.getContact());
                 companyRepository.save(company);
             }
@@ -86,10 +86,10 @@ public class JobScrapingScheduler {
                 if (rDto.getApplicationDeadline() != null) {
                     recruitment.setApplicationDeadline(LocalDate.parse(rDto.getApplicationDeadline(), formatter));
                 }
-                recruitment.setTags(rDto.getTags());
-                recruitment.setDescriptions(rDto.getDescriptions());
-                recruitment.setGeneralInfos(rDto.getGeneralInfos());
-                recruitment.setRelatedTags(rDto.getRelatedTags());
+                recruitment.setTags((java.util.Map<String, Object>)(java.util.Map) rDto.getTags());
+                recruitment.setDescriptions((java.util.Map<String, Object>)(java.util.Map) rDto.getDescriptions());
+                recruitment.setGeneralInfos((java.util.Map<String, Object>)(java.util.Map) rDto.getGeneralInfos());
+                recruitment.setRelatedTags((java.util.Map<String, Object>)(java.util.Map) rDto.getRelatedTags());
                 recruitmentRepository.save(recruitment);
             }
 
