@@ -23,4 +23,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     @Query("SELECT u FROM User u ORDER BY u.createAt DESC")
     List<User> findAllUsers();
+
+    User findByUserId(UUID userId);
+
+    User findByEmailContainingIgnoreCaseOrFullNameContainingIgnoreCase(String email, String fullName);
 }

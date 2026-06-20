@@ -14,8 +14,11 @@ import java.util.UUID;
 @AllArgsConstructor
 @Builder
 public class CareerResponse {
-    private UUID id;
-    private String roleName;
+    private UUID careerId;
+    private String careerName;
+    private String prerequisite;
     private String description;
-    private List<SkillNode> skillNodes;
+
+    @Builder.Default
+    private List<SkillNode> skillNodes = List.of();
 }

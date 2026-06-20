@@ -7,7 +7,7 @@ ALTER TABLE career_roles
 WITH ranked_student_skills AS (
     SELECT student_skill_id,
            ROW_NUMBER() OVER (
-               PARTITION BY student_id, skill_id
+               PARTITION BY user_id, skill_id
                ORDER BY student_skill_id
            ) AS duplicate_rank
     FROM student_skills
@@ -28,7 +28,7 @@ BEGIN
     ) THEN
         ALTER TABLE student_skills
             ADD CONSTRAINT uk_student_skills_student_skill
-            UNIQUE (student_id, skill_id);
+            UNIQUE (user_id, skill_id);
     END IF;
 END
 $$;

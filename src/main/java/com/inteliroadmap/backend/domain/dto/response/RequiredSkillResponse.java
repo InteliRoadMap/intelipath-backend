@@ -1,5 +1,6 @@
 package com.inteliroadmap.backend.domain.dto.response;
 
+import com.inteliroadmap.backend.domain.enums.ImportanceLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -11,5 +12,6 @@ import lombok.NoArgsConstructor;
 @Builder
 public class RequiredSkillResponse {
     private SkillItemResponse skill;
-    private String importanceLevel;
+    private ImportanceLevel importanceLevel;
+    private Integer progress;
 }

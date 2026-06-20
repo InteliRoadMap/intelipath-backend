@@ -1,21 +1,24 @@
 package com.inteliroadmap.backend.controllers;
 
-import com.inteliroadmap.backend.domain.dto.request.admin.UpdateUserRoleRequest;
+import com.inteliroadmap.backend.services.SkillExtractionService;
+import com.inteliroadmap.backend.domain.dto.request.UpdateUserRoleRequest;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminCourseMetricResponse;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminSystemHealthResponse;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminUserListItemResponse;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminUserMetricResponse;
-import com.inteliroadmap.backend.services.dashboard.AdminDashboardService;
+import com.inteliroadmap.backend.services.AdminService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -35,9 +38,28 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Admin Dashboard", description = "Admin dashboard endpoints")
+@SecurityRequirement(name = "Bearer Authentication")
+@PreAuthorize("hasRole('ADMIN')")
 public class AdminController {
 
-    private final AdminDashboardService adminDashboardService;
+    private final AdminService adminService;
+    private final SkillExtractionService skillExtractionService;
+
+    /**
+     * POST /admin/dashboard/trigger-skill-extraction - Manually trigger skill extraction job.
+     */
+    @PostMapping("/trigger-skill-extraction")
+    @Operation(summary = "Trigger Skill Extraction", description = "Manually triggers the background AI skill extraction job.")
+    public ResponseEntity<String> triggerSkillExtraction() {
+        log.info("Admin Dashboard Controller: Manual trigger for skill extraction received");
+        try {
+            skillExtractionService.extractAndRebuildSkillTrends();
+            return ResponseEntity.ok("Skill extraction via AI Service completed successfully.");
+        } catch (Exception e) {
+            log.error("Error extracting skills", e);
+            return ResponseEntity.internalServerError().body("Error during extraction: " + e.getMessage());
+        }
+    }
 
     /**
      * GET /admin/dashboard/metrics/users - Get total users metric.
@@ -73,7 +95,7 @@ public class AdminController {
     ) {
         log.info("Admin Dashboard Controller: User metric request received");
         return ResponseEntity.ok(
-                adminDashboardService.getUserMetrics(authorizationHeader)
+                adminService.getUserMetrics(authorizationHeader)
         );
     }
 
@@ -111,7 +133,7 @@ public class AdminController {
     ) {
         log.info("Admin Dashboard Controller: Course metric request received");
         return ResponseEntity.ok(
-                adminDashboardService.getCourseMetrics(authorizationHeader)
+                adminService.getCourseMetrics(authorizationHeader)
         );
     }
 
@@ -149,7 +171,7 @@ public class AdminController {
     ) {
         log.info("Admin Dashboard Controller: System health request received");
         return ResponseEntity.ok(
-                adminDashboardService.getSystemHealth(authorizationHeader)
+                adminService.getSystemHealth(authorizationHeader)
         );
     }
 
@@ -167,7 +189,11 @@ public class AdminController {
     @ApiResponses(value = {
             @ApiResponse(
                     responseCode = "200",
-                    description = "Users list retrieved successfully"
+                    description = "Users list retrieved successfully",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = AdminUserListItemResponse.class)
+                    )
             ),
             @ApiResponse(
                     responseCode = "401",
@@ -183,7 +209,7 @@ public class AdminController {
     ) {
         log.info("Admin Dashboard Controller: Users list request received");
         return ResponseEntity.ok(
-                adminDashboardService.getUsers(authorizationHeader)
+                adminService.getUsers(authorizationHeader)
         );
     }
 
@@ -241,7 +267,7 @@ public class AdminController {
     ) {
         log.info("Admin Dashboard Controller: Update user role request received. userId: {}", userId);
         return ResponseEntity.ok(
-                adminDashboardService.updateUserRole(authorizationHeader, userId, request)
+                adminService.updateUserRole(authorizationHeader, userId, request)
         );
     }
 
@@ -284,7 +310,7 @@ public class AdminController {
             @PathVariable String userId
     ) {
         log.info("Admin Dashboard Controller: Delete user request received. userId: {}", userId);
-        adminDashboardService.deleteUser(authorizationHeader, userId);
+        adminService.deleteUser(authorizationHeader, userId);
         return ResponseEntity.noContent().build();
     }
 }

@@ -1,4 +1,4 @@
-package com.inteliroadmap.backend.domain.dto.request.admin;
+package com.inteliroadmap.backend.domain.dto.request;
 
 import com.inteliroadmap.backend.domain.enums.UserRole;
 import jakarta.validation.constraints.NotNull;

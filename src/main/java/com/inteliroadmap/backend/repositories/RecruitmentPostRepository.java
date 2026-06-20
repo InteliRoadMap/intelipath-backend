@@ -1,0 +1,14 @@
+package com.inteliroadmap.backend.repositories;
+
+import com.inteliroadmap.backend.domain.entity.Company;
+import com.inteliroadmap.backend.domain.entity.Recruitment;
+import com.inteliroadmap.backend.domain.entity.RecruitmentPost;
+import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.stereotype.Repository;
+
+import java.util.UUID;
+
+@Repository
+public interface RecruitmentPostRepository extends JpaRepository<RecruitmentPost, UUID> {
+    RecruitmentPost findByCompanyAndRecruitment(Company company, Recruitment recruitment);
+}

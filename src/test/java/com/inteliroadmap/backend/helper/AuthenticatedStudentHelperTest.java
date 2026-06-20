@@ -36,18 +36,18 @@ class AuthenticatedStudentHelperTest {
     void getOrCreateStudentForUpdateCreatesMissingStudent() {
         String email = "student@example.com";
         User user = User.builder().userId(UUID.randomUUID()).email(email).build();
-        Student savedStudent = Student.builder().studentId(UUID.randomUUID()).user(user).build();
+        Student savedStudent = Student.builder().userId(user.getUserId()).build();
         SecurityContextHolder.getContext().setAuthentication(
                 new UsernamePasswordAuthenticationToken(email, null)
         );
 
         when(userRepository.findByEmailForUpdate(email)).thenReturn(Optional.of(user));
-        when(studentRepository.findByUserForUpdate(user)).thenReturn(Optional.empty());
+        when(studentRepository.findByIdForUpdate(user.getUserId())).thenReturn(Optional.empty());
         when(studentRepository.save(any(Student.class))).thenReturn(savedStudent);
 
         Student result = new AuthenticatedStudentHelper(userRepository, studentRepository)
                 .getOrCreateStudentForUpdate();
 
-        assertEquals(savedStudent.getStudentId(), result.getStudentId());
+        assertEquals(savedStudent.getUserId(), result.getUserId());
     }
 }

@@ -1,5 +1,6 @@
 package com.inteliroadmap.backend.domain.entity;
 
+import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -23,7 +24,7 @@ public class StudentProgress {
     private UUID progressId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "student_id", nullable = false, foreignKey = @ForeignKey(name = "fk_sp_student"))
+    @JoinColumn(name = "user_id", nullable = false, foreignKey = @ForeignKey(name = "fk_sp_student"))
     private Student student;
 
     @ManyToOne(fetch = FetchType.LAZY)
@@ -31,8 +32,9 @@ public class StudentProgress {
     private SkillNode skillNode;
 
     @Column(name = "status", nullable = false)
+    @Enumerated(EnumType.STRING)
     @Builder.Default
-    private String status = "IN_PROGRESS";
+    private RoadmapStepStatus status = RoadmapStepStatus.IN_PROGRESS;
 
     @Column(name = "create_at", nullable = false)
     private LocalDateTime createAt;

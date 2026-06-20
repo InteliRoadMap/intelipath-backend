@@ -31,16 +31,24 @@ public class PortfolioProject {
     @Column(name = "repo_url", columnDefinition = "TEXT")
     private String repoUrl;
 
+    @Column(name = "project_name", nullable = false)
+    @Builder.Default
+    private String projectName = "Untitled Project";
+
+    @Column(name = "demo_url", columnDefinition = "TEXT")
+    private String demoUrl;
+
+    @Column(name = "icon", length = 100)
+    private String icon;
+
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
-    @Column(name = "ai_summary", columnDefinition = "TEXT")
-    private String aiSummary;
-
     @Column(name = "stars")
+    @Builder.Default
     private Integer stars = 0;
 
     @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "tech_stack", columnDefinition = "jsonb")
-    private Object techStack;
+    private java.util.Map<String, Object> techStack;
 }

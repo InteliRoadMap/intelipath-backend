@@ -24,7 +24,7 @@ import java.util.UUID;
  * Provides functionality to fetch available career roles and their specific skill requirements.
  */
 @RestController
-@RequestMapping("/careers")
+@RequestMapping("/api/v1/careers")
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Career services", description = "Career endpoints")
@@ -50,6 +50,10 @@ public class CareerController {
                             mediaType = "application/json",
                             schema = @Schema(implementation = CareerResponse.class)
                     )
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized or invalid access token"
             ),
             @ApiResponse(
                     responseCode = "404",
@@ -81,6 +85,10 @@ public class CareerController {
                             mediaType = "application/json",
                             schema = @Schema(implementation = CareerResponse.class)
                     )
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized or invalid access token"
             ),
             @ApiResponse(
                     responseCode = "404",

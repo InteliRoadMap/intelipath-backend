@@ -2,6 +2,9 @@ spring:
   application:
     name: InteliPath
 
+  config:
+    import: optional:file:.env[.properties]
+
   profiles:
     active: prod
 
@@ -28,7 +31,7 @@ spring:
         format_sql: true
 
   flyway:
-    enabled: true
+    enabled: false
     baseline-on-migrate: true
     baseline-version: 0
     connect-retries: 10
@@ -51,12 +54,34 @@ spring:
               - user:email
               - read:user
 
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY}
+      chat:
+        options:
+          model: ${OPENAI_MODEL}
+    vectorstore:
+      pgvector:
+        initialize-schema: true
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+        dimensions: 1536
+
 jwt:
   secret: ${JWT_SECRET}
   expiration: ${JWT_EXPIRATION:86400000}
+
+supabase:
+  url: ${SUPABASE_URL}
+  key: ${SUPABASE_KEY}
 
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
   api-docs:
     path: /v3/api-docs
+
+scraper:
+  thread-sleep: ${THREAD_SLEEP:2000}
+  topcv:
+    url: ${TOPCV_TARGET}

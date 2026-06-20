@@ -1,18 +1,13 @@
-package com.inteliroadmap.backend.services.dashboard;
+package com.inteliroadmap.backend.services;
 
-import com.inteliroadmap.backend.domain.dto.response.SkillResponse;
 import com.inteliroadmap.backend.domain.dto.response.student.*;
 import com.inteliroadmap.backend.domain.entity.*;
 import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
-import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
-import com.inteliroadmap.backend.mappers.SkillMapper;
 import com.inteliroadmap.backend.mappers.StudentDashboardMapper;
 import com.inteliroadmap.backend.repositories.*;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -26,17 +21,16 @@ public class StudentDashboardService {
     private static final int AI_TEXT_LIMIT = 80;
 
     private final UserRepository userRepository;
-    private final StudentRepository studentRepository;
     private final SkillNodeRepository skillNodeRepository;
     private final StudentProgressRepository studentProgressRepository;
     private final CareerRequiredSkillRepository careerRequiredSkillRepository;
-    private final StudentSkillRepository studentSkillRepository;
     private final FeedbackRepository feedbackRepository;
     private final ChatSessionRepository chatSessionRepository;
     private final ChatMessageRepository chatMessageRepository;
     private final SkillTrendRepository skillTrendRepository;
-    private final SkillMapper skillMapper;
     private final StudentDashboardMapper studentDashboardMapper;
+    private final AuthenticatedStudentService authenticatedStudentService;
+    private final StudentService studentService;
 
     /**
      * Get roadmap progress for the current student dashboard.
@@ -64,7 +58,7 @@ public class StudentDashboardService {
                 .map(SkillNode::getNodeId)
                 .toList();
         List<StudentProgress> progresses = studentProgressRepository
-                .findByStudent_StudentIdAndSkillNode_NodeIdIn(student.getStudentId(), nodeIds);
+                .findByStudent_UserIdAndSkillNode_NodeIdIn(student.getUserId(), nodeIds);
         Map<UUID, StudentProgress> progressByNodeId = mapProgressByNodeId(progresses);
 
         boolean currentNodeAssigned = false;
@@ -95,45 +89,10 @@ public class StudentDashboardService {
             return List.of();
         }
 
-        List<CareerRequiredSkill> missingSkills = findMissingRequiredSkills(student);
+        List<CareerRequiredSkill> missingSkills = studentService.findMissingRequiredSkills(student);
         return missingSkills.stream()
-                .map(studentDashboardMapper::toSkillGapItemResponse)
+                .map(req -> studentDashboardMapper.toSkillGapItemResponse(req, studentService.calculateSkillProgress(student, req.getSkill())))
                 .toList();
-    }
-
-    /**
-     * Compare the current student's selected skills with required career skills.
-     *
-     * @return SkillResponse containing selected, required, and missing skills
-     */
-    @Transactional
-    public SkillResponse compareCurrentStudentSkills() {
-        log.info("Student Dashboard Module: Comparing selected skills with required skills");
-
-        Student student = getCurrentStudent();
-        if (student == null) {
-            return SkillResponse.builder().build();
-        }
-
-        List<StudentSkill> selectedSkills = studentSkillRepository.findByStudent_StudentId(student.getStudentId());
-        if (student.getCareerRole() == null) {
-            return SkillResponse.builder()
-                    .selectedSkills(skillMapper.toSelectedSkillResponses(selectedSkills))
-                    .build();
-        }
-
-        List<CareerRequiredSkill> requiredSkills = careerRequiredSkillRepository
-                .findByCareerRole_CareerId(student.getCareerRole().getCareerId());
-        List<CareerRequiredSkill> missingRequiredSkills = filterMissingRequiredSkills(requiredSkills, selectedSkills);
-        List<Skill> missingSkills = missingRequiredSkills.stream()
-                .map(CareerRequiredSkill::getSkill)
-                .toList();
-
-        return SkillResponse.builder()
-                .selectedSkills(skillMapper.toSelectedSkillResponses(selectedSkills))
-                .requiredSkills(skillMapper.toRequiredSkillResponses(requiredSkills))
-                .missingSkills(skillMapper.toSkillItemResponses(missingSkills))
-                .build();
     }
 
     /**
@@ -194,7 +153,7 @@ public class StudentDashboardService {
 
         Student student = getCurrentStudent();
         if (student == null || student.getCareerRole() == null) {
-            return null;
+            return MarketDemandResponse.builder().build();
         }
 
         CareerRole careerRole = student.getCareerRole();
@@ -248,7 +207,7 @@ public class StudentDashboardService {
             return List.of();
         }
 
-        List<CareerRequiredSkill> missingSkills = findMissingRequiredSkills(student);
+        List<CareerRequiredSkill> missingSkills = studentService.findMissingRequiredSkills(student);
         if (missingSkills.isEmpty()) {
             return List.of();
         }
@@ -260,23 +219,12 @@ public class StudentDashboardService {
     }
 
     private Student getCurrentStudent() {
-        User user = getCurrentUser();
-        return studentRepository.findByUser_UserId(user.getUserId());
+        return authenticatedStudentService.getOrCreateStudent();
     }
 
     private User getCurrentUser() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || authentication.getName() == null || authentication.getName().isBlank()) {
-            throw new ResourceNotFoundException("Cannot extract user from security context");
-        }
-
-        String email = authentication.getName();
-        User user = userRepository.findByEmail(email);
-        if (user == null) {
-            throw new ResourceNotFoundException("User not found from token");
-        }
-
-        return user;
+        Student student = authenticatedStudentService.getOrCreateStudent();
+        return userRepository.findByUserId(student.getUserId());
     }
 
     private Map<UUID, StudentProgress> mapProgressByNodeId(List<StudentProgress> progresses) {
@@ -295,7 +243,7 @@ public class StudentDashboardService {
             boolean currentNodeAssigned
     ) {
         StudentProgress progress = progressByNodeId.get(node.getNodeId());
-        if (progress != null && "COMPLETED".equalsIgnoreCase(progress.getStatus())) {
+        if (progress != null && "COMPLETED".equalsIgnoreCase(progress.getStatus().toString())) {
             return RoadmapStepStatus.COMPLETED;
         }
 
@@ -304,29 +252,6 @@ public class StudentDashboardService {
         }
 
         return RoadmapStepStatus.LOCKED;
-    }
-
-    private List<CareerRequiredSkill> findMissingRequiredSkills(Student student) {
-        List<CareerRequiredSkill> requiredSkills = careerRequiredSkillRepository
-                .findByCareerRole_CareerId(student.getCareerRole().getCareerId());
-        List<StudentSkill> selectedSkills = studentSkillRepository.findByStudent_StudentId(student.getStudentId());
-        return filterMissingRequiredSkills(requiredSkills, selectedSkills);
-    }
-
-    private List<CareerRequiredSkill> filterMissingRequiredSkills(
-            List<CareerRequiredSkill> requiredSkills,
-            List<StudentSkill> selectedSkills
-    ) {
-        Set<UUID> selectedSkillIds = selectedSkills.stream()
-                .map(StudentSkill::getSkill)
-                .filter(Objects::nonNull)
-                .map(Skill::getSkillId)
-                .collect(java.util.stream.Collectors.toSet());
-
-        return requiredSkills.stream()
-                .filter(requiredSkill -> requiredSkill.getSkill() != null)
-                .filter(requiredSkill -> !selectedSkillIds.contains(requiredSkill.getSkill().getSkillId()))
-                .toList();
     }
 
     private ChatMessage selectDashboardMessage(ChatSession session, List<ChatMessage> messages) {
@@ -379,5 +304,4 @@ public class StudentDashboardService {
         }
         return jobsByWeek;
     }
-
 }

@@ -2,9 +2,12 @@ package com.inteliroadmap.backend.mappers;
 
 import com.inteliroadmap.backend.domain.dto.response.student.*;
 import com.inteliroadmap.backend.domain.entity.*;
+import com.inteliroadmap.backend.domain.enums.ImportanceLevel;
 import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Component
@@ -12,7 +15,7 @@ public class StudentDashboardMapper {
 
     private static final String CRITICAL_TYPE = "critical";
     private static final String MARKET_TYPE = "market";
-    private static final String RECOMMENDATION_TYPE = "Skill";
+    private static final String RECOMMENDATION_TYPE = "Skill Gap";
     private static final String RECOMMENDATION_ICON = "Network";
 
     public DashboardRoadmapProgressResponse toRoadmapProgressResponse(List<RoadmapStepResponse> steps) {
@@ -29,7 +32,7 @@ public class StudentDashboardMapper {
                 .build();
     }
 
-    public SkillGapItemResponse toSkillGapItemResponse(CareerRequiredSkill requiredSkill) {
+    public SkillGapItemResponse toSkillGapItemResponse(CareerRequiredSkill requiredSkill, Integer progress) {
         Skill skill = requiredSkill.getSkill();
         return SkillGapItemResponse.builder()
                 .id(skill.getSkillId())
@@ -37,6 +40,7 @@ public class StudentDashboardMapper {
                 .title(skill.getSkillName())
                 .description(skillDescription(skill))
                 .severity(requiredSkill.getImportanceLevel())
+                .progress(progress)
                 .build();
     }
 
@@ -44,7 +48,7 @@ public class StudentDashboardMapper {
         return MentorFeedbackItemResponse.builder()
                 .id(feedback.getFeedbackId())
                 .name(feedback.getSender() != null ? feedback.getSender().getFullName() : null)
-                .time(feedback.getCreateAt())
+                .time(formatRelativeTime(feedback.getCreateAt()))
                 .text(feedback.getContent())
                 .build();
     }
@@ -90,18 +94,18 @@ public class StudentDashboardMapper {
     }
 
     public int importanceRank(CareerRequiredSkill requiredSkill) {
-        String importanceLevel = requiredSkill.getImportanceLevel();
-        if ("CRITICAL".equalsIgnoreCase(importanceLevel)) {
+        ImportanceLevel importanceLevel = requiredSkill.getImportanceLevel();
+        if ("CRITICAL".equalsIgnoreCase(importanceLevel.toString())) {
             return 0;
         }
-        if ("HIGH".equalsIgnoreCase(importanceLevel)) {
+        if ("HIGH".equalsIgnoreCase(importanceLevel.toString())) {
             return 1;
         }
         return 2;
     }
 
-    private String skillGapType(String importanceLevel) {
-        if ("HIGH".equalsIgnoreCase(importanceLevel) || "CRITICAL".equalsIgnoreCase(importanceLevel)) {
+    private String skillGapType(ImportanceLevel importanceLevel) {
+        if ("HIGH".equalsIgnoreCase(importanceLevel.toString()) || "CRITICAL".equalsIgnoreCase(importanceLevel.toString())) {
             return CRITICAL_TYPE;
         }
         return MARKET_TYPE;
@@ -115,5 +119,25 @@ public class StudentDashboardMapper {
             return skill.getCareer();
         }
         return null;
+    }
+
+    private String formatRelativeTime(LocalDateTime time) {
+        if (time == null) {
+            return null;
+        }
+
+        Duration duration = Duration.between(time, LocalDateTime.now());
+        long minutes = Math.max(0, duration.toMinutes());
+        if (minutes < 60) {
+            return minutes + " minutes ago";
+        }
+
+        long hours = duration.toHours();
+        if (hours < 24) {
+            return hours + " hours ago";
+        }
+
+        long days = duration.toDays();
+        return days + " days ago";
     }
 }

@@ -1,13 +1,13 @@
-package com.inteliroadmap.backend.services.dashboard;
+package com.inteliroadmap.backend.services;
 
-import com.inteliroadmap.backend.domain.dto.request.admin.UpdateUserRoleRequest;
+import com.inteliroadmap.backend.domain.dto.request.UpdateUserRoleRequest;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminCourseMetricResponse;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminSystemHealthResponse;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminUserListItemResponse;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminUserMetricResponse;
 import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
-import com.inteliroadmap.backend.mappers.AdminDashboardMapper;
+import com.inteliroadmap.backend.mappers.AdminMapper;
 import com.inteliroadmap.backend.repositories.CareerRoleRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.security.JwtService;
@@ -24,12 +24,12 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class AdminDashboardService {
+public class AdminService {
 
     private final UserRepository userRepository;
     private final CareerRoleRepository careerRoleRepository;
     private final JwtService  jwtService;
-    private final AdminDashboardMapper adminDashboardMapper;
+    private final AdminMapper adminMapper;
 
     /**
      * Get total users metric for admin dashboard
@@ -41,7 +41,7 @@ public class AdminDashboardService {
 
         log.info("Admin Dashboard Module: Get user metric data");
 
-        return adminDashboardMapper.toUserMetricResponse(userRepository.count(), 12);
+        return adminMapper.toUserMetricResponse(userRepository.count(), 12);
     }
 
     /**
@@ -56,7 +56,7 @@ public class AdminDashboardService {
 
         long total = careerRoleRepository.count();
 
-        return adminDashboardMapper.toCourseMetricResponse(total, "ACTIVE", 78);
+        return adminMapper.toCourseMetricResponse(total, "ACTIVE", 78);
     }
 
     /**
@@ -67,7 +67,7 @@ public class AdminDashboardService {
 
         log.info("Admin Dashboard Module: Get system health");
 
-        return adminDashboardMapper.toSystemHealthResponse(99.9, "ONLINE");
+        return adminMapper.toSystemHealthResponse(99.9, "ONLINE");
     }
 
     /**
@@ -81,16 +81,13 @@ public class AdminDashboardService {
 
         return userRepository.findAllUsers()
                 .stream()
-                .map(adminDashboardMapper::toUserListItem)
+                .map(adminMapper::toUserListItem)
                 .toList();
     }
 
     @Transactional
-    public AdminUserListItemResponse updateUserRole(
-            String authorizationHeader,
-            String userId,
-            UpdateUserRoleRequest request
-    ) {
+    public AdminUserListItemResponse updateUserRole(String authorizationHeader, String userId, UpdateUserRoleRequest request) {
+
         validateAdmin(authorizationHeader);
 
         log.info("Admin Dashboard Module: Update user role. userId: {}, role: {}", userId, request.getRole());
@@ -102,12 +99,11 @@ public class AdminDashboardService {
         log.info("Admin Dashboard Module: User role updated successfully. email: {}, role: {}",
                 updatedUser.getEmail(), updatedUser.getRole());
 
-        return adminDashboardMapper.toUserListItem(updatedUser);
+        return adminMapper.toUserListItem(updatedUser);
     }
 
     @Transactional
-    public void deleteUser(String authorizationHeader, String userId) {
-        validateAdmin(authorizationHeader);
+    public void deleteUser(String authorizationHeader, String userId) {validateAdmin(authorizationHeader);
 
         log.info("Admin Dashboard Module: Delete user. userId: {}", userId);
 

@@ -1,5 +1,6 @@
 package com.inteliroadmap.backend.domain.entity;
 
+import com.inteliroadmap.backend.domain.enums.ImportanceLevel;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -30,5 +31,6 @@ public class CareerRequiredSkill {
     private Skill skill;
 
     @Column(name = "importance_level")
-    private String importanceLevel;
+    @Enumerated(EnumType.STRING)
+    private ImportanceLevel importanceLevel;
 }
