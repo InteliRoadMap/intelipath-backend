@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component;
 import java.time.format.DateTimeFormatter;
 
 @Component
-public class AdminDashboardMapper {
+public class AdminMapper {
 
     private static final DateTimeFormatter DATE_FORMATTER = DateTimeFormatter.ofPattern("yyyy-MM-dd");
 

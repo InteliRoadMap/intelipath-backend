@@ -32,7 +32,7 @@ public class StudentDashboardMapper {
                 .build();
     }
 
-    public SkillGapItemResponse toSkillGapItemResponse(CareerRequiredSkill requiredSkill) {
+    public SkillGapItemResponse toSkillGapItemResponse(CareerRequiredSkill requiredSkill, Integer progress) {
         Skill skill = requiredSkill.getSkill();
         return SkillGapItemResponse.builder()
                 .id(skill.getSkillId())
@@ -40,6 +40,7 @@ public class StudentDashboardMapper {
                 .title(skill.getSkillName())
                 .description(skillDescription(skill))
                 .severity(requiredSkill.getImportanceLevel())
+                .progress(progress)
                 .build();
     }
 

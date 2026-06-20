@@ -1,5 +1,6 @@
 package com.inteliroadmap.backend.controllers;
 
+import com.inteliroadmap.backend.services.SkillExtractionService;
 import com.inteliroadmap.backend.domain.dto.request.UpdateUserRoleRequest;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminCourseMetricResponse;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminSystemHealthResponse;
@@ -42,6 +43,23 @@ import java.util.List;
 public class AdminController {
 
     private final AdminService adminService;
+    private final SkillExtractionService skillExtractionService;
+
+    /**
+     * POST /admin/dashboard/trigger-skill-extraction - Manually trigger skill extraction job.
+     */
+    @PostMapping("/trigger-skill-extraction")
+    @Operation(summary = "Trigger Skill Extraction", description = "Manually triggers the background AI skill extraction job.")
+    public ResponseEntity<String> triggerSkillExtraction() {
+        log.info("Admin Dashboard Controller: Manual trigger for skill extraction received");
+        try {
+            skillExtractionService.extractAndRebuildSkillTrends();
+            return ResponseEntity.ok("Skill extraction via AI Service completed successfully.");
+        } catch (Exception e) {
+            log.error("Error extracting skills", e);
+            return ResponseEntity.internalServerError().body("Error during extraction: " + e.getMessage());
+        }
+    }
 
     /**
      * GET /admin/dashboard/metrics/users - Get total users metric.

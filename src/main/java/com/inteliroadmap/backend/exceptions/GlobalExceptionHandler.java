@@ -176,34 +176,6 @@ public class GlobalExceptionHandler {
         return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
-    @ExceptionHandler(ParsingException.class)
-    public ResponseEntity<ErrorResponse> handleParsingException(ParsingException exception) {
-
-        ErrorResponse errorResponse = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
-                .error("INTERNAL_SERVER_ERROR")
-                .message("An error occurred while parsing")
-                .details(exception.getMessage())
-                .build();
-
-        return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
-    }
-
-    @ExceptionHandler(BlockedIpException.class)
-    public ResponseEntity<ErrorResponse> handleBlockedIpException(BlockedIpException exception) {
-
-        ErrorResponse errorResponse = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.TOO_MANY_REQUESTS.value())
-                .error("TOO_MANY_REQUESTS")
-                .message("Too many requests. Increase your scraping thread sleep")
-                .details(exception.getMessage())
-                .build();
-
-        return new ResponseEntity<>(errorResponse, HttpStatus.TOO_MANY_REQUESTS);
-    }
-
     @Data
     @NoArgsConstructor
     @AllArgsConstructor

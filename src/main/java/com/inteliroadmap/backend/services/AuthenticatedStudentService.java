@@ -87,7 +87,7 @@ public class AuthenticatedStudentService {
         return studentRepository.save(student);
     }
 
-    private User getAuthenticatedUser() {
+    public User getAuthenticatedUser() {
         String email = getAuthenticatedEmail();
         User user = userRepository.findByEmail(email);
         if (user == null) {

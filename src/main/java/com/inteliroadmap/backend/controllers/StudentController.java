@@ -117,10 +117,12 @@ public class StudentController {
         return ResponseEntity.ok(studentService.setupStudentProfile(setupStudentProfileRequest));
     }
 
+    @Deprecated
     @PutMapping("/target-career")
     @Operation(
-            summary = "Update target career",
-            description = "Update the authenticated student's target career using a database career UUID"
+            summary = "Update target career (DEPRECATED)",
+            description = "DEPRECATED: Please use PATCH /api/v1/student/profile instead. Update the authenticated student's target career using a database career UUID",
+            deprecated = true
     )
     @ApiResponses(value = {
             @ApiResponse(
@@ -155,7 +157,7 @@ public class StudentController {
             )
             @RequestBody @Valid TargetCareerRequest request
     ) {
-        log.info("Student target career update request received");
+        log.warn("DEPRECATED API CALLED: PUT /target-career. Please migrate to PATCH /profile.");
         return ResponseEntity.ok(studentService.updateTargetCareer(request.getCareerId()));
     }
 

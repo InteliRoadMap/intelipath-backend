@@ -8,5 +8,9 @@ import org.springframework.stereotype.Repository;
 public interface RecruitmentRepository extends JpaRepository<Recruitment, String> {
     boolean existsByTopCvRecruitmentId(String topCvRecruitmentId);
     Recruitment findByTopCvRecruitmentId(String topCvRecruitmentId);
-    void removeByTopCvRecruitmentId(String topCvRecruitmentId);
+    
+    java.util.List<Recruitment> findTop10ByTitleContainingIgnoreCase(String keyword);
+
+    @org.springframework.data.jpa.repository.Query("SELECT r.salary FROM Recruitment r WHERE r.salary IS NOT NULL AND r.salary != ''")
+    java.util.List<String> findAllSalaries();
 }

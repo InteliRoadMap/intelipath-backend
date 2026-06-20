@@ -13,4 +13,5 @@ import lombok.NoArgsConstructor;
 public class RequiredSkillResponse {
     private SkillItemResponse skill;
     private ImportanceLevel importanceLevel;
+    private Integer progress;
 }

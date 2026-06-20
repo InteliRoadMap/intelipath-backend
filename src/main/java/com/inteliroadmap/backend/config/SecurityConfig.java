@@ -44,6 +44,7 @@ public class SecurityConfig {
                         // ============================================================
                         // PUBLIC ENDPOINTS - No authentication required
                         // ============================================================
+                        .dispatcherTypeMatchers(jakarta.servlet.DispatcherType.ASYNC).permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(
                                 "/api/v1/auth/**",

@@ -1,8 +1,10 @@
 package com.inteliroadmap.backend.controllers;
 
 import com.inteliroadmap.backend.domain.dto.response.CompanyResponse;
-import com.inteliroadmap.backend.domain.dto.response.RecruitmentPostResponse;
+import com.inteliroadmap.backend.domain.dto.response.RecruitmentPostDto;
 import com.inteliroadmap.backend.domain.dto.response.RecruitmentResponse;
+import com.inteliroadmap.backend.exceptions.GlobalExceptionHandler.ErrorResponse;
+import java.util.List;
 import com.inteliroadmap.backend.services.ScraperService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -35,15 +37,21 @@ public class RecruitmentPostsController {
                     description = "Recruitment posts",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = RecruitmentPostResponse.class)
+                            schema = @Schema(implementation = RecruitmentPostDto.class)
                     )
             ),
             @ApiResponse(
                     responseCode = "404",
-                    description = "No Posts Found"
+                    description = "No Posts Found",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))
+            ),
+            @ApiResponse(
+                    responseCode = "500",
+                    description = "Internal Server Error",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))
             )
     })
-    public ResponseEntity<RecruitmentPostResponse> getRecruitmentPosts() {
+    public ResponseEntity<List<RecruitmentPostDto>> getRecruitmentPosts() {
         log.info("Getting all recruitment posts");
         return ResponseEntity.ok(scraperService.getRecruitmentPosts());
     }
@@ -61,7 +69,13 @@ public class RecruitmentPostsController {
             ),
             @ApiResponse(
                     responseCode = "404",
-                    description = "Company Not Found"
+                    description = "Company Not Found",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))
+            ),
+            @ApiResponse(
+                    responseCode = "500",
+                    description = "Internal Server Error",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))
             )
     })
     public ResponseEntity<CompanyResponse> getCompanyInfos(@PathVariable String companyId) {
@@ -82,7 +96,13 @@ public class RecruitmentPostsController {
             ),
             @ApiResponse(
                     responseCode = "404",
-                    description = "Recruitment Not Found"
+                    description = "Recruitment Not Found",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))
+            ),
+            @ApiResponse(
+                    responseCode = "500",
+                    description = "Internal Server Error",
+                    content = @Content(schema = @Schema(implementation = ErrorResponse.class))
             )
     })
     public ResponseEntity<RecruitmentResponse> getRecruitmentInfos(@PathVariable String recruitmentId) {
