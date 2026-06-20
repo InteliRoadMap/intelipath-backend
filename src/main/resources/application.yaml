@@ -2,9 +2,6 @@ spring:
   application:
     name: InteliPath
 
-  config:
-    import: optional:file:.env[.properties]
-
   profiles:
     active: prod
 
@@ -82,6 +79,5 @@ springdoc:
     path: /v3/api-docs
 
 scraper:
-  thread-sleep: ${THREAD_SLEEP:2000}
-  topcv:
-    url: ${TOPCV_TARGET}
+  limit: ${SCRAPER_LIMIT}
+  topcv-api: ${SCRAPER_API}
