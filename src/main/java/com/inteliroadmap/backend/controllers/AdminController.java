@@ -1,6 +1,7 @@
 package com.inteliroadmap.backend.controllers;
 
 import com.inteliroadmap.backend.services.SkillExtractionService;
+import com.inteliroadmap.backend.scheduler.JobScrapingScheduler;
 import com.inteliroadmap.backend.domain.dto.request.UpdateUserRoleRequest;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminCourseMetricResponse;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminSystemHealthResponse;
@@ -44,6 +45,7 @@ public class AdminController {
 
     private final AdminService adminService;
     private final SkillExtractionService skillExtractionService;
+    private final JobScrapingScheduler jobScrapingScheduler;
 
     /**
      * POST /admin/dashboard/trigger-skill-extraction - Manually trigger skill extraction job.
@@ -58,6 +60,22 @@ public class AdminController {
         } catch (Exception e) {
             log.error("Error extracting skills", e);
             return ResponseEntity.internalServerError().body("Error during extraction: " + e.getMessage());
+        }
+    }
+
+    /**
+     * POST /admin/dashboard/trigger-job-scraper - Manually trigger TopCV scraping job.
+     */
+    @PostMapping("/trigger-job-scraper")
+    @Operation(summary = "Trigger Job Scraper", description = "Manually triggers the Python AI scraper job to fetch new recruitments.")
+    public ResponseEntity<String> triggerJobScraper() {
+        log.info("Admin Dashboard Controller: Manual trigger for job scraper received");
+        try {
+            jobScrapingScheduler.fetchJobsFromPython();
+            return ResponseEntity.ok("Job Scraper via AI Service completed successfully.");
+        } catch (Exception e) {
+            log.error("Error triggering job scraper", e);
+            return ResponseEntity.internalServerError().body("Error during trigger: " + e.getMessage());
         }
     }
 

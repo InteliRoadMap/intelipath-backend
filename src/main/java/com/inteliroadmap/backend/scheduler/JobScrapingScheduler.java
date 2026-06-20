@@ -33,7 +33,7 @@ public class JobScrapingScheduler {
     @Value("${SCRAPER_API}")
     private String scraperTopCVApi;
 
-    @Value("${SCRAPER_LIMIT}")
+    @Value("${SCRAPER_LIMIT:20}")
     private int scraperLimit;
 
     private final RestTemplate restTemplate = new RestTemplate();
