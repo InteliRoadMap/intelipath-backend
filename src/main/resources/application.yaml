@@ -79,4 +79,5 @@ springdoc:
     path: /v3/api-docs
 
 scraper:
-  url: ${SCRAPER_API}
+  limit: ${SCRAPER_LIMIT}
+  topcv-api: ${SCRAPER_API}

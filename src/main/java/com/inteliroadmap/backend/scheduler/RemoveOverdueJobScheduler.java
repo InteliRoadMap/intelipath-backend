@@ -1,4 +1,4 @@
-package com.inteliroadmap.backend.config;
+package com.inteliroadmap.backend.scheduler;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -8,7 +8,7 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class DailyScrapeJob {
+public class RemoveOverdueJobScheduler {
 //    private final ScraperService scraperService;
 
     // Runs every day at 8:00 AM // Remove Overdue Recruitment Posts
