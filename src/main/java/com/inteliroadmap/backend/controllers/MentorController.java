@@ -20,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Mentor Dashboard", description = "Industry Mentor APIs")
+@io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
 @PreAuthorize("hasRole('MENTOR')")
 public class MentorController {
 
