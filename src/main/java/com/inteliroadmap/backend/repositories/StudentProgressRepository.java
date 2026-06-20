@@ -29,7 +29,7 @@ public interface StudentProgressRepository extends JpaRepository<StudentProgress
             "JOIN skill_nodes sn " +
             "ON sp.node_id = sn.node_id " +
             "WHERE sn.career_id = :careerId " +
-            "AND sp.student_id = :studentId " +
+            "AND sp.user_id = :studentId " +
             "AND sp.status = 'COMPLETED';", nativeQuery = true)
     int findRoadmapTotalNodeCompletedByCareerIdAndStudentId(@Param("careerId") UUID careerId, @Param("studentId") UUID studentId);
 
