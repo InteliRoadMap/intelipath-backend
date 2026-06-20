@@ -21,13 +21,13 @@ public class ScrapedRecruitmentDto {
     @JsonProperty("application_deadline")
     private String applicationDeadline;
 
-    private Map<String, List<String>> tags;
+    private Map<String, Object> tags;
 
-    private Map<String, List<String>> descriptions;
+    private Map<String, Object> descriptions;
 
     @JsonProperty("general_infos")
-    private Map<String, String> generalInfos;
+    private Map<String, Object> generalInfos;
 
     @JsonProperty("related_tags")
-    private Map<String, List<String>> relatedTags;
+    private Map<String, Object> relatedTags;
 }

@@ -43,7 +43,7 @@ public class JobScrapingScheduler {
 
     // Runs every Monday at 9:00 AM
     @Scheduled(cron = "0 0 9 * * Mon")
-    @EventListener(org.springframework.boot.context.event.ApplicationReadyEvent.class)
+//    @EventListener(org.springframework.boot.context.event.ApplicationReadyEvent.class)
     @Transactional
     public void fetchJobsFromPython() {
         int limit = scraperLimit; // Define a default limit or configure it
@@ -68,7 +68,7 @@ public class JobScrapingScheduler {
                 company.setLogo(cDto.getLogo());
                 company.setName(cDto.getName());
                 company.setIntroduction(cDto.getIntroduction());
-                company.setInfo((java.util.Map<String, Object>)(java.util.Map) cDto.getInfo());
+                company.setInfo(cDto.getInfo());
                 company.setContact(cDto.getContact());
                 companyRepository.save(company);
             }
@@ -86,10 +86,10 @@ public class JobScrapingScheduler {
                 if (rDto.getApplicationDeadline() != null) {
                     recruitment.setApplicationDeadline(LocalDate.parse(rDto.getApplicationDeadline(), formatter));
                 }
-                recruitment.setTags((java.util.Map<String, Object>)(java.util.Map) rDto.getTags());
-                recruitment.setDescriptions((java.util.Map<String, Object>)(java.util.Map) rDto.getDescriptions());
-                recruitment.setGeneralInfos((java.util.Map<String, Object>)(java.util.Map) rDto.getGeneralInfos());
-                recruitment.setRelatedTags((java.util.Map<String, Object>)(java.util.Map) rDto.getRelatedTags());
+                recruitment.setTags(rDto.getTags());
+                recruitment.setDescriptions(rDto.getDescriptions());
+                recruitment.setGeneralInfos(rDto.getGeneralInfos());
+                recruitment.setRelatedTags(rDto.getRelatedTags());
                 recruitmentRepository.save(recruitment);
             }
 
