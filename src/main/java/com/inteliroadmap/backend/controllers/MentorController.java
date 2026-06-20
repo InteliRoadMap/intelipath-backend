@@ -5,10 +5,12 @@ import com.inteliroadmap.backend.domain.dto.response.MentorResponse;
 import com.inteliroadmap.backend.domain.dto.response.mentor.*;
 import com.inteliroadmap.backend.services.MentorService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
@@ -20,7 +22,7 @@ import org.springframework.web.bind.annotation.*;
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Mentor Dashboard", description = "Industry Mentor APIs")
-@io.swagger.v3.oas.annotations.security.SecurityRequirement(name = "Bearer Authentication")
+@SecurityRequirement(name = "Bearer Authentication")
 @PreAuthorize("hasRole('MENTOR')")
 public class MentorController {
 
@@ -47,7 +49,7 @@ public class MentorController {
 
     @GetMapping("/dashboard/pending-reviews")
     @Operation(summary = "Get Pending Reviews", description = "Get list of pending review requests with pagination")
-    public ResponseEntity<org.springframework.data.domain.Page<MentorPendingReviewDto>> getPendingReviews(
+    public ResponseEntity<Page<MentorPendingReviewDto>> getPendingReviews(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         Pageable pageable = PageRequest.of(page, size);
@@ -56,7 +58,7 @@ public class MentorController {
 
     @GetMapping("/dashboard/students")
     @Operation(summary = "Get Student List", description = "Get list of students with pagination")
-    public ResponseEntity<org.springframework.data.domain.Page<MentorStudentDto>> getStudentInfos(
+    public ResponseEntity<Page<MentorStudentDto>> getStudentInfos(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         Pageable pageable = PageRequest.of(page, size);
@@ -65,7 +67,7 @@ public class MentorController {
 
     @GetMapping("/dashboard/feedback/history")
     @Operation(summary = "Get Feedback History", description = "Get list of feedbacks sent by mentor")
-    public ResponseEntity<org.springframework.data.domain.Page<MentorFeedbackHistoryDto>> getFeedbackHistory(
+    public ResponseEntity<Page<MentorFeedbackHistoryDto>> getFeedbackHistory(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         Pageable pageable = PageRequest.of(page, size);

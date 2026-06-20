@@ -10,6 +10,7 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.UUID;
+import com.inteliroadmap.backend.domain.entity.User;
 
 @Repository
 public interface PortfolioReviewRequestRepository extends JpaRepository<PortfolioReviewRequest, UUID> {
@@ -23,7 +24,7 @@ public interface PortfolioReviewRequestRepository extends JpaRepository<Portfoli
     Double getAverageResponseTimeInSecondsByMentorId(@Param("mentorId") UUID mentorId);
 
     @Query("SELECT DISTINCT r.student FROM PortfolioReviewRequest r WHERE r.mentor.userId = :mentorId")
-    Page<com.inteliroadmap.backend.domain.entity.User> findDistinctStudentsByMentorId(@Param("mentorId") UUID mentorId, Pageable pageable);
+    Page<User> findDistinctStudentsByMentorId(@Param("mentorId") UUID mentorId, Pageable pageable);
 
     @Query("SELECT COUNT(DISTINCT r.student) FROM PortfolioReviewRequest r WHERE r.mentor.userId = :mentorId")
     long countDistinctStudentsByMentorId(@Param("mentorId") UUID mentorId);
