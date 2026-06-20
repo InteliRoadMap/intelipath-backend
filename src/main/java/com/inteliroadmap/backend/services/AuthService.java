@@ -130,4 +130,20 @@ public class AuthService {
                 "Refresh token is invalid or expired"
         );
     }
+
+    /**
+     * Rotate refresh token for OAuth2 login
+     * @param user user entity
+     * @param refreshToken new refresh token string
+     */
+    @Transactional
+    public void rotateRefreshTokenForOAuth2User(User user, String refreshToken) {
+        refreshTokenRepository.deleteByUser_UserId(user.getUserId());
+        RefreshToken token = RefreshToken.builder()
+                .token(refreshToken)
+                .user(user)
+                .expireAt(LocalDateTime.now().plus(Duration.ofMillis(jwtService.getRefreshExpiration())))
+                .build();
+        refreshTokenRepository.save(token);
+    }
 }

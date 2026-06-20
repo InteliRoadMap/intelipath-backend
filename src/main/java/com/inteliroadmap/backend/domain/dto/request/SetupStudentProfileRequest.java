@@ -12,7 +12,7 @@ import java.util.UUID;
 @Data
 public class SetupStudentProfileRequest {
 
-    private String university;
+    private UUID universityId;
 
     private String yearOfAdmission;
 

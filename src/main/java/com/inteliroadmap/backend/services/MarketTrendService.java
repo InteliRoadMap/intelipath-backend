@@ -78,15 +78,15 @@ public class MarketTrendService {
             }
 
             Matcher matcher = numberPattern.matcher(salaryText);
-            List<Integer> numbers = new ArrayList<>();
+            List<Long> numbers = new ArrayList<>();
             while (matcher.find()) {
-                numbers.add(Integer.parseInt(matcher.group()));
+                numbers.add(Long.parseLong(matcher.group()));
             }
 
             if (numbers.isEmpty()) continue;
 
             // Calculate average if range is provided (e.g. 10 - 20)
-            double avg = numbers.stream().mapToInt(Integer::intValue).average().orElse(0);
+            double avg = numbers.stream().mapToLong(Long::longValue).average().orElse(0);
             
             // Adjust for unit (some say "1000 USD", some say "20 triệu")
             // Assuming TopCV data is mostly in million VND or USD. If > 100, might be USD, multiply by 25.

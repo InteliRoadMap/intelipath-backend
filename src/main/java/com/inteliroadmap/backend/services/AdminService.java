@@ -15,7 +15,9 @@ import com.inteliroadmap.backend.utils.BearerTokenUtil;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Optional;
@@ -41,7 +43,11 @@ public class AdminService {
 
         log.info("Admin Dashboard Module: Get user metric data");
 
-        return adminMapper.toUserMetricResponse(userRepository.count(), 12);
+        long totalUsers = userRepository.count();
+        long newUsers = userRepository.countUsersCreatedAfter(java.time.LocalDateTime.now().minusDays(30));
+        int growth = totalUsers == 0 ? 0 : (int) Math.round((double) newUsers / totalUsers * 100);
+
+        return adminMapper.toUserMetricResponse(totalUsers, growth);
     }
 
     /**
@@ -55,8 +61,9 @@ public class AdminService {
         log.info("Admin Dashboard Module: Get course metric data");
 
         long total = careerRoleRepository.count();
+        int avgProgress = 50; // Hardcoded fallback or placeholder since actual calculation needs complex tracking.
 
-        return adminMapper.toCourseMetricResponse(total, "ACTIVE", 78);
+        return adminMapper.toCourseMetricResponse(total, "ACTIVE", avgProgress);
     }
 
     /**
@@ -140,7 +147,7 @@ public class AdminService {
 
         if (!jwtService.isTokenValid(token) || !"ADMIN".equals(role)) {
             log.warn("Admin Dashboard Module: Access denied. role: {}", role);
-            throw new ResourceNotFoundException("Access denied");
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Access denied: ADMIN role required");
         }
     }
 

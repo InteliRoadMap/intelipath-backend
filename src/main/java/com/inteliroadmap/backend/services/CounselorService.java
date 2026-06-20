@@ -36,6 +36,7 @@ public class CounselorService {
     private final StudentRepository studentRepository;
     private final AcademicCounselorRepository academicCounselorRepository;
     private final StudentSkillRepository studentSkillRepository;
+    private final UniversityRepository universityRepository;
 
     private User getAuthenticatedUser() {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -60,20 +61,22 @@ public class CounselorService {
     @Transactional
     public CounselorResponse getCareerStatistics() {
         log.info("Get careers statistic request received");
-        getAuthenticatedCounselor();
+        AcademicCounselor counselor = getAuthenticatedCounselor();
+        UUID counselorUniversityId = counselor.getUniversity() != null ? counselor.getUniversity().getUniversityId() : null;
 
         Map<String, Integer> careerStatistics = new HashMap<>();
-
         int total = 0;
         List<CareerRole> careers = careerRoleRepository.findAll();
 
-        for(CareerRole career: careers) {
-            List<Student> students = studentRepository.findByCareerRole(career);
-            int number =  students.size();
-            if(number > 0) {
-                careerStatistics.put(career.getCareerName(), number);
+        if (counselorUniversityId != null) {
+            for(CareerRole career: careers) {
+                List<Student> students = studentRepository.findByCareerRoleAndUniversity_UniversityId(career, counselorUniversityId);
+                int number =  students.size();
+                if(number > 0) {
+                    careerStatistics.put(career.getCareerName(), number);
+                }
+                total += number;
             }
-            total += number;
         }
 
         log.info("Careers statistic retrieval successful");
@@ -83,11 +86,12 @@ public class CounselorService {
     @Transactional
     public CounselorResponse getStudentsMissingSkills(String searchName) {
         log.info("Get students skill gap of a career request received");
-        getAuthenticatedCounselor();
+        AcademicCounselor counselor = getAuthenticatedCounselor();
+        UUID counselorUniversityId = counselor.getUniversity() != null ? counselor.getUniversity().getUniversityId() : null;
 
         Map<String, Integer> totalMissingSkills = new HashMap<>();
         int totalStudent = 0;
-        String previousStudent = "";
+        String previousStudentId = "";
 
         List<DatasetMapper> missingSkillsData;
 
@@ -99,7 +103,11 @@ public class CounselorService {
         }
 
         CareerRole matchedCareer = matchingCareers.getFirst();
-        missingSkillsData = studentSkillRepository.findMissingSkillsByCareerId(matchedCareer.getCareerId());
+        if (counselorUniversityId != null) {
+            missingSkillsData = studentSkillRepository.findMissingSkillsByCareerIdAndUniversityId(matchedCareer.getCareerId(), counselorUniversityId);
+        } else {
+            missingSkillsData = new ArrayList<>();
+        }
 
         for(DatasetMapper row : missingSkillsData) {
             String skillName = row.getSkillName();
@@ -112,10 +120,10 @@ public class CounselorService {
                 totalMissingSkills.put(skillName, number);
             }
 
-            String currentStudent = row.getFullName();
-            if(!previousStudent.equals(currentStudent)) {
+            String currentStudentId = row.getStudentId();
+            if(!previousStudentId.equals(currentStudentId)) {
                 totalStudent += 1;
-                previousStudent = currentStudent;
+                previousStudentId = currentStudentId;
             }
         }
 
@@ -127,14 +135,85 @@ public class CounselorService {
     @Transactional
     public CounselorResponse getStudentInfos(String search) {
         log.info("Get students info request received");
+        AcademicCounselor counselor = getAuthenticatedCounselor();
+        UUID counselorUniversityId = counselor.getUniversity() != null ? counselor.getUniversity().getUniversityId() : null;
+
         List<Student> students;
         if (search == null || search.trim().isEmpty()) {
-            students = studentRepository.findAll();
+            if (counselorUniversityId != null) {
+                students = studentRepository.findByUniversity_UniversityId(counselorUniversityId);
+            } else {
+                students = new ArrayList<>();
+            }
         } else {
-            students = studentRepository.searchStudentsInfo(search);
+            if (counselorUniversityId != null) {
+                students = studentRepository.searchStudentsInfoByUniversity(search, counselorUniversityId);
+            } else {
+                students = new ArrayList<>();
+            }
         }
         List<Map<String, Object>> stInfos = new ArrayList<>();
 
+        // --- OPTIMIZED N+1 QUERY ---
+        // Pre-fetch all user info to avoid N+1 queries
+        List<UUID> studentUserIds = students.stream().map(Student::getUserId).collect(Collectors.toList());
+        List<User> userList = userRepository.findAllById(studentUserIds);
+        Map<UUID, User> userMap = userList.stream().collect(Collectors.toMap(User::getUserId, u -> u));
+
+        // Pre-fetch skill nodes by careerId
+        List<UUID> careerIds = students.stream()
+                .filter(s -> s.getCareerRole() != null)
+                .map(s -> s.getCareerRole().getCareerId())
+                .distinct()
+                .collect(Collectors.toList());
+        List<SkillNode> allNodes = skillNodeRepository.findAll();
+        Map<UUID, List<SkillNode>> nodesByCareerId = allNodes.stream()
+                .filter(node -> node.getCareerRole() != null)
+                .collect(Collectors.groupingBy(node -> node.getCareerRole().getCareerId()));
+
+        for(Student student: students) {
+            User userSt = userMap.get(student.getUserId());
+            if (userSt == null || userSt.getRole() != UserRole.STUDENT) continue;
+
+            Map<String, Object> stInfo = new HashMap<>();
+            stInfo.put("studentId", student.getUserId());
+            stInfo.put("fullName", userSt.getFullName());
+            stInfo.put("email", userSt.getEmail());
+            stInfo.put("university", student.getUniversity() != null ? student.getUniversity().getName() : null);
+
+            CareerRole careerRole = student.getCareerRole();
+            if (careerRole == null) {
+                stInfo.put("careerPath", null);
+                stInfo.put("roadmapProgress", 0);
+                stInfo.put("missingSkills", new ArrayList<>());
+            } else {
+                stInfo.put("careerPath", careerRole.getCareerName());
+
+                // Fix N+1 here by using the mapped lists
+                int totalNodeCompleted = studentProgressRepository
+                        .findRoadmapTotalNodeCompletedByCareerIdAndStudentId(careerRole.getCareerId(), student.getUserId());
+
+                List<SkillNode> nodes = nodesByCareerId.getOrDefault(careerRole.getCareerId(), new ArrayList<>());
+
+                int progress = nodes.isEmpty() ? 0 : totalNodeCompleted * 100 / nodes.size();
+                stInfo.put("roadmapProgress", progress);
+
+                // For missing skills, keeping original query since it's complex to batch without modifying Repository
+                List<DatasetMapper> missingSkills = studentSkillRepository
+                        .findMissingSkillsByStudentIdAndCareerName(
+                                student.getUserId(),
+                                careerRole.getCareerName()
+                        );
+                List<String> missingSkillNames = missingSkills.stream()
+                        .map(DatasetMapper::getSkillName).collect(Collectors.toList());
+                stInfo.put("missingSkills", missingSkillNames);
+            }
+
+            stInfos.add(stInfo);
+            // log.info(stInfos.toString()); // Remove log to avoid spamming
+        }
+
+        /* --- OLD N+1 CODE COMMENTED OUT ---
         for(Student student: students) {
             User userSt = userRepository.findByUserId(student.getUserId());
             if (userSt.getRole() != UserRole.STUDENT) continue;
@@ -143,7 +222,7 @@ public class CounselorService {
             stInfo.put("studentId", student.getUserId());
             stInfo.put("fullName", userSt.getFullName());
             stInfo.put("email", userSt.getEmail());
-            stInfo.put("university", student.getUniversity());
+            stInfo.put("university", student.getUniversity() != null ? student.getUniversity().getName() : null);
 
             CareerRole careerRole = student.getCareerRole();
             if (careerRole == null) {
@@ -154,7 +233,7 @@ public class CounselorService {
                 stInfo.put("careerPath", careerRole.getCareerName());
 
                 int totalNodeCompleted = studentProgressRepository
-                        .findRoadmapTotalNodeCompletedByCareerId(careerRole.getCareerId());
+                        .findRoadmapTotalNodeCompletedByCareerIdAndStudentId(careerRole.getCareerId(), student.getUserId());
 
                 List<SkillNode> nodes = skillNodeRepository.findByCareerRole_CareerId(careerRole.getCareerId());
 
@@ -174,6 +253,7 @@ public class CounselorService {
             stInfos.add(stInfo);
             log.info(stInfos.toString());
         }
+        */
 
         log.info("Get students info successfully");
         return counselorMapper.getStudentInfos(stInfos);
@@ -197,6 +277,9 @@ public class CounselorService {
         User counselorUser = getAuthenticatedUser();
 
         User student = userRepository.findByUserId(studentId);
+        if (student == null) {
+            throw new ResourceNotFoundException("Student not found");
+        }
 
         List<Feedback> feedbacks = feedbackRepository
                 .findBySenderOrReceiverOrderByCreateAtDesc(student, student);
@@ -216,6 +299,9 @@ public class CounselorService {
         User sender = getAuthenticatedUser();
 
         User receiver = userRepository.findByUserId(request.getReceiverId());
+        if (receiver == null) {
+            throw new ResourceNotFoundException("Receiver not found");
+        }
 
         Feedback feedback = new Feedback();
         feedback.setSender(sender);
@@ -230,27 +316,33 @@ public class CounselorService {
         return counselorMapper.toCrudFeedbackResponse(feedback);
     }
 
-//    @Transactional
-//    public CounselorResponse deleteFeedback(DeleteFeedbackRequest request) {
-//        log.info("Delete feedback request received");
-//        return null;
-//    }
+    @Transactional
+    public CounselorResponse deleteFeedback(java.util.UUID feedbackId) {
+        log.info("Delete feedback request received");
+        AcademicCounselor counselor = getAuthenticatedCounselor();
+        Feedback feedback = feedbackRepository.findById(feedbackId).orElse(null);
+        if (feedback == null) {
+            throw new ResourceNotFoundException("Feedback not found");
+        }
+        feedbackRepository.delete(feedback);
+        return CounselorResponse.builder()
+                .build();
+    }
 
-//    @Transactional
-//    public CounselorResponse modifyFeedback(ModifyFeedbackRequest request) {
-//        log.info("Modify feedback request received");
-//        AcademicCounselor counselor = getAuthenticatedCounselor();
-//        Feedback feedback = feedbackRepository.findByFeedbackId(request.getFeedbackId());
-//        if (feedback == null) {
-//            throw new ResourceNotFoundException("Feedback not found");
-//        }
-//        feedback.setContent(request.getContent());
-//        feedback.setType(request.getType());
-//        feedbackRepository.save(feedback);
-//        return CounselorResponse.builder()
-//                .feedback(feedback)
-//                .build();
-//    }
+    @Transactional
+    public CounselorResponse modifyFeedback(com.inteliroadmap.backend.domain.dto.request.ModifyFeedbackRequest request) {
+        log.info("Modify feedback request received");
+        AcademicCounselor counselor = getAuthenticatedCounselor();
+        Feedback feedback = feedbackRepository.findById(request.getFeedbackId()).orElse(null);
+        if (feedback == null) {
+            throw new ResourceNotFoundException("Feedback not found");
+        }
+        feedback.setContent(request.getContent());
+        feedback.setType(com.inteliroadmap.backend.domain.enums.FeedbackType.valueOf(request.getType()));
+        feedbackRepository.save(feedback);
+        return CounselorResponse.builder()
+                .build();
+    }
 
     @Transactional
     public UpdateProfileResponse getProfile() {
@@ -272,7 +364,10 @@ public class CounselorService {
         if(request.getFullName() != null) user.setFullName(request.getFullName());
         if(request.getYob() != null) user.setYob(request.getYob());
         if(request.getBio() != null) user.setBio(request.getBio());
-        if(request.getUniversity() != null) counselor.setUniversity(request.getUniversity());
+        if(request.getUniversityId() != null) {
+            University university = universityRepository.findById(request.getUniversityId()).orElse(null);
+            if (university != null) counselor.setUniversity(university);
+        }
         if(request.getDepartment() != null) counselor.setDepartment(request.getDepartment());
 
         user = userRepository.save(user);

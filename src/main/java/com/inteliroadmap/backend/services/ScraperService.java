@@ -44,10 +44,21 @@ public class ScraperService {
                     .build();
 
             List<String> flattenedTags = new ArrayList<>();
+//            if (recruitment.getTags() != null) {
+//                for (List<String> tagList : recruitment.getTags().values()) {
+//                    if (tagList != null) {
+//                        flattenedTags.addAll(tagList);
+//                    }
+//                }
+//            }
             if (recruitment.getTags() != null) {
-                for (List<String> tagList : recruitment.getTags().values()) {
-                    if (tagList != null) {
-                        flattenedTags.addAll(tagList);
+                for (Object tagListObj : recruitment.getTags().values()) {
+                    if (tagListObj instanceof List<?> list) {
+                        for (Object tag : list) {
+                            flattenedTags.add(tag.toString());
+                        }
+                    } else if (tagListObj instanceof String str) {
+                        flattenedTags.add(str);
                     }
                 }
             }

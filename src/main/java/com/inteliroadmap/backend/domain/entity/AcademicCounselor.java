@@ -21,8 +21,9 @@ public class AcademicCounselor {
     @Column(name = "user_id")
     private UUID userId;
 
-    @Column(name = "university")
-    private String university;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "university_id", foreignKey = @ForeignKey(name = "fk_ac_university"))
+    private University university;
 
     @Column(name = "department")
     private String department;

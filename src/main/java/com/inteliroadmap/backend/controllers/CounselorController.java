@@ -196,45 +196,53 @@ public class CounselorController {
         log.info("Create feedback request received");
         return ResponseEntity.ok(counselorService.createFeedback(request));
     }
+    @PatchMapping("/dashboard/modify-feedback")
+    @Operation(
+            summary = "Modify feedback",
+            description = "Modify a feedback to a student"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Feedback package",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = CounselorResponse.class)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized or invalid token"
+            ),
+            @ApiResponse(
+                    responseCode = "404",
+                    description = "Feedback not found"
+            )
+    })
+    public ResponseEntity<CounselorResponse> modifyFeedback(
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Modify feedback payload",
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ModifyFeedbackRequest.class)
+                    )
+            )
+            @RequestBody @Valid ModifyFeedbackRequest request
+    ) {
+        log.info("Modify feedback request received");
+        return ResponseEntity.ok(counselorService.modifyFeedback(request));
+    }
 
-//    @PatchMapping("/dashboard/modify-feedback")
-//    @Operation(
-//            summary = "Modify feedback",
-//            description = "Modify a feedback to a student"
-//    )
-//    @ApiResponses(value = {
-//            @ApiResponse(
-//                    responseCode = "200",
-//                    description = "Feedback package",
-//                    content = @Content(
-//                            mediaType = "application/json",
-//                            schema = @Schema(implementation = CounselorResponse.class)
-//                    )
-//            ),
-//            @ApiResponse(
-//                    responseCode = "401",
-//                    description = "Unauthorized or invalid token"
-//            ),
-//            @ApiResponse(
-//                    responseCode = "404",
-//                    description = "Feedback not found"
-//            )
-//    })
-//    public ResponseEntity<CounselorResponse> modifyFeedback(
-//            @io.swagger.v3.oas.annotations.parameters.RequestBody(
-//                    description = "Modify feedback payload",
-//                    required = true,
-//                    content = @Content(
-//                            mediaType = "application/json",
-//                            schema = @Schema(implementation = ModifyFeedbackRequest.class)
-//                    )
-//            )
-//            @RequestBody @Valid ModifyFeedbackRequest request
-//    ) {
-//        log.info("Modify feedback request received");
-//        return ResponseEntity.ok(counselorService.modifyFeedback(request));
-//    }
-
+    @DeleteMapping("/dashboard/delete-feedback/{feedbackId}")
+    @Operation(
+            summary = "Delete feedback",
+            description = "Delete a feedback"
+    )
+    public ResponseEntity<CounselorResponse> deleteFeedback(@PathVariable java.util.UUID feedbackId) {
+        log.info("Delete feedback request received");
+        return ResponseEntity.ok(counselorService.deleteFeedback(feedbackId));
+    }
     @GetMapping("/me/profile")
     @Operation(
             summary = "Get Counselor profile",

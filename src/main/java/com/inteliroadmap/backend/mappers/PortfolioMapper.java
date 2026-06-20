@@ -22,7 +22,7 @@ public class PortfolioMapper {
                 .bio(user.getBio())
                 .email(user.getEmail())
                 .portfolioSlug(student.getPortfolioSlug())
-                .university(student.getUniversity())
+                .university(student.getUniversity() != null ? student.getUniversity().getName() : null)
                 .build();
 
         PortfolioResponse.PortfolioConfigResponse configResponse = null;

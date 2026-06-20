@@ -16,6 +16,7 @@ import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
@@ -25,7 +26,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 @Slf4j
-@Service
+@Component
 @RequiredArgsConstructor
 public class TopCvParser {
 
@@ -70,7 +71,7 @@ public class TopCvParser {
                     log.info("Found {} jobs on page {}. Starting scrape...", jobs.size(), page);
 
                     for (Element job : jobs) {
-                        if (count >= 5) { //Litmit total JOB Craws
+                        if (count >= 20) { //Litmit total JOB Craws
                             log.info("Reached scraper delimiter. Stopping scrape.");
                             run = false;
                             break;

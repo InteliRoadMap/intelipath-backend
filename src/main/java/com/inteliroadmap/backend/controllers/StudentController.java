@@ -117,6 +117,32 @@ public class StudentController {
         return ResponseEntity.ok(studentService.setupStudentProfile(setupStudentProfileRequest));
     }
 
+    @PostMapping(value = "/profile/transcript", consumes = org.springframework.http.MediaType.MULTIPART_FORM_DATA_VALUE)
+    @Operation(
+            summary = "Upload student transcript for AI processing",
+            description = "Upload transcript PDF, which will be processed by RAG for personalized Virtual Mentor insights"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Transcript uploaded and processed successfully",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = StudentResponse.class)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "400",
+                    description = "Invalid file or file type"
+            )
+    })
+    public ResponseEntity<StudentResponse> uploadTranscript(
+            @org.springframework.web.bind.annotation.RequestParam("file") org.springframework.web.multipart.MultipartFile file
+    ) {
+        log.info("Student transcript upload request received");
+        return ResponseEntity.ok(studentService.uploadTranscript(file));
+    }
+
     @Deprecated
     @PutMapping("/target-career")
     @Operation(

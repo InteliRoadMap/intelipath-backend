@@ -111,4 +111,42 @@ public class SupabaseStorageService {
             throw new RuntimeException("Failed to upload chat file to Supabase: " + e.getMessage(), e);
         }
     }
+    public String uploadTranscript(MultipartFile file, String userId) {
+        log.info("SupabaseStorageService: Uploading transcript for user ID: {}", userId);
+        try {
+            RestTemplate restTemplate = new RestTemplate();
+            
+            String fileExtension = getFileExtension(file.getOriginalFilename());
+            String fileName = userId + "/transcript_" + System.currentTimeMillis() + fileExtension;
+            String transcriptBucket = "transcripts";
+            String url = supabaseUrl + "/storage/v1/object/" + transcriptBucket + "/" + fileName;
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setBearerAuth(supabaseKey);
+            headers.setContentType(MediaType.valueOf(file.getContentType() != null ? file.getContentType() : "application/pdf"));
+            
+            headers.set("x-upsert", "true");
+
+            HttpEntity<byte[]> requestEntity = new HttpEntity<>(file.getBytes(), headers);
+
+            ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, requestEntity, String.class);
+
+            if (response.getStatusCode().is2xxSuccessful()) {
+                return supabaseUrl + "/storage/v1/object/public/" + transcriptBucket + "/" + fileName;
+            } else {
+                log.error("Supabase API Error: {}", response.getBody());
+                throw new RuntimeException("Failed to upload transcript to Supabase");
+            }
+        } catch (org.springframework.web.client.HttpStatusCodeException e) {
+            String responseBody = e.getResponseBodyAsString();
+            log.error("Supabase API Error HTTP {}: {}", e.getStatusCode(), responseBody);
+            throw new RuntimeException("Supabase API Error: " + responseBody, e);
+        } catch (IOException e) {
+            log.error("Failed to read MultipartFile", e);
+            throw new RuntimeException("Failed to read file", e);
+        } catch (Exception e) {
+            log.error("Error communicating with Supabase", e);
+            throw new RuntimeException("Failed to upload transcript to Supabase: " + e.getMessage(), e);
+        }
+    }
 }

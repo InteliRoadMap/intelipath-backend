@@ -56,11 +56,20 @@ public class SkillExtractionService {
                 descBuilder.append(r.getTitle()).append(". ");
             }
             if (r.getDescriptions() != null) {
-                for (List<String> values : r.getDescriptions().values()) {
-                    if (values != null) {
-                        for (String v : values) {
-                            descBuilder.append(v).append(" ");
+//                for (List<String> values : r.getDescriptions().values()) {
+//                    if (values != null) {
+//                        for (String v : values) {
+//                            descBuilder.append(v).append(" ");
+//                        }
+//                    }
+//                }
+                for (Object valuesObj : r.getDescriptions().values()) {
+                    if (valuesObj instanceof List<?> list) {
+                        for (Object v : list) {
+                            descBuilder.append(v.toString()).append(" ");
                         }
+                    } else if (valuesObj instanceof String str) {
+                        descBuilder.append(str).append(" ");
                     }
                 }
             }

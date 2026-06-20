@@ -19,13 +19,14 @@ public class MarkItDownTool implements Function<MarkItDownTool.Request, String> 
     @Value("${ai.service.url:http://localhost:8000/api/extract}")
     private String aiServiceUrl;
 
+    private final RestTemplate restTemplate = new RestTemplate();
+
     public record Request(String fileUrl) {}
 
     @Override
     public String apply(Request request) {
         log.info("AI Called MarkItDownTool to extract text from URL: {}", request.fileUrl());
         try {
-            RestTemplate restTemplate = new RestTemplate();
             Map<String, String> requestBody = new HashMap<>();
             requestBody.put("url", request.fileUrl());
 

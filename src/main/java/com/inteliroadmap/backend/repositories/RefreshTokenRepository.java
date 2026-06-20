@@ -12,8 +12,17 @@ import java.util.UUID;
 
 @Repository
 public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID> {
+//    boolean deleteByToken(String token);
+//    RefreshToken findByToken(String token);
+//    void deleteByUser_UserId(UUID userId);
+
+    @org.springframework.transaction.annotation.Transactional
     boolean deleteByToken(String token);
+
     RefreshToken findByToken(String token);
+
+    @org.springframework.transaction.annotation.Transactional
+    void deleteByUser_UserId(UUID userId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select refreshToken from RefreshToken refreshToken where refreshToken.token = :token")

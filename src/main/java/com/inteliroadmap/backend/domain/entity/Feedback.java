@@ -41,6 +41,9 @@ public class Feedback {
     @Enumerated(EnumType.STRING)
     private FeedbackType type;
 
+    @Column(name = "rating")
+    private Integer rating;
+
     @Column(name = "create_at", nullable = false)
     private LocalDateTime createAt;
 

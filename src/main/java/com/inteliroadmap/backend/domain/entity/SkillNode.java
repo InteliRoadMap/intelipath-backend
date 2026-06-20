@@ -51,5 +51,5 @@ public class SkillNode {
 
     @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "resource", columnDefinition = "jsonb")
-    private Object resource;
+    private com.fasterxml.jackson.databind.JsonNode resource;
 }

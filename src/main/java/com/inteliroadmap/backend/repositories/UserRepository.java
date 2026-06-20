@@ -24,6 +24,9 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     @Query("SELECT u FROM User u ORDER BY u.createAt DESC")
     List<User> findAllUsers();
 
+    @Query("SELECT COUNT(u) FROM User u WHERE u.createAt >= :date")
+    long countUsersCreatedAfter(@org.springframework.data.repository.query.Param("date") java.time.LocalDateTime date);
+
     User findByUserId(UUID userId);
 
     User findByEmailContainingIgnoreCaseOrFullNameContainingIgnoreCase(String email, String fullName);

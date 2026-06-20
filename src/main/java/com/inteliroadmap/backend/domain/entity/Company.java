@@ -35,9 +35,13 @@ public class Company {
     @Column(columnDefinition = "jsonb")
     private List<String> introduction;
 
+//    @JdbcTypeCode(SqlTypes.JSON)
+//    @Column(columnDefinition = "jsonb")
+//    private Map<String, String> info;
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
-    private Map<String, String> info;
+    private Map<String, Object> info;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")

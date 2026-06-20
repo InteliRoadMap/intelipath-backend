@@ -45,10 +45,29 @@ public class CounselorMapper {
     }
 
     public UpdateProfileResponse toCrudProfileResponse(User user, AcademicCounselor academicCounselor) {
+        // Clone user to avoid exposing sensitive internal fields
+        User safeUser = User.builder()
+                .userId(user.getUserId())
+                .email(user.getEmail())
+                .fullName(user.getFullName())
+                .yob(user.getYob())
+                .bio(user.getBio())
+                .avatarUrl(user.getAvatarUrl())
+                .role(user.getRole())
+                .userStatus(user.getUserStatus())
+                .build();
+
+        return UpdateProfileResponse.builder()
+                .user(safeUser)
+                .academicCounselor(academicCounselor)
+                .build();
+
+        /* --- OLD CODE EXPOSING RAW ENTITY ---
         return UpdateProfileResponse.builder()
                 .user(user)
                 .academicCounselor(academicCounselor)
                 .build();
+        */
     }
 
 }

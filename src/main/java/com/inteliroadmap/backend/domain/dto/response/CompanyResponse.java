@@ -18,6 +18,7 @@ public class CompanyResponse {
     private String logo;
     private String name;
     private List<String> introductions;
-    private Map<String, String> infos;
+//    private Map<String, String> infos;
+    private Map<String, Object> infos;
     private List<String> contacts;
 }

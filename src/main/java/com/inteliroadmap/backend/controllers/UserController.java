@@ -15,6 +15,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -73,6 +74,7 @@ public class UserController {
      * @return ResponseEntity containing UserResponse
      */
     @PostMapping("/by-email")
+    @PreAuthorize("hasAnyRole('ADMIN', 'COUNSELOR', 'MENTOR')")
     @Operation(
             summary = "Get user info by email",
             description = "Get user information using email"

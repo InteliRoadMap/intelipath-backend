@@ -25,8 +25,9 @@ public class Student {
     @JoinColumn(name = "career_id", foreignKey = @ForeignKey(name = "fk_st_career"))
     private CareerRole careerRole;
 
-    @Column(name = "university")
-    private String university;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "university_id", foreignKey = @ForeignKey(name = "fk_st_university"))
+    private University university;
 
     @Column(name = "year_of_admission")
     private LocalDate yearOfAdmission;

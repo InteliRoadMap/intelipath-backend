@@ -229,10 +229,13 @@ public class RoadmapService {
             progress.setStatus(RoadmapStepStatus.COMPLETED);
             progress.setCompleteAt(LocalDateTime.now());
             studentProgressRepository.save(progress);
+            return RoadmapResponse.builder()
+                    .updateStatus("Update Node status successfully")
+                    .build();
         }
-        
+
         return RoadmapResponse.builder()
-                .updateStatus("Update Node status successfully")
+                .updateStatus("No update: Node status is '" + progress.getStatus() + "', only IN_PROGRESS nodes can be completed.")
                 .build();
     }
 
@@ -399,6 +402,26 @@ public class RoadmapService {
                     boolean hasSkill = studentSkillRepository.existsByStudentAndSkill(student, skill);
                     if (!hasSkill) {
                         List<SkillNode> allNodesForSkill = skillNodeRepository.findBySkillIdAndCareerRole_CareerId(skill.getSkillId(), student.getCareerRole().getCareerId());
+                        
+                        // --- OPTIMIZED N+1 QUERY ---
+                        List<UUID> nodeIds = allNodesForSkill.stream().map(SkillNode::getNodeId).collect(Collectors.toList());
+                        List<StudentProgress> allProgress = studentProgressRepository.findByStudent_UserIdAndSkillNode_NodeIdIn(student.getUserId(), nodeIds);
+                        Map<UUID, RoadmapStepStatus> progressStatusMap = allProgress.stream()
+                                .collect(Collectors.toMap(p -> p.getSkillNode().getNodeId(), StudentProgress::getStatus));
+                        
+                        boolean allCompleted = true;
+                        for (SkillNode skillNode : allNodesForSkill) {
+                            if (skillNode.getNodeId().equals(node.getNodeId())) {
+                                continue;
+                            }
+                            RoadmapStepStatus status = progressStatusMap.get(skillNode.getNodeId());
+                            if (status != RoadmapStepStatus.COMPLETED) {
+                                allCompleted = false;
+                                break;
+                            }
+                        }
+
+                        /* --- OLD N+1 CODE COMMENTED OUT ---
                         boolean allCompleted = true;
                         
                         for (SkillNode skillNode : allNodesForSkill) {
@@ -411,6 +434,7 @@ public class RoadmapService {
                                 break;
                             }
                         }
+                        */
 
                         if (allCompleted) {
                             StudentSkill newSkill = StudentSkill.builder()
@@ -599,31 +623,56 @@ public class RoadmapService {
                 .build();
     }
 
-    private List<StudentRoadmapResourceResponse> toResourceResponses(Object resource) {
-        if (resource instanceof Map<?, ?> resourceMap) {
-            Object links = resourceMap.get("links");
-            if (links instanceof List<?> linkList) {
-                return linkList.stream()
-                        .filter(Objects::nonNull)
-                        .map(Object::toString)
-                        .filter(url -> !url.isBlank())
-                        .map(this::toResourceResponse)
-                        .toList();
+    private static final com.fasterxml.jackson.databind.ObjectMapper OBJECT_MAPPER = new com.fasterxml.jackson.databind.ObjectMapper();
+
+    private List<StudentRoadmapResourceResponse> toResourceResponses(Object resourceObj) {
+        if (resourceObj == null) return List.of();
+        
+        com.fasterxml.jackson.databind.JsonNode resource = null;
+        if (resourceObj instanceof com.fasterxml.jackson.databind.JsonNode) {
+            resource = (com.fasterxml.jackson.databind.JsonNode) resourceObj;
+        } else {
+            // --- OPTIMIZED ObjectMapper ---
+            resource = OBJECT_MAPPER.valueToTree(resourceObj);
+            
+            /* --- OLD CODE COMMENTED OUT ---
+            // Fallback just in case
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            resource = mapper.valueToTree(resourceObj);
+            */
+        }
+
+        if (resource.isObject()) {
+            com.fasterxml.jackson.databind.JsonNode links = resource.get("links");
+            if (links != null && links.isArray()) {
+                List<StudentRoadmapResourceResponse> list = new java.util.ArrayList<>();
+                for (com.fasterxml.jackson.databind.JsonNode link : links) {
+                    if (link.isTextual() && !link.asText().isBlank()) {
+                        list.add(toResourceResponse(link.asText()));
+                    }
+                }
+                return list;
             }
         }
 
-        if (resource instanceof List<?> resourceList) {
-            return resourceList.stream()
-                    .map(obj -> {
-                        if (obj instanceof Map<?, ?> map) {
-                            return toResourceResponse(map);
-                        } else if (obj instanceof String url) {
-                            return toResourceResponse(url);
-                        }
-                        return null;
-                    })
-                    .filter(Objects::nonNull)
-                    .toList();
+        if (resource.isArray()) {
+            List<StudentRoadmapResourceResponse> list = new java.util.ArrayList<>();
+            for (com.fasterxml.jackson.databind.JsonNode obj : resource) {
+                if (obj.isObject()) {
+                    // --- OPTIMIZED ObjectMapper ---
+                    Map<String, Object> map = OBJECT_MAPPER.convertValue(obj, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+                    list.add(toResourceResponse(map));
+
+                    /* --- OLD CODE COMMENTED OUT ---
+                    com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+                    Map<String, Object> map = mapper.convertValue(obj, new com.fasterxml.jackson.core.type.TypeReference<Map<String, Object>>() {});
+                    list.add(toResourceResponse(map));
+                    */
+                } else if (obj.isTextual()) {
+                    list.add(toResourceResponse(obj.asText()));
+                }
+            }
+            return list.stream().filter(Objects::nonNull).toList();
         }
 
         return List.of();
@@ -640,7 +689,7 @@ public class RoadmapService {
     private StudentRoadmapResourceResponse toResourceResponse(Map<?, ?> resourceMap) {
         Object url = firstNonNull(resourceMap.get("url"), resourceMap.get("ref1"));
         if (url == null || url.toString().isBlank()) {
-            return StudentRoadmapResourceResponse.builder().build();
+            return null; // Return null so caller's Objects::nonNull filter works correctly
         }
 
         Object title = firstNonNull(resourceMap.get("title"), url);

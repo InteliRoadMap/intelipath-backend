@@ -9,6 +9,6 @@ public class UpdateProfileRequest {
     private String fullName;
     private LocalDate yob;
     private String bio;
-    private String university;
+    private java.util.UUID universityId;
     private String department;
 }

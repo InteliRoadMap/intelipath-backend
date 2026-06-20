@@ -7,6 +7,7 @@ import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.chrome.ChromeDriver;
 import org.openqa.selenium.chrome.ChromeOptions;
+import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
 
 import java.io.BufferedWriter;
@@ -14,7 +15,7 @@ import java.io.FileWriter;
 import java.io.IOException;
 
 @Slf4j
-@Service
+@Component
 @RequiredArgsConstructor
 public class LinkedInParser {
 

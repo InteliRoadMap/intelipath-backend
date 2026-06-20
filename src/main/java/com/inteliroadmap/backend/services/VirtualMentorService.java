@@ -118,6 +118,7 @@ public class VirtualMentorService {
         chatSessionRepository.delete(session);
     }
 
+    @org.springframework.transaction.annotation.Transactional
     public Flux<String> streamChat(String authorizationHeader, UUID sessionId, VirtualMentorChatRequest request) {
         User user = getAuthenticatedUser(authorizationHeader);
         ChatSession session = chatSessionRepository.findById(sessionId)
@@ -174,7 +175,8 @@ public class VirtualMentorService {
                 // Nếu bạn muốn đổi thuật toán tìm kiếm (vd: chỉnh k=5, threshold=0.8), bạn sửa ở SearchRequest.defaults().
                 .advisors(new org.springframework.ai.chat.client.advisor.QuestionAnswerAdvisor(
                         vectorStore, 
-                        org.springframework.ai.vectorstore.SearchRequest.defaults(),
+                        org.springframework.ai.vectorstore.SearchRequest.defaults()
+                                .withFilterExpression("userId == '" + user.getUserId().toString() + "'"),
                         "\n\n[OPTIONAL RETRIEVED CONTEXT]\n" +
                         "---------------------\n" +
                         "{question_answer_context}\n" +
@@ -194,6 +196,16 @@ public class VirtualMentorService {
                             .createAt(LocalDateTime.now())
                             .build();
                     chatMessageRepository.save(assistantMessage);
+                })
+                .doOnError(error -> {
+                    log.error("AI Stream failed", error);
+                    ChatMessage errorMessage = ChatMessage.builder()
+                            .chatSession(session)
+                            .role("ASSISTANT")
+                            .content(fullResponse.toString() + "\n\n**[System: Gặp lỗi khi tạo phản hồi. Vui lòng thử lại.]**")
+                            .createAt(LocalDateTime.now())
+                            .build();
+                    chatMessageRepository.save(errorMessage);
                 });
     }
 
@@ -204,7 +216,7 @@ public class VirtualMentorService {
         prompt.append("User Name: ").append(user.getFullName()).append("\n");
         
         if (student != null) {
-            prompt.append("University: ").append(student.getUniversity() != null ? student.getUniversity() : "N/A").append("\n");
+            prompt.append("University: ").append(student.getUniversity() != null ? student.getUniversity().getName() : "N/A").append("\n");
             prompt.append("Major: ").append(student.getMajor() != null ? student.getMajor() : "N/A").append("\n");
             prompt.append("GitHub Profile: ").append(student.getGithubProfile() != null ? student.getGithubProfile() : "N/A").append("\n");
             prompt.append("Transcript Info: ").append(student.getTranscriptUrl() != null ? student.getTranscriptUrl() : "N/A").append("\n");

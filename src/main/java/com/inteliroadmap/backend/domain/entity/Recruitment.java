@@ -41,21 +41,37 @@ public class Recruitment {
     @Column(name = "application_deadline")
     private LocalDate applicationDeadline;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(columnDefinition = "jsonb")
-    private Map<String, List<String>> tags;
+//    @JdbcTypeCode(SqlTypes.JSON)
+//    @Column(columnDefinition = "jsonb")
+//    private Map<String, List<String>> tags;
+//
+//    @JdbcTypeCode(SqlTypes.JSON)
+//    @Column(columnDefinition = "jsonb")
+//    private Map<String, List<String>> descriptions;
+//
+//    @JdbcTypeCode(SqlTypes.JSON)
+//    @Column(columnDefinition = "jsonb")
+//    private Map<String, String> generalInfos;
+//
+//    @JdbcTypeCode(SqlTypes.JSON)
+//    @Column(columnDefinition = "jsonb")
+//    private Map<String, List<String>> relatedTags;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
-    private Map<String, List<String>> descriptions;
+    private Map<String, Object> tags;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
-    private Map<String, String> generalInfos;
+    private Map<String, Object> descriptions;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
-    private Map<String, List<String>> relatedTags;
+    private Map<String, Object> generalInfos;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
+    private Map<String, Object> relatedTags;
 
     @OneToMany(mappedBy = "recruitment", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default

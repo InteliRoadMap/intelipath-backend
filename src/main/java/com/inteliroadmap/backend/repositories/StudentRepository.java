@@ -8,7 +8,6 @@ import com.inteliroadmap.backend.mappers.DatasetMapper;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
-import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
@@ -22,9 +21,15 @@ public interface StudentRepository extends JpaRepository<Student, UUID> {
 
     Student findByUserId(UUID userId);
     List<Student> findByCareerRole(CareerRole careerRole);
+    List<Student> findByCareerRoleAndUniversity_UniversityId(CareerRole careerRole, UUID universityId);
 
-    @Query("SELECT s FROM Student s, User u WHERE s.userId = u.userId AND (LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(s.university) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(s.careerRole.careerName) LIKE LOWER(CONCAT('%', :search, '%')))")
+    @Query("SELECT s FROM Student s JOIN User u ON s.userId = u.userId WHERE (LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(s.careerRole.careerName) LIKE LOWER(CONCAT('%', :search, '%')))")
     List<Student> searchStudentsInfo(@Param("search") String search);
+
+    List<Student> findByUniversity_UniversityId(UUID universityId);
+
+    @Query("SELECT s FROM Student s JOIN User u ON s.userId = u.userId WHERE s.university.universityId = :universityId AND (LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(s.careerRole.careerName) LIKE LOWER(CONCAT('%', :search, '%')))")
+    List<Student> searchStudentsInfoByUniversity(@Param("search") String search, @Param("universityId") UUID universityId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select student from Student student where student.userId = :userId")
