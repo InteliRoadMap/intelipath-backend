@@ -30,8 +30,7 @@ import java.time.LocalDateTime;
 public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
 
     private final JwtService jwtService;
-//    private final RefreshTokenRepository refreshTokenRepository;
-    private final com.inteliroadmap.backend.services.AuthService authService;
+    private final RefreshTokenRepository refreshTokenRepository;
     private final UserRepository userRepository;
     private final HttpCookieOAuth2AuthorizationRequestRepository httpCookieOAuth2AuthorizationRequestRepository;
 
@@ -81,14 +80,13 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         // Save refresh token — delete old tokens first to prevent accumulation
         User user = userRepository.findByEmail(email);
         if (user != null) {
-//            refreshTokenRepository.deleteByUser_UserId(user.getUserId());
-//            RefreshToken token = RefreshToken.builder()
-//                    .token(refreshToken)
-//                    .user(user)
-//                    .expireAt(LocalDateTime.now().plus(Duration.ofMillis(jwtService.getRefreshExpiration())))
-//                    .build();
-//            refreshTokenRepository.save(token);
-            authService.rotateRefreshTokenForOAuth2User(user, refreshToken);
+            refreshTokenRepository.deleteByUser_UserId(user.getUserId());
+            com.inteliroadmap.backend.domain.entity.RefreshToken token = com.inteliroadmap.backend.domain.entity.RefreshToken.builder()
+                    .token(refreshToken)
+                    .user(user)
+                    .expireAt(java.time.LocalDateTime.now().plus(java.time.Duration.ofMillis(jwtService.getRefreshExpiration())))
+                    .build();
+            refreshTokenRepository.save(token);
         }
 
         return UriComponentsBuilder.fromUriString(authorizedRedirectUri)
