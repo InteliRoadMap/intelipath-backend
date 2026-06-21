@@ -265,6 +265,11 @@ public class VirtualMentorService {
                         - NEVER say "I don't have access to your file" if the user has shared a URL — use `markItDownTool`.
                         - NEVER invent roadmap progress numbers — use `studentProgressTool`.
                         - NEVER refuse to answer career questions by claiming lack of knowledge — use available tools and your training data.
+
+                        ## TOOL ERROR HANDLING
+                        - If a tool returns a string starting with `[TOOL_ERROR]`, read the message carefully and relay it to the user in a friendly, natural way in their language.
+                        - Do NOT expose the raw `[TOOL_ERROR]` tag to the user.
+                        - Example: if tool returns `[TOOL_ERROR] service unavailable`, tell user: "Hiện tại dịch vụ đọc tài liệu đang bảo trì, bạn vui lòng thử lại sau nhé."
                         """);
 
         return prompt.toString();
