@@ -39,7 +39,6 @@ public class VirtualMentorController {
     private final VirtualMentorService virtualMentorService;
     private final SupabaseStorageService supabaseStorageService;
     private final com.inteliroadmap.backend.services.DocumentIngestionService documentIngestionService;
-    private final org.springframework.context.ApplicationContext applicationContext;
 
     @PostMapping("/sessions")
     @Operation(summary = "Create a new chat session")
@@ -108,34 +107,13 @@ public class VirtualMentorController {
     }
 
     @PostMapping("/files/upload")
-    @Operation(summary = "Upload a file for chat context and extract its text content")
+    @Operation(summary = "Upload a file for chat context",
+               description = "Uploads the file to Supabase Storage and returns the public URL. The AI will call MarkItDownTool automatically to read the content when needed.")
     public ResponseEntity<Map<String, String>> uploadChatFile(
             @RequestParam("file") MultipartFile file) {
         log.info("Uploading chat file: {}", file.getOriginalFilename());
         String fileUrl = supabaseStorageService.uploadChatFile(file);
-
-        Map<String, String> response = new HashMap<>();
-        response.put("url", fileUrl);
-
-        // If the file is a PDF, extract content immediately using PdfToMarkdownService
-        // so the FE can inject the text into the chat message and AI can read it
-        String contentType = file.getContentType();
-        String filename = file.getOriginalFilename() != null ? file.getOriginalFilename().toLowerCase() : "";
-        if ("application/pdf".equals(contentType) || filename.endsWith(".pdf")) {
-            try {
-                com.inteliroadmap.backend.services.PdfToMarkdownService pdfToMarkdownService =
-                        applicationContext.getBean(com.inteliroadmap.backend.services.PdfToMarkdownService.class);
-                String markdown = pdfToMarkdownService.convertToMarkdown(file);
-                response.put("extractedText", markdown);
-                log.info("Successfully extracted {} chars from PDF: {}", markdown.length(), file.getOriginalFilename());
-            } catch (Exception e) {
-                log.error("Failed to extract PDF content for chat context", e);
-                response.put("extractedText", "");
-                response.put("extractionError", e.getMessage());
-            }
-        }
-
-        return ResponseEntity.ok(response);
+        return ResponseEntity.ok(Map.of("url", fileUrl));
     }
 
     @PostMapping("/knowledge/ingest")
