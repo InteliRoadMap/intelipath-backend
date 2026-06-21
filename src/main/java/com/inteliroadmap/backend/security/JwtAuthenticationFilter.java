@@ -24,6 +24,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
 
     private final JwtService jwtService;
+    private final AuthenticationCookieService authenticationCookieService;
 
     /**
      * Refresh requests validate their token in the authentication service.
@@ -53,20 +54,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         try {
             log.debug("Processing request: {} {}", request.getMethod(), request.getRequestURI());
 
-            // Extract header from token
-            String authHeader = request.getHeader("Authorization");
-
-            // Check header is null or not starts with "Bearer" scheme
-            // May be don't need authentication: Public endpoint, or client not send token
-            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-                log.debug("No JWT token found in Authorization header");
+            String token = resolveToken(request);
+            if (token == null) {
+                log.debug("No JWT token found in Authorization header or access cookie");
                 filterChain.doFilter(request, response);
                 return;
             }
 
-            // Extract token from Header "Bearer "
-            String token = authHeader.substring(7);
-            log.debug("JWT token extracted from header");
+            log.debug("JWT token extracted from request");
 
             // Check token is valid
             // Ex: header.payload.signature, token expired?, JWT format token is valid?,...
@@ -111,5 +106,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
             log.error("Error in JWT authentication filter: {}", e.getMessage());
             filterChain.doFilter(request, response);
         }
+    }
+
+    private String resolveToken(HttpServletRequest request) {
+        String authHeader = request.getHeader("Authorization");
+        if (authHeader != null && authHeader.startsWith("Bearer ")) {
+            return authHeader.substring(7);
+        }
+
+        return authenticationCookieService.getAccessToken(request).orElse(null);
     }
 }

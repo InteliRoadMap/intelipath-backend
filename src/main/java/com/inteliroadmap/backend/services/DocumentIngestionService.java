@@ -2,9 +2,9 @@ package com.inteliroadmap.backend.services;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.inteliroadmap.backend.domain.entity.RagDocument;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.transformer.splitter.TokenTextSplitter;
-import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -18,8 +18,9 @@ import java.util.Map;
 @Slf4j
 public class DocumentIngestionService {
 
-    private final VectorStore vectorStore;
     private final PdfToMarkdownService pdfToMarkdownService;
+    private final RagDocumentService ragDocumentService;
+    private final RagVectorStoreService ragVectorStoreService;
 
     /**
      * Ingest a PDF file into the Vector DB
@@ -28,7 +29,9 @@ public class DocumentIngestionService {
      */
     public void ingestPdfDocument(MultipartFile file) throws IOException {
         log.info("Starting ingestion for PDF document: {}", file.getOriginalFilename());
+        RagDocument ragDocument = ragDocumentService.startGlobalKnowledge(file);
 
+        try {
         // BƯỚC 1: Dùng GPT-4o-mini Vision để parse PDF → Markdown
         // Thay vì dùng PagePdfDocumentReader (chỉ bóc text thô, mất hết bảng biểu),
         // giờ ta dùng Vision AI để "nhìn" từng trang PDF và xuất ra Markdown chuẩn.
@@ -42,7 +45,7 @@ public class DocumentIngestionService {
         log.info("Split Markdown into {} page-level documents.", documents.size());
 
         // BƯỚC 3: Cắt nhỏ thêm nếu một trang quá dài (> 800 tokens)
-        TokenTextSplitter tokenTextSplitter = new TokenTextSplitter(800, 200, 5, 10000, true);
+        TokenTextSplitter tokenTextSplitter = new TokenTextSplitter(800, 200, 5, 10000, true, List.of());
         List<Document> chunkedDocuments = tokenTextSplitter.apply(documents);
 
         // Thêm metadata
@@ -54,9 +57,17 @@ public class DocumentIngestionService {
         log.info("Split into {} final chunks. Saving to Vector DB...", chunkedDocuments.size());
 
         // BƯỚC 4: Lưu vào VectorStore (tự động gọi EmbeddingModel)
-        vectorStore.accept(chunkedDocuments);
+        ragVectorStoreService.replaceDocumentChunks(ragDocument, chunkedDocuments);
+        ragDocumentService.markCompleted(ragDocument.getDocumentId());
 
         log.info("Successfully ingested PDF document: {}", file.getOriginalFilename());
+        } catch (IOException e) {
+            ragDocumentService.markFailed(ragDocument.getDocumentId(), e);
+            throw e;
+        } catch (Exception e) {
+            ragDocumentService.markFailed(ragDocument.getDocumentId(), e);
+            throw new IllegalStateException("Failed to ingest PDF document", e);
+        }
     }
 
     /**
