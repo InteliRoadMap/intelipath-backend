@@ -63,15 +63,6 @@ spring:
         index-type: HNSW
         distance-type: COSINE_DISTANCE
         dimensions: 1536
-    mcp:
-      client:
-        enabled: ${MCP_DOCUMENT_SERVICE_ENABLED:false}
-        initialized: ${MCP_DOCUMENT_SERVICE_ENABLED:false}
-        request-timeout: ${MCP_DOCUMENT_SERVICE_TIMEOUT:60s}
-        streamable-http:
-          connections:
-            document-tools:
-              url: ${MCP_DOCUMENT_SERVICE_URL:http://localhost:8000}
 
 jwt:
   secret: ${JWT_SECRET}
@@ -90,17 +81,3 @@ springdoc:
 scraper:
   limit: ${SCRAPER_LIMIT}
   topcv-api: ${SCRAPER_API}
-
-app:
-  cors:
-    # Comma-separated exact origins. Do not use * when cookies are enabled.
-    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:3000}
-  security:
-    cookie:
-      # Keep Lax by default. OAuth callbacks are top-level GET navigations, so Lax sends
-      # the short-lived state cookie without requiring a cross-site cookie configuration.
-      # A cross-site setup using None must be HTTPS (secure=true) and add CSRF protection.
-      secure: ${COOKIE_SECURE:false}
-      same-site: ${COOKIE_SAME_SITE:Lax}
-      # Use a dedicated production secret. JWT_SECRET is only a local-development fallback.
-      oauth-secret: ${OAUTH_COOKIE_SECRET:${JWT_SECRET}}

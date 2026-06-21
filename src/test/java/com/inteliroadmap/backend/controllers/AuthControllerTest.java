@@ -2,7 +2,6 @@ package com.inteliroadmap.backend.controllers;
 
 import com.inteliroadmap.backend.domain.dto.response.RefreshResponse;
 import com.inteliroadmap.backend.exceptions.GlobalExceptionHandler;
-import com.inteliroadmap.backend.security.AuthenticationCookieService;
 import com.inteliroadmap.backend.services.AuthService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -27,9 +26,7 @@ class AuthControllerTest {
     @BeforeEach
     void setUp() {
         authService = mock(AuthService.class);
-        mockMvc = MockMvcBuilders.standaloneSetup(
-                        new AuthController(authService, mock(AuthenticationCookieService.class))
-                )
+        mockMvc = MockMvcBuilders.standaloneSetup(new AuthController(authService))
                 .setControllerAdvice(new GlobalExceptionHandler())
                 .build();
     }

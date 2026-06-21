@@ -8,21 +8,6 @@
 
 services:
 
-  ai-service:
-    build:
-      context: ../ai-service
-      dockerfile: Dockerfile
-    container_name: intelipath-ai-service
-    ports:
-      - "8000:8000"
-    healthcheck:
-      test: ["CMD", "curl", "--fail", "http://localhost:8000/"]
-      interval: 10s
-      timeout: 3s
-      retries: 5
-      start_period: 10s
-    restart: unless-stopped
-
   backend:
     build:
       context: .
@@ -33,13 +18,4 @@ services:
 
     env_file:
       - .env
-    environment:
-      AI_SERVICE_BASE_URL: http://ai-service:8000
-      AI_SERVICE_URL: http://ai-service:8000/api/extract
-      SCRAPER_API: http://ai-service:8000/api/v1/scraper/scrape/topcv/
-      MCP_DOCUMENT_SERVICE_ENABLED: "true"
-      MCP_DOCUMENT_SERVICE_URL: http://ai-service:8000
-    depends_on:
-      ai-service:
-        condition: service_healthy
     restart: unless-stopped

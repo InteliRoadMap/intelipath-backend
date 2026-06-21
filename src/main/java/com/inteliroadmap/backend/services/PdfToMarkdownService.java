@@ -7,7 +7,7 @@ import org.apache.pdfbox.rendering.PDFRenderer;
 import org.apache.pdfbox.rendering.ImageType;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.ai.content.Media;
+import org.springframework.ai.chat.messages.Media;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.stereotype.Service;
 import org.springframework.util.MimeTypeUtils;
@@ -210,10 +210,10 @@ public class PdfToMarkdownService {
         Media imageMedia = new Media(MimeTypeUtils.IMAGE_PNG, imageResource);
 
         // Tạo UserMessage kèm ảnh
-        UserMessage userMessage = UserMessage.builder()
-                .text(VISION_PROMPT + "\n\nThis is page " + pageNumber + " of the document.")
-                .media(imageMedia)
-                .build();
+        UserMessage userMessage = new UserMessage(
+                VISION_PROMPT + "\n\nThis is page " + pageNumber + " of the document.",
+                List.of(imageMedia)
+        );
 
         // Gọi ChatClient (GPT-4o-mini Vision) và nhận kết quả
         String markdown = chatClient.prompt()

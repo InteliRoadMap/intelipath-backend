@@ -18,8 +18,10 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.util.*;
 import java.util.stream.Collectors;
+import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.transformer.splitter.TokenTextSplitter;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
@@ -49,8 +51,8 @@ public class StudentService {
     // RAG Dependencies
     private final SupabaseStorageService supabaseStorageService;
     private final PdfToMarkdownService pdfToMarkdownService;
-    private final RagDocumentService ragDocumentService;
-    private final RagVectorStoreService ragVectorStoreService;
+    private final VectorStore vectorStore;
+    private final JdbcTemplate jdbcTemplate;
 
     @Transactional
     public StudentResponse setupStudentProfile(com.inteliroadmap.backend.domain.dto.request.SetupStudentProfileRequest request) {
@@ -266,10 +268,12 @@ public class StudentService {
         String url = supabaseStorageService.uploadTranscript(file, user.getUserId().toString());
         student.setTranscriptUrl(url);
         studentRepository.save(student);
-        RagDocument ragDocument = ragDocumentService.startStudentTranscript(user, url, file);
 
         // 2. RAG processing
         try {
+            // Delete old documents from vector store for this user to avoid duplicates
+            jdbcTemplate.update("DELETE FROM vector_store WHERE metadata->>'userId' = ?", user.getUserId().toString());
+            
             // Convert PDF to Markdown
             String markdown = pdfToMarkdownService.convertToMarkdown(file);
             
@@ -277,12 +281,19 @@ public class StudentService {
             TokenTextSplitter splitter = new TokenTextSplitter();
             List<Document> documents = splitter.split(List.of(new Document(markdown)));
             
-            ragVectorStoreService.replaceDocumentChunks(ragDocument, documents);
-            ragDocumentService.markCompleted(ragDocument.getDocumentId());
-            log.info("Added {} transcript chunks to VectorStore for user {}", documents.size(), user.getUserId());
+            // Add metadata
+            for (Document doc : documents) {
+                doc.getMetadata().put("userId", user.getUserId().toString());
+                doc.getMetadata().put("source", "transcript");
+            }
+            
+            // Save to VectorStore
+            if (!documents.isEmpty()) {
+                vectorStore.add(documents);
+                log.info("Added {} transcript documents to VectorStore for user {}", documents.size(), user.getUserId());
+            }
             
         } catch (Exception e) {
-            ragDocumentService.markFailed(ragDocument.getDocumentId(), e);
             log.error("Failed to process transcript for RAG", e);
             throw new RuntimeException("Failed to process transcript: " + e.getMessage(), e);
         }

@@ -10,6 +10,8 @@ import com.inteliroadmap.backend.repositories.ChatMessageRepository;
 import com.inteliroadmap.backend.repositories.ChatSessionRepository;
 import com.inteliroadmap.backend.repositories.StudentRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
+import com.inteliroadmap.backend.security.JwtService;
+import com.inteliroadmap.backend.utils.BearerTokenUtil;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,14 +21,9 @@ import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
-import org.springframework.ai.chat.prompt.PromptTemplate;
-import org.springframework.ai.mcp.SyncMcpToolCallbackProvider;
+import org.springframework.ai.chat.client.advisor.QuestionAnswerAdvisor;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
-import org.springframework.beans.factory.ObjectProvider;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
@@ -43,28 +40,28 @@ public class VirtualMentorService {
     private final ChatMessageRepository chatMessageRepository;
     private final StudentRepository studentRepository;
     private final UserRepository userRepository;
+    private final JwtService jwtService;
     private final ChatClient chatClient;
     private final VectorStore vectorStore;
-    private final ObjectProvider<SyncMcpToolCallbackProvider> documentToolCallbackProvider;
 
     public VirtualMentorService(ChatSessionRepository chatSessionRepository,
                                 ChatMessageRepository chatMessageRepository,
                                 StudentRepository studentRepository,
                                 UserRepository userRepository,
+                                JwtService jwtService,
                                 ChatClient.Builder chatClientBuilder,
-                                VectorStore vectorStore,
-                                ObjectProvider<SyncMcpToolCallbackProvider> documentToolCallbackProvider) {
+                                VectorStore vectorStore) {
         this.chatSessionRepository = chatSessionRepository;
         this.chatMessageRepository = chatMessageRepository;
         this.studentRepository = studentRepository;
         this.userRepository = userRepository;
+        this.jwtService = jwtService;
         this.vectorStore = vectorStore;
-        this.documentToolCallbackProvider = documentToolCallbackProvider;
         this.chatClient = chatClientBuilder.build();
     }
 
-    public ChatSession createSession(String sessionName) {
-        User user = getAuthenticatedUser();
+    public ChatSession createSession(String authorizationHeader, String sessionName) {
+        User user = getAuthenticatedUser(authorizationHeader);
         
         ChatSession chatSession = ChatSession.builder()
                 .user(user)
@@ -75,13 +72,13 @@ public class VirtualMentorService {
         return chatSessionRepository.save(chatSession);
     }
 
-    public List<ChatSession> getUserSessions() {
-        User user = getAuthenticatedUser();
+    public List<ChatSession> getUserSessions(String authorizationHeader) {
+        User user = getAuthenticatedUser(authorizationHeader);
         return chatSessionRepository.findByUser_UserIdOrderByCreateAtDesc(user.getUserId());
     }
 
-    public List<ChatMessage> getSessionMessages(UUID sessionId) {
-        User user = getAuthenticatedUser();
+    public List<ChatMessage> getSessionMessages(String authorizationHeader, UUID sessionId) {
+        User user = getAuthenticatedUser(authorizationHeader);
         ChatSession session = chatSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Chat session not found"));
                 
@@ -93,8 +90,8 @@ public class VirtualMentorService {
     }
 
     @org.springframework.transaction.annotation.Transactional
-    public ChatSession renameSession(UUID sessionId, String newName) {
-        User user = getAuthenticatedUser();
+    public ChatSession renameSession(String authorizationHeader, UUID sessionId, String newName) {
+        User user = getAuthenticatedUser(authorizationHeader);
         ChatSession session = chatSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Chat session not found"));
 
@@ -107,8 +104,8 @@ public class VirtualMentorService {
     }
 
     @Transactional
-    public void deleteSession(UUID sessionId) {
-        User user = getAuthenticatedUser();
+    public void deleteSession(String authorizationHeader, UUID sessionId) {
+        User user = getAuthenticatedUser(authorizationHeader);
         ChatSession session = chatSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Chat session not found"));
 
@@ -123,8 +120,8 @@ public class VirtualMentorService {
     }
 
     @Transactional
-    public Flux<String> streamChat(UUID sessionId, VirtualMentorChatRequest request) {
-        User user = getAuthenticatedUser();
+    public Flux<String> streamChat(String authorizationHeader, UUID sessionId, VirtualMentorChatRequest request) {
+        User user = getAuthenticatedUser(authorizationHeader);
         ChatSession session = chatSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Chat session not found"));
 
@@ -144,8 +141,7 @@ public class VirtualMentorService {
         // Prepare context for AI
         // 1. System Prompt (Context)
         Student student = studentRepository.findById(user.getUserId()).orElse(null);
-        SyncMcpToolCallbackProvider documentToolCallbacks = documentToolCallbackProvider.getIfAvailable();
-        String systemPrompt = buildSystemPrompt(user, student, documentToolCallbacks != null);
+        String systemPrompt = buildSystemPrompt(user, student);
         // System prompt already built
         // 2. Build Message List
         List<org.springframework.ai.chat.messages.Message> messageHistory = new ArrayList<>();
@@ -171,30 +167,24 @@ public class VirtualMentorService {
         // We use StringBuffer to accumulate the full response for saving to DB
         StringBuffer fullResponse = new StringBuffer();
 
-        ChatClient.ChatClientRequestSpec chatRequest = chatClient.prompt()
+        return chatClient.prompt()
                 .messages(messageHistory)
                 .user(request.getMessage())
                 // [CHỈNH SỬA TẠI ĐÂY - RAG & TÌM KIẾM VECTOR]
                 // Advisor này tự động biến câu hỏi của User thành Vector (dùng EmbeddingModel) 
                 // rồi tìm kiếm trong PostgreSQL những đoạn text giống nhất.
-                // Nếu bạn muốn đổi thuật toán tìm kiếm (vd: chỉnh k=5, threshold=0.8), bạn sửa ở SearchRequest.builder().
-                .advisors(QuestionAnswerAdvisor.builder(vectorStore)
-                        .searchRequest(SearchRequest.builder()
-                                .filterExpression("userId == '" + user.getUserId() + "' || scope == 'GLOBAL'")
-                                .build())
-                        .promptTemplate(new PromptTemplate("{query}\n\n[OPTIONAL RETRIEVED CONTEXT]\n" +
+                // Nếu bạn muốn đổi thuật toán tìm kiếm (vd: chỉnh k=5, threshold=0.8), bạn sửa ở SearchRequest.defaults().
+                .advisors(new org.springframework.ai.chat.client.advisor.QuestionAnswerAdvisor(
+                        vectorStore, 
+                        org.springframework.ai.vectorstore.SearchRequest.defaults()
+                                .withFilterExpression("userId == '" + user.getUserId().toString() + "'"),
+                        "\n\n[OPTIONAL RETRIEVED CONTEXT]\n" +
                                 "---------------------\n" +
                                 "{question_answer_context}\n" +
                                 "---------------------\n" +
-                                "If the above context is relevant to the user's question, use it. Otherwise, ignore it and rely completely on the conversation history, the attached PDF (if any), and your own knowledge. DO NOT say you cannot answer just because the context is empty or irrelevant."))
-                        .build())
-                .toolNames("jobMarketTool", "studentProgressTool", "markItDownTool");
-
-        if (documentToolCallbacks != null) {
-            chatRequest = chatRequest.toolCallbacks(documentToolCallbacks.getToolCallbacks());
-        }
-
-        return chatRequest
+                                "If the above context is relevant to the user's question, use it. Otherwise, ignore it and rely completely on the conversation history, the attached PDF (if any), and your own knowledge. DO NOT say you cannot answer just because the context is empty or irrelevant."
+                ))
+                .functions("jobMarketTool", "studentProgressTool", "markItDownTool")
                 .stream()
                 .content()
                 .doOnNext(fullResponse::append)
@@ -220,7 +210,7 @@ public class VirtualMentorService {
                 });
     }
 
-    private String buildSystemPrompt(User user, Student student, boolean documentExtractionAvailable) {
+    private String buildSystemPrompt(User user, Student student) {
         String university = (student != null && student.getUniversity() != null) ? student.getUniversity().getName() : "Unknown";
         String major = (student != null && student.getMajor() != null) ? student.getMajor() : "Unknown";
         String github = (student != null && student.getGithubProfile() != null) ? student.getGithubProfile() : null;
@@ -242,15 +232,20 @@ public class VirtualMentorService {
             prompt.append("- **GitHub**: ").append(github).append("\n");
         }
         if (transcriptUrl != null) {
-            prompt.append("- **Transcript source URL**: ").append(transcriptUrl).append("\n");
-            prompt.append("- **Transcript RAG status**: already indexed; use retrieved RAG context first.\n");
+            prompt.append("- **Transcript URL**: ").append(transcriptUrl).append("\n");
         }
 
         prompt.append("""
 
                         ## TOOL USAGE — MANDATORY RULES (NON-NEGOTIABLE)
-                        Use tools when they are needed for current, complete, or exact information. Do not claim access to data that a tool did not return.
-
+                        You have access to the following tools. You MUST use them proactively — never tell the user you "cannot access" a file or URL if a tool exists to do it.
+                        
+                        ### `markItDownTool`
+                        - **TRIGGER**: ANY time the user's message contains a URL (http/https) pointing to a PDF, DOCX, image, or any document.
+                        - **ACTION**: IMMEDIATELY call `markItDownTool` with that URL. Do NOT ask the user to paste the content manually.
+                        - **CRITICAL**: If the student's Transcript URL is provided in the context above, call `markItDownTool` on it automatically when the user asks about their grades, GPA, or academic performance — without waiting to be asked.
+                        - **LANGUAGE**: The documents may be in Vietnamese. Extract and interpret all Vietnamese text faithfully, including diacritical marks (ă, â, đ, ê, ô, ơ, ư and tones).
+                        
                         ### `studentProgressTool`
                         - **TRIGGER**: When the user asks about their roadmap, skill progress, completed nodes, or learning path status.
                         - **ACTION**: Call this tool to get real-time data. Do NOT guess or fabricate progress numbers.
@@ -268,7 +263,7 @@ public class VirtualMentorService {
                         6. **No hallucination**: If a tool returns an error or empty data, tell the user honestly instead of making things up.
                         
                         ## ABSOLUTE PROHIBITIONS
-                        - NEVER claim that a document was read if `extract_document` was unavailable or did not return content.
+                        - NEVER say "I don't have access to your file" if the user has shared a URL — use `markItDownTool`.
                         - NEVER invent roadmap progress numbers — use `studentProgressTool`.
                         - NEVER refuse to answer career questions by claiming lack of knowledge — use available tools and your training data.
 
@@ -278,30 +273,12 @@ public class VirtualMentorService {
                         - Example: if tool returns `[TOOL_ERROR] service unavailable`, tell user: "Hiện tại dịch vụ đọc tài liệu đang bảo trì, bạn vui lòng thử lại sau nhé."
                         """);
 
-        if (documentExtractionAvailable) {
-            prompt.append("""
-
-                            ## DOCUMENT RETRIEVAL POLICY — THIS OVERRIDES ANY EARLIER DOCUMENT-TOOL INSTRUCTION
-                            - The available document tool is `extract_document`.
-                            - For a URL explicitly included in the user's current message, call `extract_document` when its contents are needed.
-                            - The transcript source URL in student context is already indexed for RAG. For ordinary grade, GPA, or course questions, answer from retrieved RAG context first.
-                            - Call `extract_document` with the transcript source URL only if the user explicitly requests complete/exhaustive document detail, or the retrieved RAG context lacks the exact required information.
-                            - Never call the document tool merely because a transcript URL exists in student context.
-                            """);
-        }
-
         return prompt.toString();
     }
 
-    private User getAuthenticatedUser() {
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication == null || !authentication.isAuthenticated()
-                || authentication.getName() == null || authentication.getName().isBlank()
-                || "anonymousUser".equals(authentication.getName())) {
-            throw new ResourceNotFoundException("Cannot extract user from security context");
-        }
-
-        String email = authentication.getName();
+    private User getAuthenticatedUser(String authorizationHeader) {
+        String token = BearerTokenUtil.extractToken(authorizationHeader);
+        String email = jwtService.extractEmail(token);
         User user = userRepository.findByEmail(email);
         if (user == null) {
             throw new ResourceNotFoundException("User not found");
