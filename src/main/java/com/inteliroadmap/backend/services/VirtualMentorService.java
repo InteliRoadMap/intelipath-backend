@@ -224,6 +224,7 @@ public class VirtualMentorService {
                         
                         ## STUDENT CONTEXT
                         """);
+        prompt.append("- **User ID**: ").append(user.getUserId()).append("\n");
         prompt.append("- **Name**: ").append(user.getFullName()).append("\n");
         prompt.append("- **University**: ").append(university).append("\n");
         prompt.append("- **Major**: ").append(major).append("\n");

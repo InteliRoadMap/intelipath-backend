@@ -39,9 +39,12 @@ public class StudentDashboardService {
      */
     @Transactional
     public DashboardRoadmapProgressResponse getRoadmapProgress() {
-        log.info("Student Dashboard Module: Fetching roadmap progress");
+        return getRoadmapProgress(getCurrentStudent());
+    }
 
-        Student student = getCurrentStudent();
+    @Transactional
+    public DashboardRoadmapProgressResponse getRoadmapProgress(Student student) {
+        log.info("Student Dashboard Module: Fetching roadmap progress");
         if (student == null || student.getCareerRole() == null) {
             return DashboardRoadmapProgressResponse.builder().build();
         }
@@ -82,9 +85,12 @@ public class StudentDashboardService {
      */
     @Transactional
     public List<SkillGapItemResponse> getSkillGaps() {
-        log.info("Student Dashboard Module: Fetching skill gaps");
+        return getSkillGaps(getCurrentStudent());
+    }
 
-        Student student = getCurrentStudent();
+    @Transactional
+    public List<SkillGapItemResponse> getSkillGaps(Student student) {
+        log.info("Student Dashboard Module: Fetching skill gaps");
         if (student == null || student.getCareerRole() == null) {
             return List.of();
         }
