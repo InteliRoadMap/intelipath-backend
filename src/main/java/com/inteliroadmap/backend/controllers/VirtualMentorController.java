@@ -96,7 +96,7 @@ public class VirtualMentorController {
                 .collect(Collectors.toList()));
     }
 
-    @PostMapping(value = "/sessions/{sessionId}/stream", produces = "text/event-stream")
+    @PostMapping(value = "/sessions/{sessionId}/stream", produces = "text/event-stream;charset=UTF-8")
     @Operation(summary = "Stream chat with AI Virtual Mentor")
     public Flux<String> streamChat(
             @RequestHeader("Authorization") String authorizationHeader,
