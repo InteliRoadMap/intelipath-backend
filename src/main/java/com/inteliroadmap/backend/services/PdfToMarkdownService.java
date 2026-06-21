@@ -52,6 +52,11 @@ public class PdfToMarkdownService {
             1. Output raw Markdown only. No code fences (```markdown), no explanations, no preamble.
             2. If the page is blank or completely unreadable, output exactly: <!-- empty page -->
             
+            LANGUAGE (CRITICAL):
+            - This document may contain Vietnamese text. You MUST preserve ALL Vietnamese diacritical marks exactly as shown in the image.
+            - This includes characters like: ă â đ ê ô ơ ư and all tone marks (ắ ặ ấ ầ ề ộ ứ ự...).
+            - NEVER substitute or drop diacritical marks. "Toan" and "Toán" are different words.
+            
             TEXT & SPACING:
             - Reproduce all text accurately. Ensure there is a proper space between distinct words, numbers, and symbols.
             - Use # / ## / ### for headings only when the source document visually uses a title or section header.
