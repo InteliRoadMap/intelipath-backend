@@ -12,6 +12,7 @@ import com.inteliroadmap.backend.repositories.StudentRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.security.JwtService;
 import com.inteliroadmap.backend.utils.BearerTokenUtil;
+import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
@@ -102,7 +103,7 @@ public class VirtualMentorService {
         return chatSessionRepository.save(session);
     }
 
-    @org.springframework.transaction.annotation.Transactional
+    @Transactional
     public void deleteSession(String authorizationHeader, UUID sessionId) {
         User user = getAuthenticatedUser(authorizationHeader);
         ChatSession session = chatSessionRepository.findById(sessionId)
@@ -118,7 +119,7 @@ public class VirtualMentorService {
         chatSessionRepository.delete(session);
     }
 
-    @org.springframework.transaction.annotation.Transactional
+    @Transactional
     public Flux<String> streamChat(String authorizationHeader, UUID sessionId, VirtualMentorChatRequest request) {
         User user = getAuthenticatedUser(authorizationHeader);
         ChatSession session = chatSessionRepository.findById(sessionId)
@@ -179,9 +180,9 @@ public class VirtualMentorService {
                                 .withFilterExpression("userId == '" + user.getUserId().toString() + "'"),
                         "\n\n[OPTIONAL RETRIEVED CONTEXT]\n" +
                                 "---------------------\n" +
-                        "{question_answer_context}\n" +
-                        "---------------------\n" +
-                        "If the above context is relevant to the user's question, use it. Otherwise, ignore it and rely completely on the conversation history, the attached PDF (if any), and your own knowledge. DO NOT say you cannot answer just because the context is empty or irrelevant."
+                                "{question_answer_context}\n" +
+                                "---------------------\n" +
+                                "If the above context is relevant to the user's question, use it. Otherwise, ignore it and rely completely on the conversation history, the attached PDF (if any), and your own knowledge. DO NOT say you cannot answer just because the context is empty or irrelevant."
                 ))
                 .functions("jobMarketTool", "studentProgressTool", "markItDownTool")
                 .stream()
