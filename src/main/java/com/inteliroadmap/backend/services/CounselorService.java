@@ -127,6 +127,10 @@ public class CounselorService {
     @Transactional
     public CounselorResponse getStudentInfos(String search) {
         log.info("Get students info request received");
+
+        AcademicCounselor counselor = getAuthenticatedCounselor();
+        String uni = counselor.getUniversity();
+
         List<Student> students;
         if (search == null || search.trim().isEmpty()) {
             students = studentRepository.findAll();
@@ -136,6 +140,10 @@ public class CounselorService {
         List<Map<String, Object>> stInfos = new ArrayList<>();
 
         for(Student student: students) {
+            if (uni != null && !uni.equals(student.getUniversity())) {
+                continue;
+            }
+
             User userSt = userRepository.findByUserId(student.getUserId());
             if (userSt.getRole() != UserRole.STUDENT) continue;
 

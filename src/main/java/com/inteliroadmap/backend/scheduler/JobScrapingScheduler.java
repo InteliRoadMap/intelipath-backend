@@ -43,7 +43,7 @@ public class JobScrapingScheduler {
 
     // Runs every Monday at 9:00 AM
     @Scheduled(cron = "0 0 9 * * Mon")
-    @EventListener(org.springframework.boot.context.event.ApplicationReadyEvent.class)
+//    @EventListener(org.springframework.boot.context.event.ApplicationReadyEvent.class)
     @Transactional
     public void fetchJobsFromPython() {
         int limit = scraperLimit; // Define a default limit or configure it

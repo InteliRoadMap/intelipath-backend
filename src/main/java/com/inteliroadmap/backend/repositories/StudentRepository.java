@@ -23,6 +23,8 @@ public interface StudentRepository extends JpaRepository<Student, UUID> {
     Student findByUserId(UUID userId);
     List<Student> findByCareerRole(CareerRole careerRole);
 
+
+
     @Query("SELECT s FROM Student s, User u WHERE s.userId = u.userId AND (LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(s.university) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(s.careerRole.careerName) LIKE LOWER(CONCAT('%', :search, '%')))")
     List<Student> searchStudentsInfo(@Param("search") String search);
 

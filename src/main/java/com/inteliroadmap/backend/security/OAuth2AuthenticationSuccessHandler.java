@@ -4,6 +4,7 @@ import com.inteliroadmap.backend.domain.entity.RefreshToken;
 import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.repositories.RefreshTokenRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
+import com.inteliroadmap.backend.utils.CookieUtils;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -88,9 +89,10 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
             refreshTokenRepository.save(token);
         }
 
+        CookieUtils.addNonHttpOnlyCookie(response, "token", accessToken, 60);
+        CookieUtils.addNonHttpOnlyCookie(response, "refreshToken", refreshToken, 60);
+
         return UriComponentsBuilder.fromUriString(authorizedRedirectUri)
-                .queryParam("token", accessToken)
-                .queryParam("refreshToken", refreshToken)
                 .build().toUriString();
     }
 }
