@@ -15,6 +15,6 @@ public class CreateFeedbackRequest {
     @NotBlank(message = "Content is required")
     private String content;
 
-    @NotBlank(message = "Type is required")
+    @NotNull(message = "Type is required")
     private FeedbackType type;
 }

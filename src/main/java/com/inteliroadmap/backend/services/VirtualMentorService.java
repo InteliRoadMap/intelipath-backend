@@ -15,13 +15,11 @@ import com.inteliroadmap.backend.utils.BearerTokenUtil;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.messages.Message;
-import org.springframework.ai.chat.messages.SystemMessage;
-import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.ai.chat.messages.AssistantMessage;
-import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.chat.client.advisor.QuestionAnswerAdvisor;
+import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
+import org.springframework.ai.chat.prompt.PromptTemplate;
+import org.springframework.ai.mcp.SyncMcpToolCallbackProvider;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.stereotype.Service;
@@ -43,6 +41,7 @@ public class VirtualMentorService {
     private final JwtService jwtService;
     private final ChatClient chatClient;
     private final VectorStore vectorStore;
+    private final ObjectProvider<SyncMcpToolCallbackProvider> mcpToolCallbackProvider;
 
     public VirtualMentorService(ChatSessionRepository chatSessionRepository,
                                 ChatMessageRepository chatMessageRepository,
@@ -50,13 +49,15 @@ public class VirtualMentorService {
                                 UserRepository userRepository,
                                 JwtService jwtService,
                                 ChatClient.Builder chatClientBuilder,
-                                VectorStore vectorStore) {
+                                VectorStore vectorStore,
+                                ObjectProvider<SyncMcpToolCallbackProvider> mcpToolCallbackProvider) {
         this.chatSessionRepository = chatSessionRepository;
         this.chatMessageRepository = chatMessageRepository;
         this.studentRepository = studentRepository;
         this.userRepository = userRepository;
         this.jwtService = jwtService;
         this.vectorStore = vectorStore;
+        this.mcpToolCallbackProvider = mcpToolCallbackProvider;
         this.chatClient = chatClientBuilder.build();
     }
 
@@ -89,7 +90,7 @@ public class VirtualMentorService {
         return chatMessageRepository.findByChatSession_SessionIdOrderByCreateAtAsc(sessionId);
     }
 
-    @org.springframework.transaction.annotation.Transactional
+    @Transactional
     public ChatSession renameSession(String authorizationHeader, UUID sessionId, String newName) {
         User user = getAuthenticatedUser(authorizationHeader);
         ChatSession session = chatSessionRepository.findById(sessionId)
@@ -141,7 +142,8 @@ public class VirtualMentorService {
         // Prepare context for AI
         // 1. System Prompt (Context)
         Student student = studentRepository.findById(user.getUserId()).orElse(null);
-        String systemPrompt = buildSystemPrompt(user, student);
+        SyncMcpToolCallbackProvider documentTools = mcpToolCallbackProvider.getIfAvailable();
+        String systemPrompt = buildSystemPrompt(user, student, documentTools != null);
         // System prompt already built
         // 2. Build Message List
         List<org.springframework.ai.chat.messages.Message> messageHistory = new ArrayList<>();
@@ -153,7 +155,6 @@ public class VirtualMentorService {
         List<ChatMessage> previousMessages = chatMessageRepository.findByChatSession_SessionIdOrderByCreateAtAsc(sessionId);
         for (int i = 0; i < previousMessages.size(); i++) {
             ChatMessage msg = previousMessages.get(i);
-            // Skip the VERY LAST message if it's the one we just saved
             if (i == previousMessages.size() - 1 && "USER".equalsIgnoreCase(msg.getRole()) && msg.getContent().equals(request.getMessage())) {
                 continue;
             }
@@ -164,27 +165,33 @@ public class VirtualMentorService {
             }
         }
         
-        // We use StringBuffer to accumulate the full response for saving to DB
         StringBuffer fullResponse = new StringBuffer();
 
-        return chatClient.prompt()
+        var prompt = chatClient.prompt()
                 .messages(messageHistory)
                 .user(request.getMessage())
-                // [CHỈNH SỬA TẠI ĐÂY - RAG & TÌM KIẾM VECTOR]
-                // Advisor này tự động biến câu hỏi của User thành Vector (dùng EmbeddingModel) 
-                // rồi tìm kiếm trong PostgreSQL những đoạn text giống nhất.
-                // Nếu bạn muốn đổi thuật toán tìm kiếm (vd: chỉnh k=5, threshold=0.8), bạn sửa ở SearchRequest.defaults().
-                .advisors(new org.springframework.ai.chat.client.advisor.QuestionAnswerAdvisor(
-                        vectorStore, 
-                        org.springframework.ai.vectorstore.SearchRequest.defaults()
-                                .withFilterExpression("userId == '" + user.getUserId().toString() + "'"),
-                        "\n\n[OPTIONAL RETRIEVED CONTEXT]\n" +
-                                "---------------------\n" +
-                                "{question_answer_context}\n" +
-                                "---------------------\n" +
-                                "If the above context is relevant to the user's question, use it. Otherwise, ignore it and rely completely on the conversation history, the attached PDF (if any), and your own knowledge. DO NOT say you cannot answer just because the context is empty or irrelevant."
-                ))
-                .functions("jobMarketTool", "studentProgressTool", "markItDownTool")
+                .advisors(QuestionAnswerAdvisor.builder(vectorStore)
+                        .searchRequest(SearchRequest.builder()
+                                .filterExpression("scope == 'GLOBAL' || userId == '" + user.getUserId() + "'")
+                                .build())
+                        .promptTemplate(new PromptTemplate("""
+                                {query}
+
+                                [OPTIONAL RETRIEVED CONTEXT]
+                                ---------------------
+                                {question_answer_context}
+                                ---------------------
+                                Use the retrieved context when relevant. If it is empty or insufficient, be transparent
+                                and use an available tool only when current or full-document data is necessary.
+                                """))
+                        .build())
+                .toolNames("jobMarketTool", "studentProgressTool");
+
+        if (documentTools != null) {
+            prompt = prompt.toolCallbacks(documentTools.getToolCallbacks());
+        }
+
+        return prompt
                 .stream()
                 .content()
                 .doOnNext(fullResponse::append)
@@ -210,7 +217,7 @@ public class VirtualMentorService {
                 });
     }
 
-    private String buildSystemPrompt(User user, Student student) {
+    private String buildSystemPrompt(User user, Student student, boolean documentToolsAvailable) {
         String university = (student != null && student.getUniversity() != null) ? student.getUniversity().getName() : "Unknown";
         String major = (student != null && student.getMajor() != null) ? student.getMajor() : "Unknown";
         String github = (student != null && student.getGithubProfile() != null) ? student.getGithubProfile() : null;
@@ -236,11 +243,10 @@ public class VirtualMentorService {
         }
 
         prompt.append("""
-
                         ## TOOL USAGE — MANDATORY RULES (NON-NEGOTIABLE)
                         You have access to the following tools. You MUST use them proactively — never tell the user you "cannot access" a file or URL if a tool exists to do it.
                         
-                        ### `markItDownTool`
+                        ### Legacy `markItDownTool` (not available to this chat)
                         - **TRIGGER**: ANY time the user's message contains a URL (http/https) pointing to a PDF, DOCX, image, or any document.
                         - **ACTION**: IMMEDIATELY call `markItDownTool` with that URL. Do NOT ask the user to paste the content manually.
                         - **CRITICAL**: If the student's Transcript URL is provided in the context above, call `markItDownTool` on it automatically when the user asks about their grades, GPA, or academic performance — without waiting to be asked.
@@ -272,6 +278,21 @@ public class VirtualMentorService {
                         - Do NOT expose the raw `[TOOL_ERROR]` tag to the user.
                         - Example: if tool returns `[TOOL_ERROR] service unavailable`, tell user: "Hiện tại dịch vụ đọc tài liệu đang bảo trì, bạn vui lòng thử lại sau nhé."
                         """);
+
+        prompt.append("""
+                        ## DOCUMENT RETRIEVAL POLICY
+                        The legacy `markItDownTool` section above is retained only for backward compatibility and is
+                        not available to this chat. Do not attempt to call it.
+                        """);
+        if (documentToolsAvailable) {
+            prompt.append("""
+                            The available document tool is `extract_document`.
+                            Use it only for a public URL explicitly supplied by the user when full-document detail is
+                            needed or the retrieved RAG context is insufficient. For ordinary transcript questions,
+                            use retrieved RAG context first; do not extract a complete transcript merely because its
+                            URL appears in student context.
+                            """);
+        }
 
         return prompt.toString();
     }

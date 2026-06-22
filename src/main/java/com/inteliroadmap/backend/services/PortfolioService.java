@@ -33,6 +33,7 @@ public class PortfolioService {
     private final StudentSkillRepository studentSkillRepository;
     private final StudentRepository studentRepository;
     private final UserRepository userRepository;
+    private final com.inteliroadmap.backend.repositories.PortfolioReviewRequestRepository portfolioReviewRequestRepository;
 
     @Transactional(readOnly = true)
     public PortfolioResponse getPortfolio() {
@@ -64,6 +65,30 @@ public class PortfolioService {
         Optional<User> userOpt = userRepository.findById(student.getUserId());
         if (userOpt.isEmpty()) {
             log.error("[PortfolioService] User not found for ID: {}", student.getUserId());
+            throw new ResourceNotFoundException("User not found");
+        }
+        User user = userOpt.get();
+
+        PortfolioConfig config = portfolioConfigRepository.findByUser(student);
+        List<StudentSkill> skills = studentSkillRepository.findByStudent(student);
+        List<PortfolioProject> projects = portfolioProjectRepository.findByUser(user);
+        List<StudentEducation> education = studentEducationRepository.findByUser(student);
+
+        return portfolioMapper.toPortfolioResponse(user, student, config, skills, projects, education);
+    }
+
+    @Transactional(readOnly = true)
+    public PortfolioResponse getPortfolioByStudentId(UUID studentId) {
+        Optional<Student> studentOpt = studentRepository.findById(studentId);
+        if (studentOpt.isEmpty()) {
+            log.error("[PortfolioService] Student not found for ID: {}", studentId);
+            throw new ResourceNotFoundException("Student not found for ID: " + studentId);
+        }
+        Student student = studentOpt.get();
+
+        Optional<User> userOpt = userRepository.findById(studentId);
+        if (userOpt.isEmpty()) {
+            log.error("[PortfolioService] User not found for ID: {}", studentId);
             throw new ResourceNotFoundException("User not found");
         }
         User user = userOpt.get();
@@ -121,5 +146,29 @@ public class PortfolioService {
         studentEducationRepository.saveAll(newEducation);
     }
 
+    @Transactional
+    public void requestReview(com.inteliroadmap.backend.domain.dto.request.RequestReviewRequest request) {
+        Student student = AuthenticatedStudentService.getRequiredStudent();
+        User mentor = userRepository.findByEmail(request.getEmail());
+        if (mentor == null || mentor.getRole() != com.inteliroadmap.backend.domain.enums.UserRole.MENTOR) {
+            throw new ResourceNotFoundException("Mentor not found with email: " + request.getEmail());
+        }
 
+        boolean exists = portfolioReviewRequestRepository.existsByStudent_UserIdAndMentor_UserIdAndStatus(
+                student.getUserId(),
+                mentor.getUserId(),
+                com.inteliroadmap.backend.domain.enums.ReviewStatus.PENDING
+        );
+
+        if (exists) {
+            throw new IllegalArgumentException("A pending review request already exists for this mentor.");
+        }
+
+        com.inteliroadmap.backend.domain.entity.PortfolioReviewRequest reviewReq = new com.inteliroadmap.backend.domain.entity.PortfolioReviewRequest();
+        reviewReq.setStudent(userRepository.findById(student.getUserId()).orElseThrow());
+        reviewReq.setMentor(mentor);
+        reviewReq.setStatus(com.inteliroadmap.backend.domain.enums.ReviewStatus.PENDING);
+        
+        portfolioReviewRequestRepository.save(reviewReq);
+    }
 }

@@ -13,6 +13,7 @@ import java.util.Map;
 import java.util.function.Function;
 
 @Slf4j
+@Deprecated(forRemoval = false)
 @Service("markItDownTool")
 @Description("Use this tool to read and extract text from ANY document URL (PDF, DOCX, XLSX, PPTX, Images). Provide the full public URL of the document.")
 public class MarkItDownTool implements Function<MarkItDownTool.Request, String> {

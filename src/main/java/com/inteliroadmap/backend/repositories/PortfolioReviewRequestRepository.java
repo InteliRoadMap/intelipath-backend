@@ -19,6 +19,8 @@ public interface PortfolioReviewRequestRepository extends JpaRepository<Portfoli
 
     Page<PortfolioReviewRequest> findByMentor_UserIdAndStatus(UUID mentorId, ReviewStatus status, Pageable pageable);
 
+    boolean existsByStudent_UserIdAndMentor_UserIdAndStatus(UUID studentId, UUID mentorId, ReviewStatus status);
+
     @Query(value = "SELECT AVG(EXTRACT(EPOCH FROM (r.resolved_at - r.create_at))) FROM portfolio_review_requests r " +
             "WHERE r.mentor_id = :mentorId AND r.status = 'REVIEWED'", nativeQuery = true)
     Double getAverageResponseTimeInSecondsByMentorId(@Param("mentorId") UUID mentorId);

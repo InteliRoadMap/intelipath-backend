@@ -32,6 +32,8 @@ public class MentorService {
     private final StudentRepository studentRepository;
     private final StudentProgressRepository studentProgressRepository;
     private final SkillNodeRepository skillNodeRepository;
+    private final IndustryMentorRepository industryMentorRepository;
+    private final RoadmapService roadmapService;
 
     private User getAuthenticatedMentor() {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -98,35 +100,26 @@ public class MentorService {
     }
 
     @Transactional
-    public Page<MentorPendingReviewDto> getPendingReviews(Pageable pageable) {
+    public Page<MentorPendingReviewResponse> getPendingReviews(Pageable pageable) {
         User mentor = getAuthenticatedMentor();
         Page<PortfolioReviewRequest> requests = reviewRequestRepository.findByMentor_UserIdAndStatus(mentor.getUserId(), ReviewStatus.PENDING, pageable);
         
-        List<MentorPendingReviewDto> dtos = requests.getContent().stream().map(req -> {
+        List<MentorPendingReviewResponse> dtos = requests.getContent().stream().map(req -> {
             Student student = studentRepository.findById(req.getStudent().getUserId()).orElse(null);
             User studentUser = userRepository.findById(req.getStudent().getUserId()).orElse(null);
             
             String name = studentUser != null ? studentUser.getFullName() : "Unknown";
+            String yob = studentUser != null && studentUser.getYob() != null ? String.valueOf(studentUser.getYob().getYear()) : "Unknown";
             String major = student != null && student.getUniversity() != null ? student.getUniversity().getName() : "Unknown";
             String career = student != null && student.getCareerRole() != null ? student.getCareerRole().getCareerName() : "Unknown";
             
-            int progress = 0;
-            if (student != null && student.getCareerRole() != null) {
-                int completed = studentProgressRepository.findRoadmapTotalNodeCompletedByCareerIdAndStudentId(student.getCareerRole().getCareerId(), student.getUserId());
-                List<SkillNode> allNodes = skillNodeRepository.findAll();
-                long total = allNodes.stream().filter(n -> n.getCareerRole() != null && n.getCareerRole().getCareerId().equals(student.getCareerRole().getCareerId())).count();
-                progress = total == 0 ? 0 : (int) (completed * 100 / total);
-            }
-            
-            return MentorPendingReviewDto.builder()
-                    .id(req.getStudent().getUserId().toString())
-                    .initials(getInitials(name))
-                    .name(name)
-                    .status("Pending review")
-                    .major(major)
-                    .year("Senior") // Hardcoded for now as year is not tracked
-                    .role(career)
-                    .progress(progress)
+            return MentorPendingReviewResponse.builder()
+                    .id(req.getRequestId().toString())
+                    .studentId(req.getStudent().getUserId().toString())
+                    .studentName(name)
+                    .yob(yob)
+                    .targetCareer(career)
+                    .university(major)
                     .build();
         }).collect(Collectors.toList());
         
@@ -162,6 +155,71 @@ public class MentorService {
         }
 
         return new PageImpl<>(dtos, pageable, studentUsersPage.getTotalElements());
+    }
+
+    @Transactional
+    public List<MentorCareerDistributionResponse> getCareerDistribution() {
+        User mentor = getAuthenticatedMentor();
+        // Use unpaged to get all students for calculation
+        Page<User> studentUsersPage = reviewRequestRepository.findDistinctStudentsByMentorId(mentor.getUserId(), Pageable.unpaged());
+        
+        List<UUID> userIds = studentUsersPage.getContent().stream().map(User::getUserId).collect(Collectors.toList());
+        List<Student> students = studentRepository.findAllById(userIds);
+        
+        Map<String, Long> careerCounts = students.stream()
+                .filter(s -> s.getCareerRole() != null)
+                .collect(Collectors.groupingBy(s -> s.getCareerRole().getCareerName(), Collectors.counting()));
+                
+        String[] colors = {"#0088FE", "#00C49F", "#FFBB28", "#FF8042", "#8884d8", "#8dd1e1"};
+        int colorIdx = 0;
+        
+        List<MentorCareerDistributionResponse> distribution = new ArrayList<>();
+        long totalCount = students.stream().filter(s -> s.getCareerRole() != null).count();
+        
+        for (Map.Entry<String, Long> entry : careerCounts.entrySet()) {
+            int percentage = totalCount == 0 ? 0 : (int) (entry.getValue() * 100 / totalCount);
+            distribution.add(MentorCareerDistributionResponse.builder()
+                    .name(entry.getKey())
+                    .value(percentage)
+                    .color(colors[colorIdx % colors.length])
+                    .build());
+            colorIdx++;
+        }
+        
+        return distribution;
+    }
+
+    @Transactional
+    public MentorProfileResponse getMentorProfile() {
+        User mentor = getAuthenticatedMentor();
+        IndustryMentor industryMentor = industryMentorRepository.findById(mentor.getUserId()).orElse(null);
+        return MentorProfileResponse.builder()
+                .userId(mentor.getUserId())
+                .email(mentor.getEmail())
+                .fullName(mentor.getFullName())
+                .yob(mentor.getYob())
+                .bio(mentor.getBio())
+                .avatar(mentor.getAvatarUrl())
+                .role(mentor.getRole().name())
+                .company(industryMentor != null ? industryMentor.getCompany() : null)
+                .industryFocus(industryMentor != null ? industryMentor.getIndustryFocus() : null)
+                .build();
+    }
+
+    @Transactional
+    public MentorProfileResponse updateMentorProfile(com.inteliroadmap.backend.domain.dto.request.UpdateMentorProfileRequest request) {
+        User mentor = getAuthenticatedMentor();
+        IndustryMentor industryMentor = industryMentorRepository.findById(mentor.getUserId()).orElse(null);
+        if (industryMentor == null) {
+            industryMentor = IndustryMentor.builder()
+                    .userId(mentor.getUserId())
+                    .build();
+        }
+        industryMentor.setCompany(request.getCompany());
+        industryMentor.setIndustryFocus(request.getIndustryFocus());
+        industryMentorRepository.save(industryMentor);
+
+        return getMentorProfile();
     }
 
     @Transactional

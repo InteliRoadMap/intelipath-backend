@@ -9,13 +9,11 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class MentorPendingReviewDto {
+public class MentorPendingReviewResponse {
     private String id;
-    private String initials;
-    private String name;
-    private String status;
-    private String major;
-    private String year;
-    private String role;
-    private int progress;
+    private String studentId;
+    private String studentName;
+    private String yob;
+    private String targetCareer;
+    private String university;
 }

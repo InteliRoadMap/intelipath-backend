@@ -56,4 +56,20 @@ public class PortfolioController {
         return ResponseEntity.ok(portfolioService.upsertPortfolio(request));
     }
 
+    @PostMapping("/request-review")
+    @Operation(summary = "Request Portfolio Review", description = "Send a review request to a mentor by their email")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Review request sent successfully"),
+            @ApiResponse(responseCode = "400", description = "Invalid payload or request already exists"),
+            @ApiResponse(responseCode = "404", description = "Mentor not found")
+    })
+    public ResponseEntity<java.util.Map<String, Object>> requestReview(
+            @RequestBody @Valid com.inteliroadmap.backend.domain.dto.request.RequestReviewRequest request) {
+        log.info("Request received: Request Portfolio Review to {}", request.getEmail());
+        portfolioService.requestReview(request);
+        return ResponseEntity.ok(java.util.Map.of(
+                "success", true,
+                "message", "Review request sent successfully."
+        ));
+    }
 }

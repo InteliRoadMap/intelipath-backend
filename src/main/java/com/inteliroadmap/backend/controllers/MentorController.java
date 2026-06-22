@@ -49,14 +49,20 @@ public class MentorController {
 
     @GetMapping("/dashboard/pending-reviews")
     @Operation(summary = "Get Pending Reviews", description = "Get list of pending review requests with pagination")
-    public ResponseEntity<Page<MentorPendingReviewDto>> getPendingReviews(
+    public ResponseEntity<Page<MentorPendingReviewResponse>> getPendingReviews(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         Pageable pageable = PageRequest.of(page, size);
         return ResponseEntity.ok(mentorService.getPendingReviews(pageable));
     }
 
-    @GetMapping("/dashboard/students")
+    @GetMapping("/dashboard/career-distribution")
+    @Operation(summary = "Get Career Distribution", description = "Get data for career distribution chart of mentees")
+    public ResponseEntity<java.util.List<MentorCareerDistributionResponse>> getCareerDistribution() {
+        return ResponseEntity.ok(mentorService.getCareerDistribution());
+    }
+
+    @GetMapping("/feedback/students")
     @Operation(summary = "Get Student List", description = "Get list of students with pagination")
     public ResponseEntity<Page<MentorStudentDto>> getStudentInfos(
             @RequestParam(defaultValue = "0") int page,
@@ -65,7 +71,7 @@ public class MentorController {
         return ResponseEntity.ok(mentorService.getStudentInfos(pageable));
     }
 
-    @GetMapping("/dashboard/feedback/history")
+    @GetMapping("/feedback/history")
     @Operation(summary = "Get Feedback History", description = "Get list of feedbacks sent by mentor")
     public ResponseEntity<Page<MentorFeedbackHistoryDto>> getFeedbackHistory(
             @RequestParam(defaultValue = "0") int page,
@@ -85,5 +91,17 @@ public class MentorController {
     public ResponseEntity<MentorResponse> submitFeedback(@RequestBody @Valid CreateFeedbackRequest request) {
         log.info("Mentor submit feedback request received");
         return ResponseEntity.ok(mentorService.submitFeedback(request));
+    }
+
+    @GetMapping("/profile")
+    @Operation(summary = "Get Mentor Profile", description = "Get profile information of the authenticated mentor")
+    public ResponseEntity<MentorProfileResponse> getMentorProfile() {
+        return ResponseEntity.ok(mentorService.getMentorProfile());
+    }
+
+    @PatchMapping("/profile")
+    @Operation(summary = "Update Mentor Profile", description = "Update professional information (company, industry focus) of the authenticated mentor")
+    public ResponseEntity<MentorProfileResponse> updateMentorProfile(@RequestBody @Valid com.inteliroadmap.backend.domain.dto.request.UpdateMentorProfileRequest request) {
+        return ResponseEntity.ok(mentorService.updateMentorProfile(request));
     }
 }

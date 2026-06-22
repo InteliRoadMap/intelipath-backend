@@ -6,13 +6,13 @@ WORKDIR /app
 
 # Copy the pom.xml and download dependencies
 COPY pom.xml .
-RUN mvn dependency:go-offline -B
+RUN mvn -B -q dependency:go-offline
 
 # Copy the source code
 COPY src ./src
 
 # Package the application (skip tests for faster build in docker)
-RUN mvn clean package -DskipTests
+RUN mvn -B -q clean package -DskipTests
 
 # Stage 2: Run the application using a lightweight JRE image
 FROM eclipse-temurin:21-jre-alpine

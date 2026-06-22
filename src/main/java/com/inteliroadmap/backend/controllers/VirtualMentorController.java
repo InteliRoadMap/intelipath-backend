@@ -108,7 +108,7 @@ public class VirtualMentorController {
 
     @PostMapping("/files/upload")
     @Operation(summary = "Upload a file for chat context",
-               description = "Uploads the file to Supabase Storage and returns the public URL. The AI will call MarkItDownTool automatically to read the content when needed.")
+               description = "Uploads the file to Supabase Storage and returns the public URL. Send that URL in chat when full-document extraction is needed.")
     public ResponseEntity<Map<String, String>> uploadChatFile(
             @RequestParam("file") MultipartFile file) {
         log.info("Uploading chat file: {}", file.getOriginalFilename());

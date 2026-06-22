@@ -63,6 +63,16 @@ spring:
         index-type: HNSW
         distance-type: COSINE_DISTANCE
         dimensions: 1536
+    mcp:
+      client:
+        enabled: ${MCP_DOCUMENT_SERVICE_ENABLED:false}
+        initialized: ${MCP_DOCUMENT_SERVICE_ENABLED:false}
+        request-timeout: ${MCP_DOCUMENT_SERVICE_TIMEOUT:60s}
+        streamable-http:
+          connections:
+            document-tools:
+              # Spring's Streamable-HTTP client appends its MCP endpoint path (/mcp).
+              url: ${MCP_DOCUMENT_SERVICE_URL:http://localhost:8000}
 
 jwt:
   secret: ${JWT_SECRET}

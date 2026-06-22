@@ -42,13 +42,15 @@ public class DocumentIngestionService {
         log.info("Split Markdown into {} page-level documents.", documents.size());
 
         // BƯỚC 3: Cắt nhỏ thêm nếu một trang quá dài (> 800 tokens)
-        TokenTextSplitter tokenTextSplitter = new TokenTextSplitter(800, 200, 5, 10000, true);
+        TokenTextSplitter tokenTextSplitter = new TokenTextSplitter(800, 200, 5, 10000, true, List.of());
         List<Document> chunkedDocuments = tokenTextSplitter.apply(documents);
 
         // Thêm metadata
         for (Document doc : chunkedDocuments) {
             doc.getMetadata().put("file_name", file.getOriginalFilename());
             doc.getMetadata().put("content_type", "markdown");
+            // Knowledge uploaded by an admin is shared reference material, not student-private data.
+            doc.getMetadata().put("scope", "GLOBAL");
         }
 
         log.info("Split into {} final chunks. Saving to Vector DB...", chunkedDocuments.size());

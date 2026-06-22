@@ -195,7 +195,9 @@ public class CounselorService {
 
                 List<SkillNode> nodes = nodesByCareerId.getOrDefault(careerRole.getCareerId(), new ArrayList<>());
 
-                int progress = nodes.isEmpty() ? 0 : totalNodeCompleted * 100 / nodes.size();
+                // Keep the same rounding rule as the student's primary roadmap API.
+                int progress = nodes.isEmpty() ? 0
+                        : (int) Math.round(((double) totalNodeCompleted / nodes.size()) * 100);
                 stInfo.put("roadmapProgress", progress);
 
                 // For missing skills, keeping original query since it's complex to batch without modifying Repository
@@ -237,7 +239,9 @@ public class CounselorService {
 
                 List<SkillNode> nodes = skillNodeRepository.findByCareerRole_CareerId(careerRole.getCareerId());
 
-                int progress = nodes.isEmpty() ? 0 : totalNodeCompleted * 100 / nodes.size();
+                // Keep the same rounding rule as the student's primary roadmap API.
+                int progress = nodes.isEmpty() ? 0
+                        : (int) Math.round(((double) totalNodeCompleted / nodes.size()) * 100);
                 stInfo.put("roadmapProgress", progress);
 
                 List<DatasetMapper> missingSkills = studentSkillRepository

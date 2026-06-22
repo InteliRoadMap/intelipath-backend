@@ -1,0 +1,68 @@
+package com.inteliroadmap.backend.security;
+
+import com.inteliroadmap.backend.utils.CookieUtils;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.ResponseCookie;
+import org.springframework.stereotype.Component;
+
+import java.time.Duration;
+import java.util.Optional;
+
+/** Handles the HTTP-only cookies used by the OAuth2 login flow. */
+@Component
+@RequiredArgsConstructor
+public class AuthenticationCookieService {
+
+    public static final String ACCESS_TOKEN_COOKIE_NAME = "access_token";
+    public static final String REFRESH_TOKEN_COOKIE_NAME = "refresh_token";
+
+    private final JwtService jwtService;
+
+    @Value("${app.security.cookie.secure:false}")
+    private boolean secure;
+
+    @Value("${app.security.cookie.same-site:Lax}")
+    private String sameSite;
+
+    public void addAuthenticationCookies(
+            HttpServletResponse response,
+            String accessToken,
+            String refreshToken
+    ) {
+        addCookie(response, ACCESS_TOKEN_COOKIE_NAME, accessToken, jwtService.getAccessExpiration(), "/");
+        addCookie(response, REFRESH_TOKEN_COOKIE_NAME, refreshToken, jwtService.getRefreshExpiration(), "/api/v1/auth/refresh");
+    }
+
+    public Optional<String> getAccessToken(HttpServletRequest request) {
+        return CookieUtils.getCookie(request, ACCESS_TOKEN_COOKIE_NAME)
+                .map(cookie -> cookie.getValue())
+                .filter(value -> !value.isBlank());
+    }
+
+    public Optional<String> getRefreshToken(HttpServletRequest request) {
+        return CookieUtils.getCookie(request, REFRESH_TOKEN_COOKIE_NAME)
+                .map(cookie -> cookie.getValue())
+                .filter(value -> !value.isBlank());
+    }
+
+    private void addCookie(
+            HttpServletResponse response,
+            String name,
+            String value,
+            long maxAgeMillis,
+            String path
+    ) {
+        ResponseCookie cookie = ResponseCookie.from(name, value)
+                .httpOnly(true)
+                .secure(secure)
+                .sameSite(sameSite)
+                .path(path)
+                .maxAge(Duration.ofMillis(maxAgeMillis))
+                .build();
+        response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+    }
+}
