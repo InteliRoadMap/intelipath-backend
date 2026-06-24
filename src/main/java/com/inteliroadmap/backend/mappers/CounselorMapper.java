@@ -1,10 +1,12 @@
 package com.inteliroadmap.backend.mappers;
 
 import com.inteliroadmap.backend.domain.dto.response.CounselorResponse;
+import com.inteliroadmap.backend.domain.dto.response.FeedbackResponse;
 import com.inteliroadmap.backend.domain.dto.response.UpdateProfileResponse;
 import com.inteliroadmap.backend.domain.entity.*;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -13,34 +15,63 @@ public class CounselorMapper {
     public CounselorResponse toRoadmapStatisticResponse(int total, Map<String, Integer> careerStatistics) {
         return CounselorResponse.builder()
                 .total(total)
-                .careerStatistics(careerStatistics)
+                .totalCareerStatistics(careerStatistics)
                 .build();
     }
 
     public CounselorResponse toMissingSkillsResponse(int total, Map<String, Integer> missingSkills, String careerName) {
         return CounselorResponse.builder()
                 .total(total)
-                .missingSkills(missingSkills)
+                .totalMissingSkills(missingSkills)
                 .careerName(careerName)
                 .build();
     }
 
-    public CounselorResponse getStudentInfos(List<Map<String, Object>> stInfos) {
+    public CounselorResponse toGetStudentInfos(List<Map<String, Object>> stInfos) {
         return CounselorResponse.builder()
                 .students(stInfos)
                 .build();
     }
 
     public CounselorResponse toGetFeedbacksResponse(List<Feedback> feedbacks, int total) {
+        List<FeedbackResponse> dtos = feedbacks.stream()
+                .map(this::mapFeedbackToResponse)
+                .toList();
         return CounselorResponse.builder()
-                .feedbacks(feedbacks)
+                .feedbacks(dtos)
                 .total(total)
+                .build();
+    }
+
+    public CounselorResponse toGetStudentStatisticAndFeedback(int progress, List<String> missingSkills, List<Feedback> feedbacks) {
+        List<FeedbackResponse> fr = new ArrayList<>();
+        for (Feedback feedback : feedbacks) {
+            fr.add(mapFeedbackToResponse(feedback));
+        }
+
+        return CounselorResponse.builder()
+                .roadmapProgress(progress)
+                .missingSkills(missingSkills)
+                .feedbacks(fr)
                 .build();
     }
 
     public CounselorResponse toCrudFeedbackResponse(Feedback feedback) {
         return CounselorResponse.builder()
-                .feedback(feedback)
+                .feedback(mapFeedbackToResponse(feedback))
+                .build();
+    }
+
+    private FeedbackResponse mapFeedbackToResponse(Feedback f) {
+        return FeedbackResponse.builder()
+                .feedbackId(f.getFeedbackId())
+                .senderId(f.getSender() != null ? f.getSender().getUserId() : null)
+                .receiverId(f.getReceiver() != null ? f.getReceiver().getUserId() : null)
+                .senderName(f.getSenderName())
+                .content(f.getContent())
+                .type(f.getType())
+                .createAt(f.getCreateAt())
+                .updateAt(f.getUpdateAt())
                 .build();
     }
 

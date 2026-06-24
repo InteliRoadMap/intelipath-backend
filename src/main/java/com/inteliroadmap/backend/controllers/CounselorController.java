@@ -139,15 +139,15 @@ public class CounselorController {
         return ResponseEntity.ok(counselorService.getStudentInfos(search));
     }
 
-    @GetMapping("/feedback/{studentId}")
+    @GetMapping("/feedback/student/info/{studentId}")
     @Operation(
-            summary = "Get feedback history of a student",
-            description = "Get feedback history between a student and a counselor"
+            summary = "Get student info",
+            description = "Get student statistic and feedbacks info"
     )
     @ApiResponses(value = {
             @ApiResponse(
                     responseCode = "200",
-                    description = "Feedbacks retrieved successfully",
+                    description = "Statistic And Feedback retrieved successfully",
                     content = @Content(
                             mediaType = "application/json",
                             schema = @Schema(implementation = CounselorResponse.class)
@@ -158,9 +158,9 @@ public class CounselorController {
                     description = "Unauthorized or invalid token"
             )
     })
-    public ResponseEntity<CounselorResponse> getFeedbacksHistoryWithStudent(@PathVariable UUID studentId) {
-        log.info("Get feedback history request received");
-        return ResponseEntity.ok(counselorService.getFeedbacksHistoryWithStudent(studentId));
+    public ResponseEntity<CounselorResponse> getStudentStatisticAndFeedback(@PathVariable UUID studentId) {
+        log.info("Get statistic and feedback request received");
+        return ResponseEntity.ok(counselorService.getStudentStatisticAndFeedback(studentId));
     }
 
     @PostMapping("/feedback/create")

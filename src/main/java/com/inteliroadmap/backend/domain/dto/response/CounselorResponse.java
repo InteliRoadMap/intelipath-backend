@@ -15,10 +15,13 @@ import java.util.Map;
 @Builder
 public class CounselorResponse {
     private int total;
-    private Map<String, Integer> careerStatistics;
-    private Map<String, Integer> missingSkills;
+    private Map<String, Integer> totalCareerStatistics;
+    private Map<String, Integer> totalMissingSkills;
     private String careerName;
-    private List<Feedback> feedbacks;
-    private Feedback feedback;
+    private List<FeedbackResponse> feedbacks;
+    private FeedbackResponse feedback;
     private List<Map<String, Object>> students;
+    private Map<String, Object> studentInfo;
+    private List<String> missingSkills;
+    private int roadmapProgress;
 }

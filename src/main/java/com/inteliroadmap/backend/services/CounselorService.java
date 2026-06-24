@@ -5,10 +5,8 @@ import com.inteliroadmap.backend.domain.dto.request.UpdateProfileRequest;
 import com.inteliroadmap.backend.domain.dto.response.CounselorResponse;
 import com.inteliroadmap.backend.domain.dto.response.UpdateProfileResponse;
 import com.inteliroadmap.backend.domain.entity.*;
-import com.inteliroadmap.backend.domain.enums.UserRole;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.mappers.CounselorMapper;
-import com.inteliroadmap.backend.mappers.DatasetMapper;
 import com.inteliroadmap.backend.repositories.*;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -16,9 +14,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
-import java.time.LocalDate;
 import java.util.*;
-import java.util.stream.Collectors;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -85,39 +82,27 @@ public class CounselorService {
         log.info("Get students skill gap of a career request received");
         getAuthenticatedCounselor();
 
-        Map<String, Integer> totalMissingSkills = new HashMap<>();
-        int totalStudent = 0;
-        String previousStudent = "";
-
-        List<DatasetMapper> missingSkillsData;
-
-        List<CareerRole> matchingCareers = careerRoleRepository.findByCareerNameContainingIgnoreCase(searchName);
+        List<CareerRole> matchingCareers = careerRoleRepository
+                .findByCareerNameContainingIgnoreCase(searchName);
         if (matchingCareers.isEmpty()) {
             throw new ResourceNotFoundException("No career found matching your search.");
         } else if (matchingCareers.size() > 1) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Multiple careers found. Please type a more specific search.");
         }
-
         CareerRole matchedCareer = matchingCareers.getFirst();
-        missingSkillsData = studentSkillRepository.findMissingSkillsByCareerId(matchedCareer.getCareerId());
 
-        for(DatasetMapper row : missingSkillsData) {
-            String skillName = row.getSkillName();
-            Integer number =  totalMissingSkills.get(skillName);
+        List<Object[]> missingSkillsData = studentSkillRepository
+                .findMissingSkillsByCareerId(matchedCareer.getCareerId());
 
-            if(number == null) {
-                totalMissingSkills.put(skillName, 1);
-            } else {
-                number += 1;
-                totalMissingSkills.put(skillName, number);
-            }
+        Map<String, Integer> totalMissingSkills = new HashMap<>();
+        for (Object[] row : missingSkillsData) {
+            String skillName = (String) row[0];
+            Integer count = ((Number) row[1]).intValue();
 
-            String currentStudent = row.getFullName();
-            if(!previousStudent.equals(currentStudent)) {
-                totalStudent += 1;
-                previousStudent = currentStudent;
-            }
+            totalMissingSkills.put(skillName, count);
         }
+
+        int totalStudent = studentRepository.findByCareerRole(matchedCareer).size();
 
         log.info("Get students skill gap of a career successfully");
         return counselorMapper
@@ -125,27 +110,30 @@ public class CounselorService {
     }
 
     @Transactional
+    public CounselorResponse getAllFeedbacksSentToMe() {
+        log.info("Get feedback request received");
+        AcademicCounselor counselor = getAuthenticatedCounselor();
+        User me = userRepository.findByUserId(counselor.getUserId());
+
+        List<Feedback> feedbacks = feedbackRepository.findByReceiver(me);
+
+        log.info("Get feedback successfully");
+        return counselorMapper.toGetFeedbacksResponse(feedbacks, feedbacks.size());
+    }
+
+    @Transactional
     public CounselorResponse getStudentInfos(String search) {
         log.info("Get students info request received");
+        if (search == null) search = "";
 
         AcademicCounselor counselor = getAuthenticatedCounselor();
         String uni = counselor.getUniversity();
 
-        List<Student> students;
-        if (search == null || search.trim().isEmpty()) {
-            students = studentRepository.findAll();
-        } else {
-            students = studentRepository.searchStudentsInfo(search);
-        }
+        List<Student> students = studentRepository.searchStudentsInfo(search, uni);
         List<Map<String, Object>> stInfos = new ArrayList<>();
 
         for(Student student: students) {
-            if (uni != null && !uni.equals(student.getUniversity())) {
-                continue;
-            }
-
             User userSt = userRepository.findByUserId(student.getUserId());
-            if (userSt.getRole() != UserRole.STUDENT) continue;
 
             Map<String, Object> stInfo = new HashMap<>();
             stInfo.put("studentId", student.getUserId());
@@ -153,68 +141,48 @@ public class CounselorService {
             stInfo.put("email", userSt.getEmail());
             stInfo.put("university", student.getUniversity());
 
-            CareerRole careerRole = student.getCareerRole();
-            if (careerRole == null) {
-                stInfo.put("careerPath", null);
-                stInfo.put("roadmapProgress", 0);
-                stInfo.put("missingSkills", new ArrayList<>());
-            } else {
-                stInfo.put("careerPath", careerRole.getCareerName());
-
-                int totalNodeCompleted = studentProgressRepository
-                        .findRoadmapTotalNodeCompletedByCareerId(careerRole.getCareerId());
-
-                List<SkillNode> nodes = skillNodeRepository.findByCareerRole_CareerId(careerRole.getCareerId());
-
-                int progress = nodes.isEmpty() ? 0 : totalNodeCompleted * 100 / nodes.size();
-                stInfo.put("roadmapProgress", progress);
-
-                List<DatasetMapper> missingSkills = studentSkillRepository
-                        .findMissingSkillsByStudentIdAndCareerName(
-                                student.getUserId(),
-                                careerRole.getCareerName()
-                        );
-                List<String> missingSkillNames = missingSkills.stream()
-                        .map(DatasetMapper::getSkillName).collect(Collectors.toList());
-                stInfo.put("missingSkills", missingSkillNames);
-            }
+            CareerRole stCareer = student.getCareerRole();
+            stInfo.put("careerPath", (stCareer == null) ? null : stCareer.getCareerName());
 
             stInfos.add(stInfo);
-            log.info(stInfos.toString());
+            log.info(stInfo.toString());
         }
 
         log.info("Get students info successfully");
-        return counselorMapper.getStudentInfos(stInfos);
+        return counselorMapper.toGetStudentInfos(stInfos);
     }
 
     @Transactional
-    public CounselorResponse getAllFeedbacksSentToMe() {
-        log.info("Get feedback request received");
-        User counselorUser = getAuthenticatedUser();
+    public CounselorResponse getStudentStatisticAndFeedback(UUID studentId) {
+        log.info("Getting student statistic and feedback...");
 
-        List<Feedback> feedbacks = feedbackRepository.findByReceiver(counselorUser);
+        AcademicCounselor counselor = getAuthenticatedCounselor();
+        User me = userRepository.findByUserId(counselor.getUserId());
+        User st = userRepository.findByUserId(studentId);
+        Student student = studentRepository.findByUserId(studentId);
 
-        log.info("Get feedback successfully");
-        return counselorMapper.toGetFeedbacksResponse(feedbacks, feedbacks.size());
-    }
+        int nodesCompleted = studentProgressRepository
+                .findRoadmapTotalNodeCompletedByStudentIdAndCareerId(
+                        student.getUserId(),
+                        student.getCareerRole().getCareerId()
+                );
 
-    @Transactional
-    public CounselorResponse getFeedbacksHistoryWithStudent(UUID studentId) {
-        log.info("Getting feedback history...");
+        int totalRoadmapNode = skillNodeRepository
+                .findTotalNodeOfRoadmap(student.getCareerRole().getCareerId());
 
-        User counselorUser = getAuthenticatedUser();
+        int progress = (totalRoadmapNode == 0) ? 0 : nodesCompleted / totalRoadmapNode;
 
-        User student = userRepository.findByUserId(studentId);
+        List<String> missingSkillNames = studentSkillRepository
+                .findMissingSkillsByStudentIdAndCareerId(
+                        student.getUserId(),
+                        student.getCareerRole().getCareerId()
+                );
 
         List<Feedback> feedbacks = feedbackRepository
-                .findBySenderOrReceiverOrderByCreateAtDesc(student, student);
+                .findBySenderOrReceiverOrderByCreateAtDesc(me, st);
 
-        feedbacks.removeIf(f ->
-                !(f.getSender().equals(counselorUser) && f.getReceiver().equals(student)) &&
-                !(f.getSender().equals(student) && f.getReceiver().equals(counselorUser)));
-
-        log.info("Get feedback history successfully");
-        return counselorMapper.toGetFeedbacksResponse(feedbacks, feedbacks.size());
+        log.info("Get student statistic and feedback successfully");
+        return counselorMapper.toGetStudentStatisticAndFeedback(progress, missingSkillNames, feedbacks);
     }
 
     @Transactional
