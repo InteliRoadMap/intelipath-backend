@@ -5,6 +5,7 @@ import com.inteliroadmap.backend.security.OAuth2AuthenticationFailureHandler;
 import com.inteliroadmap.backend.security.OAuth2AuthenticationSuccessHandler;
 import com.inteliroadmap.backend.security.HttpCookieOAuth2AuthorizationRequestRepository;
 import com.inteliroadmap.backend.security.JwtAuthenticationFilter;
+import com.inteliroadmap.backend.services.impl.OAuth2UserServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -26,7 +27,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
-    private final com.inteliroadmap.backend.services.OAuth2UserService oAuth2UserService;
+    private final OAuth2UserServiceImpl oAuth2UserService;
     private final OAuth2AuthenticationSuccessHandler oAuth2AuthenticationSuccessHandler;
     private final OAuth2AuthenticationFailureHandler oAuth2AuthenticationFailureHandler;
     private final HttpCookieOAuth2AuthorizationRequestRepository httpCookieOAuth2AuthorizationRequestRepository;

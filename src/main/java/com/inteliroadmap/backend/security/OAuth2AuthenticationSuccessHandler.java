@@ -83,8 +83,8 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         if (user != null) {
             RefreshToken token = RefreshToken.builder()
                     .token(refreshToken)
-                    .user(user)
-                    .expireAt(LocalDateTime.now().plus(Duration.ofMillis(jwtService.getRefreshExpiration())))
+                    .userId(user.getUserId())
+                    .expiredAt(LocalDateTime.now().plus(Duration.ofMillis(jwtService.getRefreshExpiration())))
                     .build();
             refreshTokenRepository.save(token);
         }

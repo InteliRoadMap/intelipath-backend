@@ -22,9 +22,11 @@ public class OauthAccount {
     @Column(name = "oauth_acc_id")
     private UUID oauthAccountId;
 
-    @ManyToOne
-    @JoinColumn(name = "user_id", nullable = false)
-    private User user;
+//    @ManyToOne
+//    @JoinColumn(name = "user_id", nullable = false)
+//    private User user;
+    @Column(name = "user_id", nullable = false)
+    private UUID userId;
 
     @Column(name = "provider_id", nullable = false)
     private String providerId;
@@ -32,3 +34,4 @@ public class OauthAccount {
     @Column(name = "provider_name", nullable = false)
     private String providerName;
 }
+

@@ -11,12 +11,13 @@ import java.util.UUID;
 
 @Repository
 public interface SkillNodeRepository extends JpaRepository<SkillNode, UUID> {
+    SkillNode findByNodeId(UUID nodeId);
     SkillNode findByNodeName(String nodeName);
-    List<SkillNode> findByCareerRole_CareerId(UUID careerId);
-    List<SkillNode> findByCareerRole_CareerIdOrderByLevelAscNodeNameAsc(UUID careerId);
-    List<SkillNode> findBySkillIdAndCareerRole_CareerId(UUID skillId, UUID careerId);
+    List<SkillNode> findByCareerId(UUID careerId);
+    List<SkillNode> findByCareerIdOrderByNodeLevelAscNodeNameAsc(UUID careerId);
+    List<SkillNode> findBySkillIdAndCareerId(UUID skillId, UUID careerId);
 
-    @Query("SELECT COUNT(sn) FROM SkillNode sn WHERE sn.careerRole.careerId = :careerId")
+    @Query("SELECT COUNT(sn) FROM SkillNode sn WHERE sn.careerId = :careerId")
     int findTotalNodeOfRoadmap(@Param("careerId") UUID careerId);
 
 }

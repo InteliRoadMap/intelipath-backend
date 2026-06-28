@@ -22,13 +22,16 @@ public class SkillTrend {
     @Column(name = "trend_id")
     private UUID trendId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "skill_id", nullable = false, foreignKey = @ForeignKey(name = "fk_strd_skill"))
-    private Skill skill;
+//    @ManyToOne(fetch = FetchType.LAZY)
+//    @JoinColumn(name = "skill_id", nullable = false, foreignKey = @ForeignKey(name = "fk_strd_skill"))
+//    private Skill skill;
+    @Column(name = "skill_id", nullable = false)
+    private UUID skillId;
 
     @Column(name = "jobs_needed")
     private Integer jobsNeeded;
 
-    @Column(name = "week_stack")
-    private LocalDate weekStack;
+    @Column(name = "week_stamp")
+    private LocalDate weekStamp;
 }
+

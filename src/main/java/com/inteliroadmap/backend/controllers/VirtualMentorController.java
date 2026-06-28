@@ -137,17 +137,17 @@ public class VirtualMentorController {
                 .sessionId(session.getSessionId())
                 .userId(session.getUser().getUserId())
                 .sessionName(session.getSessionName())
-                .createAt(session.getCreateAt())
+                .createAt(session.getCreatedAt())
                 .build();
     }
 
     private VirtualMentorMessageResponse mapToMessageResponse(ChatMessage message) {
         return VirtualMentorMessageResponse.builder()
                 .messageId(message.getMessageId())
-                .sessionId(message.getChatSession().getSessionId())
+                .sessionId(message.getSessionId())
                 .role(message.getRole())
                 .content(message.getContent())
-                .createAt(message.getCreateAt())
+                .createAt(message.getCreatedAt())
                 .build();
     }
 }

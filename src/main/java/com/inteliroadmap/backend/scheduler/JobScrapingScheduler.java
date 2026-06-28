@@ -67,8 +67,9 @@ public class JobScrapingScheduler {
                 company.setCompanyLink(cDto.getCompanyLink());
                 company.setLogo(cDto.getLogo());
                 company.setName(cDto.getName());
-                company.setIntroduction(cDto.getIntroduction());
-                company.setInfo(cDto.getInfo());
+                if (company.getInfo() == null) company.setInfo(new java.util.HashMap<>());
+                if (cDto.getInfo() != null) company.getInfo().putAll((java.util.Map) cDto.getInfo());
+                if (cDto.getIntroduction() != null) company.getInfo().put("introduction", cDto.getIntroduction());
                 company.setContact(cDto.getContact());
                 companyRepository.save(company);
             }
@@ -79,17 +80,23 @@ public class JobScrapingScheduler {
                 Recruitment recruitment = recruitmentRepository.findById(rDto.getRecruitmentId()).orElse(new Recruitment());
                 recruitment.setTopCvRecruitmentId(rDto.getRecruitmentId());
                 recruitment.setRecruitmentLink(rDto.getRecruitmentLink());
-                recruitment.setTitle(rDto.getTitle());
-                recruitment.setSalary(rDto.getSalary());
-                recruitment.setLocation(rDto.getLocation());
-                recruitment.setExperience(rDto.getExperience());
+                
+                if (recruitment.getBasicInfo() == null) recruitment.setBasicInfo(new java.util.HashMap<>());
+                if (rDto.getTitle() != null) recruitment.getBasicInfo().put("title", rDto.getTitle());
+                if (rDto.getSalary() != null) recruitment.getBasicInfo().put("salary", rDto.getSalary());
+                if (rDto.getLocation() != null) recruitment.getBasicInfo().put("location", rDto.getLocation());
+                if (rDto.getExperience() != null) recruitment.getBasicInfo().put("experience", rDto.getExperience());
+
                 if (rDto.getApplicationDeadline() != null) {
                     recruitment.setApplicationDeadline(LocalDate.parse(rDto.getApplicationDeadline(), formatter));
                 }
-                recruitment.setTags(rDto.getTags());
-                recruitment.setDescriptions(rDto.getDescriptions());
-                recruitment.setGeneralInfos(rDto.getGeneralInfos());
-                recruitment.setRelatedTags(rDto.getRelatedTags());
+
+                if (recruitment.getDescriptions() == null) recruitment.setDescriptions(new java.util.HashMap<>());
+                if (rDto.getTags() != null) recruitment.getDescriptions().put("tags", rDto.getTags());
+                if (rDto.getDescriptions() != null) recruitment.getDescriptions().putAll(rDto.getDescriptions());
+                if (rDto.getGeneralInfos() != null) recruitment.getDescriptions().put("generalInfos", rDto.getGeneralInfos());
+                if (rDto.getRelatedTags() != null) recruitment.getDescriptions().put("relatedTags", rDto.getRelatedTags());
+
                 recruitmentRepository.save(recruitment);
             }
 
@@ -99,18 +106,19 @@ public class JobScrapingScheduler {
                 Recruitment rec = recruitmentRepository.findById(pDto.getRecruitmentId()).orElse(null);
                 
                 if (comp != null && rec != null) {
-                    RecruitmentPost existingPost = recruitmentPostRepository.findFirstByCompanyAndRecruitment(comp, rec);
+                    RecruitmentPost existingPost = recruitmentPostRepository
+                            .findFirstByCompanyIdAndRecruitmentId(comp.getTopCvCompanyId(), rec.getTopCvRecruitmentId());
                     if (existingPost == null) {
                         RecruitmentPost post = new RecruitmentPost();
-                        post.setCompany(comp);
-                        post.setRecruitment(rec);
+                        post.setCompanyId(comp.getTopCvCompanyId());
+                        post.setRecruitmentId(rec.getTopCvRecruitmentId());
                         if (pDto.getExpireAt() != null) {
-                            post.setExpireAt(LocalDate.parse(pDto.getExpireAt(), formatter));
+                            post.setExpiredAt(LocalDate.parse(pDto.getExpireAt(), formatter));
                         }
                         recruitmentPostRepository.save(post);
                     } else {
                         if (pDto.getExpireAt() != null) {
-                            existingPost.setExpireAt(LocalDate.parse(pDto.getExpireAt(), formatter));
+                            existingPost.setExpiredAt(LocalDate.parse(pDto.getExpireAt(), formatter));
                             recruitmentPostRepository.save(existingPost);
                         }
                     }

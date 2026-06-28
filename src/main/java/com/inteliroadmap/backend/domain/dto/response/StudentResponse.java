@@ -20,7 +20,7 @@ public class StudentResponse {
     private LocalDate yob;
     private String bio;
     private String university;
-    private LocalDate yearOfAdmission;
+    private Integer yearOfAdmission;
     private String major;
     private String githubProfile;
     private String role;

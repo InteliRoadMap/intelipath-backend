@@ -5,6 +5,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
 
 import java.util.UUID;
 
@@ -21,9 +22,11 @@ public class PortfolioProject {
     @Column(name = "project_id")
     private UUID projectId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false, foreignKey = @ForeignKey(name = "fk_pp_user"))
-    private User user;
+//    @ManyToOne(fetch = FetchType.LAZY)
+//    @JoinColumn(name = "user_id", nullable = false, foreignKey = @ForeignKey(name = "fk_pp_user"))
+//    private User user;
+    @Column(name = "user_id", nullable = false)
+    private UUID userId;
 
     @Column(name = "repo_id")
     private Long repoId;
@@ -48,7 +51,8 @@ public class PortfolioProject {
     @Builder.Default
     private Integer stars = 0;
 
-    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
+    @JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "tech_stack", columnDefinition = "jsonb")
     private java.util.Map<String, Object> techStack;
 }
+

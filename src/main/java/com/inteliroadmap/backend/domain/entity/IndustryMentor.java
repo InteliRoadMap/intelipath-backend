@@ -26,3 +26,4 @@ public class IndustryMentor {
     @Column(name = "industry_focus")
     private String industryFocus;
 }
+

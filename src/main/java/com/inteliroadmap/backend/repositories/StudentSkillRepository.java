@@ -12,10 +12,9 @@ import java.util.UUID;
 
 @Repository
 public interface StudentSkillRepository extends JpaRepository<StudentSkill, UUID> {
-    List<StudentSkill> findByStudent(Student student);
-    List<StudentSkill> findByStudent_UserId(UUID userId);
-    List<StudentSkill> findByStudentAndSkill_SkillIdIn(Student student, List<UUID> skillIds);
-    boolean existsByStudentAndSkill(Student student, com.inteliroadmap.backend.domain.entity.Skill skill);
+    List<StudentSkill> findByStudentId(UUID studentId);
+    List<StudentSkill> findByStudentIdAndSkillIdIn(UUID studentId, List<UUID> skillIds);
+    boolean existsByStudentIdAndSkillId(UUID studentId, UUID skillId);
 
     @Query(value = "SELECT s.skill_name as skillName, COUNT(st.user_id) as count FROM students st JOIN career_roles cr ON st.career_id = cr.career_id JOIN career_required_skills crs ON crs.career_id = cr.career_id JOIN skills s ON crs.skill_id = s.skill_id LEFT JOIN student_skills ss ON ss.user_id = st.user_id AND ss.skill_id = crs.skill_id WHERE ss.skill_id IS NULL AND cr.career_id = :careerId GROUP BY s.skill_name", nativeQuery = true)
     List<Object[]> findMissingSkillsByCareerId(@Param("careerId") UUID careerId);

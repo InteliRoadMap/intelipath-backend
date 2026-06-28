@@ -27,9 +27,11 @@ public class CounselorMapper {
                 .build();
     }
 
-    public CounselorResponse toGetStudentInfos(List<Map<String, Object>> stInfos) {
+    public CounselorResponse toGetStudentInfos(List<Map<String, Object>> stInfos, int totalPages, int currentPage) {
         return CounselorResponse.builder()
                 .students(stInfos)
+                .totalPages(totalPages)
+                .currentPage(currentPage)
                 .build();
     }
 
@@ -44,34 +46,26 @@ public class CounselorMapper {
     }
 
     public CounselorResponse toGetStudentStatisticAndFeedback(int progress, List<String> missingSkills, List<Feedback> feedbacks) {
-        List<FeedbackResponse> fr = new ArrayList<>();
-        for (Feedback feedback : feedbacks) {
-            fr.add(mapFeedbackToResponse(feedback));
-        }
-
+        List<FeedbackResponse> dtos = feedbacks.stream()
+                .map(this::mapFeedbackToResponse)
+                .toList();
         return CounselorResponse.builder()
                 .roadmapProgress(progress)
                 .missingSkills(missingSkills)
-                .feedbacks(fr)
-                .build();
-    }
-
-    public CounselorResponse toCrudFeedbackResponse(Feedback feedback) {
-        return CounselorResponse.builder()
-                .feedback(mapFeedbackToResponse(feedback))
+                .feedbacks(dtos)
                 .build();
     }
 
     private FeedbackResponse mapFeedbackToResponse(Feedback f) {
         return FeedbackResponse.builder()
                 .feedbackId(f.getFeedbackId())
-                .senderId(f.getSender() != null ? f.getSender().getUserId() : null)
-                .receiverId(f.getReceiver() != null ? f.getReceiver().getUserId() : null)
+                .senderId(f.getSenderId())
+                .receiverId(f.getReceiverId())
                 .senderName(f.getSenderName())
                 .content(f.getContent())
                 .type(f.getType())
-                .createAt(f.getCreateAt())
-                .updateAt(f.getUpdateAt())
+                .createdAt(f.getCreatedAt())
+                .updatedAt(f.getUpdatedAt())
                 .build();
     }
 

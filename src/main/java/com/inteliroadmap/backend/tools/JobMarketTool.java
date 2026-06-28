@@ -34,10 +34,10 @@ public class JobMarketTool implements Function<JobMarketTool.Request, JobMarketT
 
         List<JobData> jobs = recruitments.stream()
                 .map(r -> new JobData(
-                        r.getTitle(),
-                        r.getSalary(),
-                        r.getLocation(),
-                        r.getExperience(),
+                        r.getBasicInfo() != null ? (String) r.getBasicInfo().get("title") : null,
+                        r.getBasicInfo() != null ? (String) r.getBasicInfo().get("salary") : null,
+                        r.getBasicInfo() != null ? (String) r.getBasicInfo().get("location") : null,
+                        r.getBasicInfo() != null ? (String) r.getBasicInfo().get("experience") : null,
                         r.getRecruitmentLink()
                 ))
                 .collect(Collectors.toList());

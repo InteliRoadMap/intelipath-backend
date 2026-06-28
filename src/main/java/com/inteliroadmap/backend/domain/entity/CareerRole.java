@@ -1,5 +1,6 @@
 package com.inteliroadmap.backend.domain.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -14,7 +15,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@com.fasterxml.jackson.annotation.JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class CareerRole {
 
     @Id
@@ -31,3 +32,4 @@ public class CareerRole {
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 }
+

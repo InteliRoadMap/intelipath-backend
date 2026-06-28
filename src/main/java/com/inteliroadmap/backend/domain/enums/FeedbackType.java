@@ -5,7 +5,8 @@ import com.fasterxml.jackson.annotation.JsonCreator;
 public enum FeedbackType {
     GENERAL,
     SKILL,
-    CAREER;
+    CAREER,
+    PORTFOLIO;
 
     @JsonCreator
     public static ImportanceLevel fromString(String value) {

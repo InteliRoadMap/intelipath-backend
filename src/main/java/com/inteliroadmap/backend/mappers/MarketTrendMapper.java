@@ -21,7 +21,7 @@ public class MarketTrendMapper {
                 .name(company.getName())
                 .logo(company.getLogo())
                 .companyLink(company.getCompanyLink())
-                .recruitmentCount(company.getRecruitmentPosts() != null ? company.getRecruitmentPosts().size() : 0)
+                .recruitmentCount(0)
                 .build();
     }
 
@@ -30,7 +30,7 @@ public class MarketTrendMapper {
             return null;
         }
         return MarketTrendResponse.TrendDataPoint.builder()
-                .date(skillTrend.getWeekStack())
+                .date(skillTrend.getWeekStamp())
                 .jobsNeeded(skillTrend.getJobsNeeded() != null ? skillTrend.getJobsNeeded() : 0)
                 .build();
     }
@@ -44,7 +44,7 @@ public class MarketTrendMapper {
         }
 
         List<MarketTrendResponse.TrendDataPoint> dataPoints = skillTrends.stream()
-                .sorted(Comparator.comparing(SkillTrend::getWeekStack))
+                .sorted(Comparator.comparing(SkillTrend::getWeekStamp))
                 .map(this::toTrendDataPoint)
                 .collect(Collectors.toList());
 

@@ -41,7 +41,7 @@ public class AdminMapper {
                 .id(user.getUserId().toString())
                 .name(user.getFullName())
                 .role(user.getRole().name())
-                .joinedDate(user.getCreateAt().format(DATE_FORMATTER))
+                .joinedDate(user.getCreatedAt().format(DATE_FORMATTER))
                 .build();
     }
 }

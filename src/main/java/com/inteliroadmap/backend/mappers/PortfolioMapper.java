@@ -3,14 +3,20 @@ package com.inteliroadmap.backend.mappers;
 import com.inteliroadmap.backend.domain.dto.request.PortfolioUpsertRequest;
 import com.inteliroadmap.backend.domain.dto.response.PortfolioResponse;
 import com.inteliroadmap.backend.domain.entity.*;
+import com.inteliroadmap.backend.repositories.SkillRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
+import java.util.Optional;
 
 @Component
+@RequiredArgsConstructor
 public class PortfolioMapper {
+
+    private final SkillRepository skillRepository;
 
     public PortfolioResponse toPortfolioResponse(
             User user, Student student, PortfolioConfig config,
@@ -37,11 +43,20 @@ public class PortfolioMapper {
         }
 
         List<PortfolioResponse.StudentSkillResponse> skillResponses = skills.stream()
-                .map(s -> PortfolioResponse.StudentSkillResponse.builder()
-                        .skillName(s.getSkill().getSkillName())
-                        .customDescription(s.getCustomDescription())
-                        .techStack(s.getTechStack())
-                        .build())
+                .map(s -> {
+                    String skillName = "Unknown Skill";
+                    if (s.getSkillId() != null) {
+                        Optional<Skill> opt = skillRepository.findById(s.getSkillId());
+                        if (opt.isPresent()) {
+                            skillName = opt.get().getSkillName();
+                        }
+                    }
+                    return PortfolioResponse.StudentSkillResponse.builder()
+                            .skillName(skillName)
+                            .customDescription(s.getCustomDescription())
+                            .techStack(s.getTechStack())
+                            .build();
+                })
                 .collect(Collectors.toList());
 
         List<PortfolioResponse.PortfolioProjectResponse> projectResponses = projects.stream()
@@ -82,7 +97,7 @@ public class PortfolioMapper {
         }
         return projectRequests.stream().map(p ->
                 PortfolioProject.builder()
-                        .user(user)
+                        .userId(user.getUserId())
                         .projectName(p.getProjectName())
                         .repoUrl(p.getRepoUrl())
                         .demoUrl(p.getDemoUrl())
@@ -100,7 +115,7 @@ public class PortfolioMapper {
         }
         return educationRequests.stream().map(e ->
                 StudentEducation.builder()
-                        .user(student)
+                        .userId(student.getUserId())
                         .university(e.getUniversity())
                         .degree(e.getDegree())
                         .period(e.getPeriod())

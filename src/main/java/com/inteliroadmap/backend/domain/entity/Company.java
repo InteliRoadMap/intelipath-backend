@@ -10,7 +10,7 @@ import java.util.List;
 import java.util.Map;
 
 @Entity
-@Table(name = "companies")
+@Table(name = "processed_companies")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -31,9 +31,9 @@ public class Company {
     @Column(name = "name", columnDefinition = "TEXT")
     private String name;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(columnDefinition = "jsonb")
-    private List<String> introduction;
+//    @JdbcTypeCode(SqlTypes.JSON)
+//    @Column(columnDefinition = "jsonb")
+//    private List<String> introduction;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
@@ -43,7 +43,8 @@ public class Company {
     @Column(columnDefinition = "jsonb")
     private List<String> contact;
 
-    @OneToMany(mappedBy = "company", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
-    private List<RecruitmentPost> recruitmentPosts = new ArrayList<>();
+//    @OneToMany(mappedBy = "company", cascade = CascadeType.ALL, orphanRemoval = true)
+//    @Builder.Default
+//    private List<RecruitmentPost> recruitmentPosts = new ArrayList<>();
 }
+
