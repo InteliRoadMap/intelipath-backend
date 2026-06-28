@@ -1,4 +1,4 @@
-package com.inteliroadmap.backend.services;
+package com.inteliroadmap.backend.services.impl;
 
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.Loader;
@@ -33,7 +33,7 @@ import java.util.List;
  */
 @Service
 @Slf4j
-public class PdfToMarkdownService {
+public class PdfToMarkdownServiceImpl {
 
     private final ChatClient chatClient;
 
@@ -75,7 +75,7 @@ public class PdfToMarkdownService {
             - Do not leave empty lines between the header, separator, and body rows of a table.
             """;
 
-    public PdfToMarkdownService(ChatClient.Builder chatClientBuilder) {
+    public PdfToMarkdownServiceImpl(ChatClient.Builder chatClientBuilder) {
         this.chatClient = chatClientBuilder.build();
     }
 

@@ -1,11 +1,10 @@
-package com.inteliroadmap.backend.services;
+package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.domain.dto.request.CompareStRmSkillRequest;
 import com.inteliroadmap.backend.domain.dto.request.ImportSkillsRequest;
 import com.inteliroadmap.backend.domain.dto.response.SkillResponse;
 import com.inteliroadmap.backend.domain.entity.*;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
-import com.inteliroadmap.backend.services.AuthenticatedStudentService;
 import com.inteliroadmap.backend.mappers.SkillMapper;
 import com.inteliroadmap.backend.repositories.*;
 import jakarta.transaction.Transactional;
@@ -23,13 +22,13 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class SkillService {
+public class SkillServiceImpl {
 
     private final SkillRepository skillRepository;
     private final StudentSkillRepository studentSkillRepository;
     private final CareerRoleRepository careerRoleRepository;
     private final CareerRequiredSkillRepository careerRequiredSkillRepository;
-    private final AuthenticatedStudentService AuthenticatedStudentService;
+    private final AuthenticatedStudentServiceImpl AuthenticatedStudentService;
     private final SkillMapper skillMapper;
 
     /**

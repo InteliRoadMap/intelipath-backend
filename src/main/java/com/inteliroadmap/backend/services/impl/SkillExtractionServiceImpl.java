@@ -1,4 +1,4 @@
-package com.inteliroadmap.backend.services;
+package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.domain.entity.Recruitment;
 import com.inteliroadmap.backend.domain.entity.Skill;
@@ -23,7 +23,7 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class SkillExtractionService {
+public class SkillExtractionServiceImpl {
 
     private final RecruitmentRepository recruitmentRepository;
     private final SkillRepository skillRepository;

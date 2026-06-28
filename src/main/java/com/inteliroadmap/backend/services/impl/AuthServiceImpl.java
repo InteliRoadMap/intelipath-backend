@@ -1,4 +1,4 @@
-package com.inteliroadmap.backend.services;
+package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.domain.dto.request.RefreshRequest;
 import com.inteliroadmap.backend.domain.dto.response.RefreshResponse;
@@ -22,7 +22,7 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class AuthService {
+public class AuthServiceImpl {
 
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;

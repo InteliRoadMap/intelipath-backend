@@ -1,6 +1,5 @@
-package com.inteliroadmap.backend.services;
+package com.inteliroadmap.backend.services.impl;
 
-import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -18,7 +17,7 @@ import java.io.IOException;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class SupabaseStorageService {
+public class SupabaseStorageServiceImpl {
 
     @Value("${supabase.url}")
     private String supabaseUrl;

@@ -1,31 +1,25 @@
-package com.inteliroadmap.backend.services;
+package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.domain.dto.request.PortfolioUpsertRequest;
-import com.inteliroadmap.backend.domain.dto.request.UpdateSlugRequest;
 import com.inteliroadmap.backend.domain.dto.response.PortfolioResponse;
 import com.inteliroadmap.backend.domain.entity.*;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
-import com.inteliroadmap.backend.services.AuthenticatedStudentService;
 import com.inteliroadmap.backend.repositories.*;
 import com.inteliroadmap.backend.mappers.PortfolioMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class PortfolioService {
+public class PortfolioServiceImpl {
 
-    private final AuthenticatedStudentService AuthenticatedStudentService;
+    private final AuthenticatedStudentServiceImpl AuthenticatedStudentService;
     private final PortfolioMapper portfolioMapper;
     private final PortfolioConfigRepository portfolioConfigRepository;
     private final PortfolioProjectRepository portfolioProjectRepository;

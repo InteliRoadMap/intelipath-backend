@@ -1,4 +1,4 @@
-package com.inteliroadmap.backend.services;
+package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.domain.dto.response.student.*;
 import com.inteliroadmap.backend.domain.entity.*;
@@ -16,7 +16,7 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class StudentDashboardService {
+public class StudentDashboardServiceImpl {
 
     private static final int AI_TEXT_LIMIT = 80;
 
@@ -29,8 +29,8 @@ public class StudentDashboardService {
     private final ChatMessageRepository chatMessageRepository;
     private final SkillTrendRepository skillTrendRepository;
     private final StudentDashboardMapper studentDashboardMapper;
-    private final AuthenticatedStudentService authenticatedStudentService;
-    private final StudentService studentService;
+    private final AuthenticatedStudentServiceImpl authenticatedStudentService;
+    private final StudentServiceImpl studentService;
 
     /**
      * Get roadmap progress for the current student dashboard.

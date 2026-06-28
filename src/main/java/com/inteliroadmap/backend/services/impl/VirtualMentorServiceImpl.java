@@ -1,4 +1,4 @@
-package com.inteliroadmap.backend.services;
+package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.domain.dto.request.VirtualMentorChatRequest;
 import com.inteliroadmap.backend.domain.entity.ChatMessage;
@@ -12,16 +12,8 @@ import com.inteliroadmap.backend.repositories.StudentRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.security.JwtService;
 import com.inteliroadmap.backend.utils.BearerTokenUtil;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.messages.Message;
-import org.springframework.ai.chat.messages.SystemMessage;
-import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.ai.chat.messages.AssistantMessage;
-import org.springframework.ai.chat.prompt.Prompt;
-import org.springframework.ai.chat.client.advisor.QuestionAnswerAdvisor;
-import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -33,7 +25,7 @@ import java.util.UUID;
 
 @Service
 @Slf4j
-public class VirtualMentorService {
+public class VirtualMentorServiceImpl {
 
     private final ChatSessionRepository chatSessionRepository;
     private final ChatMessageRepository chatMessageRepository;
@@ -43,13 +35,13 @@ public class VirtualMentorService {
     private final ChatClient chatClient;
     private final VectorStore vectorStore;
 
-    public VirtualMentorService(ChatSessionRepository chatSessionRepository,
-                                ChatMessageRepository chatMessageRepository,
-                                StudentRepository studentRepository,
-                                UserRepository userRepository,
-                                JwtService jwtService,
-                                ChatClient.Builder chatClientBuilder,
-                                VectorStore vectorStore) {
+    public VirtualMentorServiceImpl(ChatSessionRepository chatSessionRepository,
+                                    ChatMessageRepository chatMessageRepository,
+                                    StudentRepository studentRepository,
+                                    UserRepository userRepository,
+                                    JwtService jwtService,
+                                    ChatClient.Builder chatClientBuilder,
+                                    VectorStore vectorStore) {
         this.chatSessionRepository = chatSessionRepository;
         this.chatMessageRepository = chatMessageRepository;
         this.studentRepository = studentRepository;

@@ -1,4 +1,4 @@
-package com.inteliroadmap.backend.services;
+package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.mappers.MarketTrendMapper;
 import com.inteliroadmap.backend.domain.dto.response.market.MarketTrendResponse;
@@ -14,8 +14,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Matcher;
@@ -25,7 +23,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class MarketTrendService {
+public class MarketTrendServiceImpl {
 
     private final CompanyRepository companyRepository;
     private final SkillTrendRepository skillTrendRepository;

@@ -1,4 +1,4 @@
-package com.inteliroadmap.backend.services;
+package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.domain.dto.internal.OAuth2UserInfoInternal;
 import com.inteliroadmap.backend.domain.dto.internal.info.GitHubOauth2UserInfo;
@@ -32,7 +32,7 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class OAuth2UserService extends DefaultOAuth2UserService {
+public class OAuth2UserServiceImpl extends DefaultOAuth2UserService {
 
     private final UserRepository userRepository;
     private final OauthAccountRepository oauthAccountRepository;

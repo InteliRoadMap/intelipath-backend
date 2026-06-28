@@ -1,11 +1,9 @@
-package com.inteliroadmap.backend.services;
+package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.domain.dto.response.SkillResponse;
 import com.inteliroadmap.backend.domain.dto.response.StudentResponse;
-import com.inteliroadmap.backend.domain.dto.response.student.*;
 import com.inteliroadmap.backend.domain.entity.*;
 import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
-import com.inteliroadmap.backend.services.AuthenticatedStudentService;
 import com.inteliroadmap.backend.mappers.SkillMapper;
 import com.inteliroadmap.backend.mappers.StudentDashboardMapper;
 import com.inteliroadmap.backend.mappers.StudentMapper;
@@ -21,7 +19,7 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class StudentService {
+public class StudentServiceImpl {
 
     private static final int AI_TEXT_LIMIT = 80;
 
@@ -39,7 +37,7 @@ public class StudentService {
     private final StudentDashboardMapper studentDashboardMapper;
     private final StudentMapper studentMapper;
     private final CareerRoleRepository careerRoleRepository;
-    private final AuthenticatedStudentService AuthenticatedStudentService;
+    private final AuthenticatedStudentServiceImpl AuthenticatedStudentService;
 
     @Transactional
     public StudentResponse setupStudentProfile(com.inteliroadmap.backend.domain.dto.request.SetupStudentProfileRequest request) {

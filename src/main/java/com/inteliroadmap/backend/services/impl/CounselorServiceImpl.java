@@ -1,4 +1,4 @@
-package com.inteliroadmap.backend.services;
+package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.domain.dto.request.CreateFeedbackRequest;
 import com.inteliroadmap.backend.domain.dto.request.UpdateProfileRequest;
@@ -22,7 +22,7 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class CounselorService {
+public class CounselorServiceImpl {
 
     private final CounselorMapper counselorMapper;
     private final CareerRoleRepository careerRoleRepository;

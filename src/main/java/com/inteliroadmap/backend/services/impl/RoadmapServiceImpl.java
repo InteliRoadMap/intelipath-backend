@@ -1,4 +1,4 @@
-package com.inteliroadmap.backend.services;
+package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.domain.dto.request.UpdateUserProgressRequest;
 import com.inteliroadmap.backend.domain.dto.request.UpdateNodeProgressRequest;
@@ -15,7 +15,6 @@ import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.security.JwtService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -33,7 +32,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class RoadmapService {
+public class RoadmapServiceImpl {
 
     private final UserRepository userRepository;
     private final StudentRepository studentRepository;
@@ -50,7 +49,7 @@ public class RoadmapService {
     private static final String FRONTEND_IN_PROGRESS_STATUS = "in_progress";
     private static final String FRONTEND_CURRENT_STATUS = "current";
     private static final String FRONTEND_LOCKED_STATUS = "locked";
-    private final com.inteliroadmap.backend.services.AuthenticatedStudentService AuthenticatedStudentService;
+    private final AuthenticatedStudentServiceImpl AuthenticatedStudentService;
 
     /**
      * Securely identifies the currently authenticated student.

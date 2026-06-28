@@ -1,4 +1,4 @@
-package com.inteliroadmap.backend.services;
+package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.domain.dto.request.SetupUserProfileRequest;
 import com.inteliroadmap.backend.domain.dto.request.UserRequest;
@@ -18,11 +18,11 @@ import java.time.LocalDate;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class UserService {
+public class UserServiceImpl {
 
     private final UserRepository userRepository;
     private final UserMapper userMapper;
-    private final SupabaseStorageService supabaseStorageService;
+    private final SupabaseStorageServiceImpl supabaseStorageService;
 
     @Transactional
     public UserResponse getCurrentUser() {

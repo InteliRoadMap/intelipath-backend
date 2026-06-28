@@ -1,4 +1,4 @@
-package com.inteliroadmap.backend.services;
+package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.domain.dto.request.GithubImportRequest;
 import com.inteliroadmap.backend.domain.dto.response.PortfolioResponse;
@@ -17,7 +17,7 @@ import java.util.regex.Pattern;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class GithubPortfolioService {
+public class GithubPortfolioServiceImpl {
 
     private final GithubApiClient githubApiClient;
     private final PortfolioAiAnalyzer portfolioAiAnalyzer;
