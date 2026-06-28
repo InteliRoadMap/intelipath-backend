@@ -1,4 +1,5 @@
 package com.inteliroadmap.backend.services.impl;
+import com.inteliroadmap.backend.services.PdfToMarkdownService;
 
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.Loader;
@@ -33,7 +34,7 @@ import java.util.List;
  */
 @Service
 @Slf4j
-public class PdfToMarkdownServiceImpl {
+public class PdfToMarkdownServiceImpl implements PdfToMarkdownService {
 
     private final ChatClient chatClient;
 

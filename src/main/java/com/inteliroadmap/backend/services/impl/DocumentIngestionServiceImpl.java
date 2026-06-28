@@ -1,4 +1,5 @@
 package com.inteliroadmap.backend.services.impl;
+import com.inteliroadmap.backend.services.DocumentIngestionService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -16,7 +17,7 @@ import java.util.Map;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class DocumentIngestionServiceImpl {
+public class DocumentIngestionServiceImpl implements DocumentIngestionService {
 
     private final VectorStore vectorStore;
     private final PdfToMarkdownServiceImpl pdfToMarkdownService;

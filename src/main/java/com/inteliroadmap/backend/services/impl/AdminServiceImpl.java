@@ -1,5 +1,7 @@
 package com.inteliroadmap.backend.services.impl;
 
+import com.inteliroadmap.backend.services.AdminService;
+
 import com.inteliroadmap.backend.domain.dto.request.UpdateUserRoleRequest;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminCourseMetricResponse;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminSystemHealthResponse;
@@ -23,8 +25,8 @@ import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
-@Slf4j
-public class AdminServiceImpl {
+public class AdminServiceImpl implements AdminService {
+    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(AdminServiceImpl.class);
 
     private final UserRepository userRepository;
     private final CareerRoleRepository careerRoleRepository;

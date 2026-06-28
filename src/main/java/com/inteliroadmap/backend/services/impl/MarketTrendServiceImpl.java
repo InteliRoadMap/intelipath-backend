@@ -1,4 +1,5 @@
 package com.inteliroadmap.backend.services.impl;
+import com.inteliroadmap.backend.services.MarketTrendService;
 
 import com.inteliroadmap.backend.mappers.MarketTrendMapper;
 import com.inteliroadmap.backend.domain.dto.response.market.MarketTrendResponse;
@@ -23,7 +24,7 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class MarketTrendServiceImpl {
+public class MarketTrendServiceImpl implements MarketTrendService {
 
     private final CompanyRepository companyRepository;
     private final SkillTrendRepository skillTrendRepository;

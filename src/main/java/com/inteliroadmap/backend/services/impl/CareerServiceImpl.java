@@ -1,4 +1,5 @@
 package com.inteliroadmap.backend.services.impl;
+import com.inteliroadmap.backend.services.CareerService;
 
 import com.inteliroadmap.backend.domain.dto.response.CareerResponse;
 import com.inteliroadmap.backend.domain.entity.CareerRole;
@@ -17,7 +18,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class CareerServiceImpl {
+public class CareerServiceImpl implements CareerService {
 
     private final CareerRoleRepository careerRoleRepository;
     private final SkillNodeRepository skillNodeRepository;

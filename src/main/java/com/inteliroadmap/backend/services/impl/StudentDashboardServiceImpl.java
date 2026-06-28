@@ -1,4 +1,5 @@
 package com.inteliroadmap.backend.services.impl;
+import com.inteliroadmap.backend.services.StudentDashboardService;
 
 import com.inteliroadmap.backend.domain.dto.response.student.*;
 import com.inteliroadmap.backend.domain.entity.*;
@@ -16,7 +17,7 @@ import java.util.*;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class StudentDashboardServiceImpl {
+public class StudentDashboardServiceImpl implements StudentDashboardService {
 
     private static final int AI_TEXT_LIMIT = 80;
 

@@ -1,4 +1,5 @@
 package com.inteliroadmap.backend.services.impl;
+import com.inteliroadmap.backend.services.ScraperService;
 
 import com.inteliroadmap.backend.domain.dto.response.CompanyResponse;
 import com.inteliroadmap.backend.domain.dto.response.RecruitmentPostDto;
@@ -19,7 +20,7 @@ import java.util.*;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class ScraperServiceImpl {
+public class ScraperServiceImpl implements ScraperService {
 
     private final CompanyRepository companyRepository;
     private final RecruitmentRepository recruitmentRepository;

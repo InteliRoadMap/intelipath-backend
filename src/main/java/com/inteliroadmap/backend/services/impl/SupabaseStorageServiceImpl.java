@@ -1,4 +1,5 @@
 package com.inteliroadmap.backend.services.impl;
+import com.inteliroadmap.backend.services.SupabaseStorageService;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -17,7 +18,7 @@ import java.io.IOException;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class SupabaseStorageServiceImpl {
+public class SupabaseStorageServiceImpl implements SupabaseStorageService {
 
     @Value("${supabase.url}")
     private String supabaseUrl;

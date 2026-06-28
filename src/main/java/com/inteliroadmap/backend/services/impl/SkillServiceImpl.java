@@ -1,4 +1,5 @@
 package com.inteliroadmap.backend.services.impl;
+import com.inteliroadmap.backend.services.SkillService;
 
 import com.inteliroadmap.backend.domain.dto.request.CompareStRmSkillRequest;
 import com.inteliroadmap.backend.domain.dto.request.ImportSkillsRequest;
@@ -22,7 +23,7 @@ import java.util.UUID;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class SkillServiceImpl {
+public class SkillServiceImpl implements SkillService {
 
     private final SkillRepository skillRepository;
     private final StudentSkillRepository studentSkillRepository;

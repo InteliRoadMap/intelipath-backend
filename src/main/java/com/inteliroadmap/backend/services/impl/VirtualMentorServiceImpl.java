@@ -1,4 +1,5 @@
 package com.inteliroadmap.backend.services.impl;
+import com.inteliroadmap.backend.services.VirtualMentorService;
 
 import com.inteliroadmap.backend.domain.dto.request.VirtualMentorChatRequest;
 import com.inteliroadmap.backend.domain.entity.ChatMessage;
@@ -25,7 +26,7 @@ import java.util.UUID;
 
 @Service
 @Slf4j
-public class VirtualMentorServiceImpl {
+public class VirtualMentorServiceImpl implements VirtualMentorService {
 
     private final ChatSessionRepository chatSessionRepository;
     private final ChatMessageRepository chatMessageRepository;

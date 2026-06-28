@@ -1,4 +1,5 @@
 package com.inteliroadmap.backend.services.impl;
+import com.inteliroadmap.backend.services.AuthenticatedStudentService;
 
 import com.inteliroadmap.backend.domain.entity.Student;
 import com.inteliroadmap.backend.domain.entity.User;
@@ -17,7 +18,7 @@ import java.util.Optional;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class AuthenticatedStudentServiceImpl {
+public class AuthenticatedStudentServiceImpl implements AuthenticatedStudentService {
 
     private final UserRepository userRepository;
     private final StudentRepository studentRepository;
