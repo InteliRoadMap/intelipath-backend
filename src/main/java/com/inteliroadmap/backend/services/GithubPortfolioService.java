@@ -4,6 +4,7 @@ import com.inteliroadmap.backend.domain.dto.request.GithubImportRequest;
 import com.inteliroadmap.backend.domain.dto.response.PortfolioResponse;
 import com.inteliroadmap.backend.clients.GithubApiClient;
 import com.inteliroadmap.backend.components.PortfolioAiAnalyzer;
+import com.inteliroadmap.backend.services.GithubPortfolioService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;

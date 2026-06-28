@@ -6,6 +6,7 @@ import com.inteliroadmap.backend.domain.entity.SkillTrend;
 import com.inteliroadmap.backend.repositories.RecruitmentRepository;
 import com.inteliroadmap.backend.repositories.SkillRepository;
 import com.inteliroadmap.backend.repositories.SkillTrendRepository;
+import com.inteliroadmap.backend.services.SkillExtractionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

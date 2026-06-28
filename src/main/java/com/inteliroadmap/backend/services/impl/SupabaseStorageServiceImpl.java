@@ -1,6 +1,6 @@
 package com.inteliroadmap.backend.services.impl;
-import com.inteliroadmap.backend.services.SupabaseStorageService;
 
+import com.inteliroadmap.backend.services.SupabaseStorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,6 +15,10 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
 
+/**
+ * Implementation of the {@link SupabaseStorageService}.
+ * Provides services for uploading files (such as avatars and chat files) to Supabase Storage.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -29,15 +33,27 @@ public class SupabaseStorageServiceImpl implements SupabaseStorageService {
     private final String AVATAR_BUCKET = "avatars";
     private final String CHAT_BUCKET = "chat_files";
 
+    /**
+     * Uploads an avatar image to the Supabase avatars bucket for the given user ID.
+     *
+     * @param file the multipart file containing the avatar image
+     * @param userId the ID of the user for whom the avatar is being uploaded
+     * @return the public URL of the uploaded avatar
+     * @throws RuntimeException if the upload fails
+     */
+    @Override
     public String uploadAvatar(MultipartFile file, String userId) {
         log.info("SupabaseStorageService: Uploading avatar for user ID: {}", userId);
         try {
+            // Initialize RestTemplate to make HTTP requests
             RestTemplate restTemplate = new RestTemplate();
             
+            // Construct the unique file name using user ID and file extension
             String fileExtension = getFileExtension(file.getOriginalFilename());
             String fileName = userId + (fileExtension.isEmpty() ? ".jpg" : fileExtension);
             String url = supabaseUrl + "/storage/v1/object/" + AVATAR_BUCKET + "/" + fileName;
 
+            // Prepare HTTP headers with bearer auth and content type
             HttpHeaders headers = new HttpHeaders();
             headers.setBearerAuth(supabaseKey);
             headers.setContentType(MediaType.valueOf(file.getContentType() != null ? file.getContentType() : "image/jpeg"));
@@ -45,11 +61,14 @@ public class SupabaseStorageServiceImpl implements SupabaseStorageService {
             // Allow overwriting existing files
             headers.set("x-upsert", "true");
 
+            // Build request entity with file bytes and headers
             HttpEntity<byte[]> requestEntity = new HttpEntity<>(file.getBytes(), headers);
 
+            // Execute POST request to Supabase API
             ResponseEntity<String> response = restTemplate.exchange(url, HttpMethod.POST, requestEntity, String.class);
 
             if (response.getStatusCode().is2xxSuccessful()) {
+                // Return the public URL of the uploaded image if successful
                 return supabaseUrl + "/storage/v1/object/public/" + AVATAR_BUCKET + "/" + fileName;
             } else {
                 log.error("Supabase API Error: {}", response.getBody());
@@ -64,6 +83,12 @@ public class SupabaseStorageServiceImpl implements SupabaseStorageService {
         }
     }
 
+    /**
+     * Extracts the file extension from the given file name.
+     *
+     * @param fileName the original file name
+     * @return the file extension (including the dot), or an empty string if no extension is found
+     */
     private String getFileExtension(String fileName) {
         if (fileName == null || fileName.lastIndexOf(".") == -1) {
             return "";
@@ -71,6 +96,14 @@ public class SupabaseStorageServiceImpl implements SupabaseStorageService {
         return fileName.substring(fileName.lastIndexOf("."));
     }
 
+    /**
+     * Uploads a chat file to the Supabase chat files bucket.
+     *
+     * @param file the multipart file containing the chat file
+     * @return the public URL of the uploaded chat file
+     * @throws RuntimeException if the upload fails
+     */
+    @Override
     public String uploadChatFile(MultipartFile file) {
         log.info("SupabaseStorageService: Uploading chat file: {}", file.getOriginalFilename());
         try {

@@ -1,5 +1,6 @@
 package com.inteliroadmap.backend.services;
 
+import com.inteliroadmap.backend.services.SupabaseStorageService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;

@@ -1,7 +1,7 @@
 package com.inteliroadmap.backend.services;
 
+import com.inteliroadmap.backend.services.EmailService;
 import com.inteliroadmap.backend.utils.EmailUtil;
-import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -11,5 +11,5 @@ import org.springframework.stereotype.Service;
 
 public interface EmailService {
 
-    public void sendOtpEmail(String email, String fullName, String otp) ;
+    public void sendFeedbackNotificationEmail(String email, String receiverName, String senderName, String content) ;
 }

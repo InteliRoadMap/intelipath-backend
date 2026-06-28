@@ -1,16 +1,20 @@
 package com.inteliroadmap.backend.services;
 
-import com.inteliroadmap.backend.domain.dto.request.CreateFeedbackRequest;
 import com.inteliroadmap.backend.domain.dto.request.UpdateProfileRequest;
 import com.inteliroadmap.backend.domain.dto.response.CounselorResponse;
+import com.inteliroadmap.backend.domain.dto.response.StudentInfoProjection;
 import com.inteliroadmap.backend.domain.dto.response.UpdateProfileResponse;
 import com.inteliroadmap.backend.domain.entity.*;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.mappers.CounselorMapper;
 import com.inteliroadmap.backend.repositories.*;
+import com.inteliroadmap.backend.services.CounselorService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import java.util.*;
@@ -25,11 +29,9 @@ public interface CounselorService {
 
     public CounselorResponse getAllFeedbacksSentToMe() ;
 
-    public CounselorResponse getStudentInfos(String search) ;
+    public CounselorResponse getStudentInfos(String search, int page, int size) ;
 
     public CounselorResponse getStudentStatisticAndFeedback(UUID studentId) ;
-
-    public CounselorResponse createFeedback(CreateFeedbackRequest request) ;
 
     public UpdateProfileResponse getProfile() ;
 

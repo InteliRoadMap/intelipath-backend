@@ -5,6 +5,7 @@ import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.repositories.StudentRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
+import com.inteliroadmap.backend.services.AuthenticatedStudentService;
 import com.inteliroadmap.backend.utils.SlugUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,4 +23,6 @@ public interface AuthenticatedStudentService {
     public Student getOrCreateStudentForUpdate() ;
 
     public User getAuthenticatedUser() ;
+
+    public String getAuthenticatedEmail() ;
 }

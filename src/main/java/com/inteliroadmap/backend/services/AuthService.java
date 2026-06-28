@@ -8,6 +8,7 @@ import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.repositories.RefreshTokenRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.security.JwtService;
+import com.inteliroadmap.backend.services.AuthService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -21,4 +22,8 @@ import java.util.Optional;
 public interface AuthService {
 
     public RefreshResponse refreshAccount(RefreshRequest refreshRequest) ;
+
+    public RefreshResponse refreshResponse(String accessToken, String refreshToken, LocalDateTime expiresIn) ;
+
+    public ResponseStatusException invalidRefreshToken() ;
 }

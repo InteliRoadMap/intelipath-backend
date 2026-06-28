@@ -1,5 +1,6 @@
 package com.inteliroadmap.backend.services;
 
+import com.inteliroadmap.backend.services.PdfToMarkdownService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -29,5 +30,4 @@ public interface PdfToMarkdownService {
 
     public String convertToMarkdown(byte[] pdfBytes, String sourceName) throws IOException ;
 
-        
-}
+        }

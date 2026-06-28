@@ -1,13 +1,12 @@
 package com.inteliroadmap.backend.services.impl;
 
-import com.inteliroadmap.backend.services.SkillExtractionService;
-
 import com.inteliroadmap.backend.domain.entity.Recruitment;
 import com.inteliroadmap.backend.domain.entity.Skill;
 import com.inteliroadmap.backend.domain.entity.SkillTrend;
 import com.inteliroadmap.backend.repositories.RecruitmentRepository;
 import com.inteliroadmap.backend.repositories.SkillRepository;
 import com.inteliroadmap.backend.repositories.SkillTrendRepository;
+import com.inteliroadmap.backend.services.SkillExtractionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -22,10 +21,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * Implementation of the {@link SkillExtractionService} interface.
+ * Handles the extraction of skills from recruitment descriptions and rebuilds skill trends
+ * utilizing an external AI service.
+ */
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class SkillExtractionServiceImpl implements SkillExtractionService {
-    private static final org.slf4j.Logger log = org.slf4j.LoggerFactory.getLogger(SkillExtractionServiceImpl.class);
 
     private final RecruitmentRepository recruitmentRepository;
     private final SkillRepository skillRepository;
@@ -37,7 +41,13 @@ public class SkillExtractionServiceImpl implements SkillExtractionService {
     public record SkillExtractRequest(List<String> descriptions) {}
     public record SkillExtractResponse(List<List<String>> skills_per_doc) {}
 
+    /**
+     * Extracts skills from recruitment descriptions using an external AI service
+     * and rebuilds the skill trends data in the database based on the extracted skills.
+     * It groups the occurrences of each skill by the application deadline of the recruitment.
+     */
     @Transactional
+    @Override
     public void extractAndRebuildSkillTrends() {
         log.info("Starting Skill Trends extraction process via AI Service...");
 
@@ -54,19 +64,35 @@ public class SkillExtractionServiceImpl implements SkillExtractionService {
 
         for (Recruitment r : recruitments) {
             StringBuilder descBuilder = new StringBuilder();
-            if (r.getTitle() != null) {
-                descBuilder.append(r.getTitle()).append(". ");
+            // Append title to the description
+            String title = r.getBasicInfo() != null ? (String) r.getBasicInfo().get("title") : null;
+            if (title != null) {
+                descBuilder.append(title).append(". ");
             }
+            // Append all description values
             if (r.getDescriptions() != null) {
-                for (List<String> values : r.getDescriptions().values()) {
-                    if (values != null) {
-                        for (String v : values) {
+                for (Object val : r.getDescriptions().values()) {
+                    if (val instanceof java.util.List) {
+                        for (Object v : (java.util.List<?>) val) {
                             descBuilder.append(v).append(" ");
                         }
+                    } else if (val instanceof java.util.Map) {
+                        for (Object v : ((java.util.Map<?, ?>) val).values()) {
+                            if (v instanceof java.util.List) {
+                                for (Object v2 : (java.util.List<?>) v) {
+                                    descBuilder.append(v2).append(" ");
+                                }
+                            } else {
+                                descBuilder.append(v).append(" ");
+                            }
+                        }
+                    } else if (val != null) {
+                        descBuilder.append(val).append(" ");
                     }
                 }
             }
             
+            // Clean up the description string and determine the relevant date
             String desc = descBuilder.toString().trim();
             LocalDate date = r.getApplicationDeadline() != null ? r.getApplicationDeadline() : LocalDate.now();
             descriptions.add(desc);
@@ -126,8 +152,8 @@ public class SkillExtractionServiceImpl implements SkillExtractionService {
 
             for (Map.Entry<LocalDate, Integer> dateEntry : entry.getValue().entrySet()) {
                 SkillTrend trend = SkillTrend.builder()
-                        .skill(skill)
-                        .weekStack(dateEntry.getKey())
+                        .skillId(skill.getSkillId())
+                        .weekStamp(dateEntry.getKey())
                         .jobsNeeded(dateEntry.getValue())
                         .build();
                 newTrends.add(trend);

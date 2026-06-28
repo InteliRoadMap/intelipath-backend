@@ -4,10 +4,12 @@ import com.inteliroadmap.backend.domain.dto.response.SkillResponse;
 import com.inteliroadmap.backend.domain.dto.response.StudentResponse;
 import com.inteliroadmap.backend.domain.entity.*;
 import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
+import com.inteliroadmap.backend.services.AuthenticatedStudentService;
 import com.inteliroadmap.backend.mappers.SkillMapper;
 import com.inteliroadmap.backend.mappers.StudentDashboardMapper;
 import com.inteliroadmap.backend.mappers.StudentMapper;
 import com.inteliroadmap.backend.repositories.*;
+import com.inteliroadmap.backend.services.StudentService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,5 +29,5 @@ public interface StudentService {
 
     public List<CareerRequiredSkill> findMissingRequiredSkills(Student student) ;
 
-    public Integer calculateSkillProgress(Student student, Skill skill) ;
+    public Integer calculateSkillProgress(Student student, UUID skillId) ;
 }

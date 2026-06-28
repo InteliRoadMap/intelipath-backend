@@ -1,5 +1,4 @@
 package com.inteliroadmap.backend.services.impl;
-import com.inteliroadmap.backend.services.CareerService;
 
 import com.inteliroadmap.backend.domain.dto.response.CareerResponse;
 import com.inteliroadmap.backend.domain.entity.CareerRole;
@@ -7,6 +6,7 @@ import com.inteliroadmap.backend.domain.entity.SkillNode;
 import com.inteliroadmap.backend.repositories.CareerRoleRepository;
 import com.inteliroadmap.backend.repositories.SkillNodeRepository;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
+import com.inteliroadmap.backend.services.CareerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -15,6 +15,10 @@ import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+/**
+ * Service implementation for managing career-related operations.
+ * Handles the retrieval of available career roles and their specific skill roadmap nodes.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -28,6 +32,7 @@ public class CareerServiceImpl implements CareerService {
      *
      * @return list of career role responses
      */
+    @Override
     public List<CareerResponse> getAllCareers() {
         log.info("Career role retrieval request received");
 
@@ -46,6 +51,7 @@ public class CareerServiceImpl implements CareerService {
      * @param careerId database UUID of the requested career role
      * @return career response containing required skill nodes
      */
+    @Override
     public CareerResponse getCareerRequirements(UUID careerId) {
         log.info("Career requirement retrieval request received. careerId: {}", careerId);
 
@@ -59,7 +65,7 @@ public class CareerServiceImpl implements CareerService {
         CareerRole careerRole = careerRoleOptional.get();
 
         // Step 2: Load all roadmap nodes assigned to the career
-        List<SkillNode> nodes = skillNodeRepository.findByCareerRole_CareerId(careerId);
+        List<SkillNode> nodes = skillNodeRepository.findByCareerId(careerId);
 
         // Step 3: Build the career requirement response
         return CareerResponse.builder()
@@ -78,6 +84,7 @@ public class CareerServiceImpl implements CareerService {
      * @return mapped career response
      */
     private CareerResponse toCareerResponse(CareerRole careerRole) {
+        // Map entity fields to the response data transfer object
         return CareerResponse.builder()
                 .careerId(careerRole.getCareerId())
                 .careerName(careerRole.getCareerName())

@@ -7,6 +7,8 @@ import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.mappers.UserMapper;
 import com.inteliroadmap.backend.repositories.UserRepository;
+import com.inteliroadmap.backend.services.SupabaseStorageService;
+import com.inteliroadmap.backend.services.UserService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;

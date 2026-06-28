@@ -10,6 +10,7 @@ import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.repositories.CompanyRepository;
 import com.inteliroadmap.backend.repositories.RecruitmentPostRepository;
 import com.inteliroadmap.backend.repositories.RecruitmentRepository;
+import com.inteliroadmap.backend.services.ScraperService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

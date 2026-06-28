@@ -1,11 +1,13 @@
 package com.inteliroadmap.backend.services.impl;
-import com.inteliroadmap.backend.services.StudentDashboardService;
 
 import com.inteliroadmap.backend.domain.dto.response.student.*;
 import com.inteliroadmap.backend.domain.entity.*;
 import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
 import com.inteliroadmap.backend.mappers.StudentDashboardMapper;
 import com.inteliroadmap.backend.repositories.*;
+import com.inteliroadmap.backend.services.AuthenticatedStudentService;
+import com.inteliroadmap.backend.services.StudentDashboardService;
+import com.inteliroadmap.backend.services.StudentService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,6 +16,10 @@ import org.springframework.stereotype.Service;
 import java.time.LocalDate;
 import java.util.*;
 
+/**
+ * Implementation of the {@link StudentDashboardService}.
+ * Provides aggregation of various metrics and insights for the student dashboard.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -22,7 +28,9 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
     private static final int AI_TEXT_LIMIT = 80;
 
     private final UserRepository userRepository;
+    private final SkillRepository skillRepository;
     private final SkillNodeRepository skillNodeRepository;
+    private final CareerRoleRepository careerRoleRepository;
     private final StudentProgressRepository studentProgressRepository;
     private final CareerRequiredSkillRepository careerRequiredSkillRepository;
     private final FeedbackRepository feedbackRepository;
@@ -30,8 +38,8 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
     private final ChatMessageRepository chatMessageRepository;
     private final SkillTrendRepository skillTrendRepository;
     private final StudentDashboardMapper studentDashboardMapper;
-    private final AuthenticatedStudentServiceImpl authenticatedStudentService;
-    private final StudentServiceImpl studentService;
+    private final AuthenticatedStudentService authenticatedStudentService;
+    private final StudentService studentService;
 
     /**
      * Get roadmap progress for the current student dashboard.
@@ -39,35 +47,43 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
      * @return roadmap progress response with ordered steps and nullable AI tip
      */
     @Transactional
+    @Override
     public DashboardRoadmapProgressResponse getRoadmapProgress() {
         log.info("Student Dashboard Module: Fetching roadmap progress");
 
+        // Fetch current authenticated student and check if they have selected a career
         Student student = getCurrentStudent();
-        if (student == null || student.getCareerRole() == null) {
+        if (student == null || student.getCareerId() == null) {
             return DashboardRoadmapProgressResponse.builder().build();
         }
 
-        UUID careerId = student.getCareerRole().getCareerId();
+        // Retrieve ordered skill nodes associated with the student's chosen career
+        UUID careerId = student.getCareerId();
         List<SkillNode> nodes = skillNodeRepository
-                .findByCareerRole_CareerIdOrderByLevelAscNodeNameAsc(careerId);
+                .findByCareerIdOrderByNodeLevelAscNodeNameAsc(careerId);
 
         if (nodes.isEmpty()) {
             return DashboardRoadmapProgressResponse.builder().build();
         }
 
+        // Fetch all progress records for these specific nodes for the student
         List<UUID> nodeIds = nodes.stream()
                 .map(SkillNode::getNodeId)
                 .toList();
         List<StudentProgress> progresses = studentProgressRepository
-                .findByStudent_UserIdAndSkillNode_NodeIdIn(student.getUserId(), nodeIds);
+                .findByStudentIdAndNodeIdIn(student.getUserId(), nodeIds);
+        
+        // Map progress records by node ID for fast lookup during iteration
         Map<UUID, StudentProgress> progressByNodeId = mapProgressByNodeId(progresses);
 
+        // Iterate through the roadmap nodes to determine the status of each step
         boolean currentNodeAssigned = false;
         List<RoadmapStepResponse> steps = new ArrayList<>();
         for (SkillNode node : nodes) {
+            // Determine if a node is COMPLETED, IN_PROGRESS, or LOCKED
             RoadmapStepStatus status = mapRoadmapStepStatus(node, progressByNodeId, currentNodeAssigned);
             if (status == RoadmapStepStatus.IN_PROGRESS) {
-                currentNodeAssigned = true;
+                currentNodeAssigned = true; // Mark that we've found the current active step
             }
 
             steps.add(studentDashboardMapper.toRoadmapStepResponse(node, status));
@@ -82,17 +98,23 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
      * @return list of skill gap items
      */
     @Transactional
+    @Override
     public List<SkillGapItemResponse> getSkillGaps() {
         log.info("Student Dashboard Module: Fetching skill gaps");
 
         Student student = getCurrentStudent();
-        if (student == null || student.getCareerRole() == null) {
+        if (student == null || student.getCareerId() == null) {
             return List.of();
         }
 
         List<CareerRequiredSkill> missingSkills = studentService.findMissingRequiredSkills(student);
         return missingSkills.stream()
-                .map(req -> studentDashboardMapper.toSkillGapItemResponse(req, studentService.calculateSkillProgress(student, req.getSkill())))
+                .map(req -> studentDashboardMapper.toSkillGapItemResponse(
+                        req, studentService.calculateSkillProgress(
+                                student,
+                                req.getSkillId()
+                        )
+                ))
                 .toList();
     }
 
@@ -102,12 +124,13 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
      * @return latest feedback list ordered by creation time descending
      */
     @Transactional
+    @Override
     public List<MentorFeedbackItemResponse> getMentorFeedback() {
         log.info("Student Dashboard Module: Fetching mentor feedback");
 
         User user = getCurrentUser();
         List<Feedback> feedbackList = feedbackRepository
-                .findTop5ByReceiver_UserIdOrderByCreateAtDesc(user.getUserId());
+                .findTop5ByReceiverIdOrderByCreatedAtDesc(user.getUserId());
 
         return feedbackList.stream()
                 .map(studentDashboardMapper::toMentorFeedbackItemResponse)
@@ -120,6 +143,7 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
      * @return list of chat history preview items
      */
     @Transactional
+    @Override
     public List<AiHistoryItemResponse> getAiHistory() {
         log.info("Student Dashboard Module: Fetching AI chat history");
 
@@ -130,7 +154,8 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
             return List.of();
         }
 
-        List<ChatMessage> messages = chatMessageRepository.findByChatSessionInOrderByCreateAtAsc(sessions);
+        List<UUID> sessionIds = sessions.stream().map(ChatSession::getSessionId).toList();
+        List<ChatMessage> messages = chatMessageRepository.findBySessionIdInOrderByCreateAtAsc(sessionIds);
         List<AiHistoryItemResponse> historyItems = new ArrayList<>();
         for (ChatSession session : sessions) {
             ChatMessage message = selectDashboardMessage(session, messages);
@@ -149,28 +174,28 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
      * @return market demand response or null when the student has no career
      */
     @Transactional
+    @Override
     public MarketDemandResponse getMarketDemand() {
         log.info("Student Dashboard Module: Fetching market demand");
 
         Student student = getCurrentStudent();
-        if (student == null || student.getCareerRole() == null) {
+        if (student == null || student.getCareerId() == null) {
             return MarketDemandResponse.builder().build();
         }
 
-        CareerRole careerRole = student.getCareerRole();
+        CareerRole careerRole = careerRoleRepository.findByCareerId(student.getCareerId());
         List<CareerRequiredSkill> requiredSkills = careerRequiredSkillRepository
-                .findByCareerRole_CareerId(careerRole.getCareerId());
+                .findByCareerRoleId(careerRole.getCareerId());
         List<UUID> skillIds = requiredSkills.stream()
-                .map(CareerRequiredSkill::getSkill)
+                .map(CareerRequiredSkill::getSkillId)
                 .filter(Objects::nonNull)
-                .map(Skill::getSkillId)
                 .toList();
 
         if (skillIds.isEmpty()) {
             return studentDashboardMapper.toEmptyMarketDemandResponse(careerRole);
         }
 
-        List<SkillTrend> trends = skillTrendRepository.findBySkill_SkillIdInOrderByWeekStackAsc(skillIds);
+        List<SkillTrend> trends = skillTrendRepository.findBySkillIdInOrderByweekStampAsc(skillIds);
         Map<LocalDate, Integer> jobsByWeek = sumJobsByWeek(trends);
         if (jobsByWeek.size() < 2) {
             return studentDashboardMapper.toEmptyMarketDemandResponse(careerRole);
@@ -200,11 +225,12 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
      * @return list of generated recommendations or an empty list
      */
     @Transactional
+    @Override
     public List<RecommendationItemResponse> getRecommendations() {
         log.info("Student Dashboard Module: Fetching recommendations");
 
         Student student = getCurrentStudent();
-        if (student == null || student.getCareerRole() == null) {
+        if (student == null || student.getCareerId() == null) {
             return List.of();
         }
 
@@ -219,25 +245,49 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
                 .toList();
     }
 
+    /**
+     * Retrieves the currently authenticated student profile.
+     *
+     * @return the current {@link Student}
+     */
     private Student getCurrentStudent() {
         return authenticatedStudentService.getOrCreateStudent();
     }
 
+    /**
+     * Retrieves the currently authenticated user profile based on the student session.
+     *
+     * @return the current {@link User}
+     */
     private User getCurrentUser() {
         Student student = authenticatedStudentService.getOrCreateStudent();
         return userRepository.findByUserId(student.getUserId());
     }
 
+    /**
+     * Maps a list of student progress records into a map indexed by the node ID.
+     *
+     * @param progresses the list of {@link StudentProgress}
+     * @return a map with the node ID as the key and the corresponding progress as the value
+     */
     private Map<UUID, StudentProgress> mapProgressByNodeId(List<StudentProgress> progresses) {
         Map<UUID, StudentProgress> progressByNodeId = new HashMap<>();
         for (StudentProgress progress : progresses) {
-            if (progress.getSkillNode() != null) {
-                progressByNodeId.put(progress.getSkillNode().getNodeId(), progress);
+            if (progress.getNodeId() != null) {
+                progressByNodeId.put(progress.getNodeId(), progress);
             }
         }
         return progressByNodeId;
     }
 
+    /**
+     * Determines the status of a specific roadmap step for a given skill node.
+     *
+     * @param node the skill node in the roadmap
+     * @param progressByNodeId map of student's progress indexed by node ID
+     * @param currentNodeAssigned flag indicating if the current step is already assigned
+     * @return the determined {@link RoadmapStepStatus}
+     */
     private RoadmapStepStatus mapRoadmapStepStatus(
             SkillNode node,
             Map<UUID, StudentProgress> progressByNodeId,
@@ -255,12 +305,20 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
         return RoadmapStepStatus.LOCKED;
     }
 
+    /**
+     * Selects the appropriate message to display on the dashboard preview for a chat session.
+     * Prefers the first user message, otherwise falls back to the first available message.
+     *
+     * @param session the chat session
+     * @param messages list of all messages in history
+     * @return the selected {@link ChatMessage} for preview
+     */
     private ChatMessage selectDashboardMessage(ChatSession session, List<ChatMessage> messages) {
         ChatMessage firstMessage = null;
         ChatMessage firstUserMessage = null;
 
         for (ChatMessage message : messages) {
-            if (!message.getChatSession().getSessionId().equals(session.getSessionId())) {
+            if (!message.getSessionId().equals(session.getSessionId())) {
                 continue;
             }
 
@@ -280,6 +338,12 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
         return firstMessage;
     }
 
+    /**
+     * Shortens the text content to a predefined length limit for preview purposes.
+     *
+     * @param content the original text content
+     * @return the shortened text string
+     */
     private String shortenText(String content) {
         if (content == null) {
             return null;
@@ -290,18 +354,24 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
         return content.substring(0, AI_TEXT_LIMIT);
     }
 
+    /**
+     * Aggregates skill trend jobs by their respective week stack dates.
+     *
+     * @param trends the list of {@link SkillTrend} data
+     * @return a map containing the aggregated job count per week date
+     */
     private Map<LocalDate, Integer> sumJobsByWeek(List<SkillTrend> trends) {
         Map<LocalDate, Integer> jobsByWeek = new TreeMap<>();
         for (SkillTrend trend : trends) {
-            if (trend.getWeekStack() == null || trend.getJobsNeeded() == null) {
+            if (trend.getWeekStamp() == null || trend.getJobsNeeded() == null) {
                 continue;
             }
 
-            Integer currentValue = jobsByWeek.get(trend.getWeekStack());
+            Integer currentValue = jobsByWeek.get(trend.getWeekStamp());
             if (currentValue == null) {
                 currentValue = 0;
             }
-            jobsByWeek.put(trend.getWeekStack(), currentValue + trend.getJobsNeeded());
+            jobsByWeek.put(trend.getWeekStamp(), currentValue + trend.getJobsNeeded());
         }
         return jobsByWeek;
     }

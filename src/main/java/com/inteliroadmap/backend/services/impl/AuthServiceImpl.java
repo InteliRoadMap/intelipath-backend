@@ -1,5 +1,4 @@
 package com.inteliroadmap.backend.services.impl;
-import com.inteliroadmap.backend.services.AuthService;
 
 import com.inteliroadmap.backend.domain.dto.request.RefreshRequest;
 import com.inteliroadmap.backend.domain.dto.response.RefreshResponse;
@@ -9,6 +8,7 @@ import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.repositories.RefreshTokenRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.security.JwtService;
+import com.inteliroadmap.backend.services.AuthService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -20,6 +20,10 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
+/**
+ * Implementation of AuthService for handling user authentication and token lifecycle.
+ * Manages access and refresh tokens validation, rotation, and revocation.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -36,6 +40,7 @@ public class AuthServiceImpl implements AuthService {
      * @return RefreshResponse containing new access token, refresh token and expiration time
      */
     @Transactional
+    @Override
     public RefreshResponse refreshAccount(RefreshRequest refreshRequest) {
         // Step 1: Get refresh token from request body
         String refreshToken = refreshRequest.getRefreshToken();
@@ -63,7 +68,7 @@ public class AuthServiceImpl implements AuthService {
         }
 
         RefreshToken storedToken = storedTokenOptional.get();
-        if (storedToken.getExpireAt().isBefore(LocalDateTime.now())) {
+        if (storedToken.getExpiredAt().isBefore(LocalDateTime.now())) {
             log.warn("Stored refresh token has expired for user: {}", email);
             throw invalidRefreshToken();
         }
@@ -75,7 +80,7 @@ public class AuthServiceImpl implements AuthService {
             throw new ResourceNotFoundException("Refresh token or user not found");
         }
 
-        if (!storedToken.getUser().getUserId().equals(user.getUserId())) {
+        if (!storedToken.getUserId().equals(user.getUserId())) {
             log.warn("Refresh token ownership mismatch for user: {}", email);
             throw invalidRefreshToken();
         }
@@ -93,8 +98,8 @@ public class AuthServiceImpl implements AuthService {
 
         RefreshToken newStoredToken = RefreshToken.builder()
                 .token(newRefreshToken)
-                .user(user)
-                .expireAt(LocalDateTime.now().plus(Duration.ofMillis(jwtService.getRefreshExpiration())))
+                .userId(user.getUserId())
+                .expiredAt(LocalDateTime.now().plus(Duration.ofMillis(jwtService.getRefreshExpiration())))
                 .build();
 
         refreshTokenRepository.save(newStoredToken);
@@ -112,7 +117,9 @@ public class AuthServiceImpl implements AuthService {
      * @param expiresIn access token expiration time
      * @return RefreshResponse containing generated token information
      */
-    private RefreshResponse refreshResponse(String accessToken, String refreshToken, LocalDateTime expiresIn) {
+    @Override
+    public RefreshResponse refreshResponse(String accessToken, String refreshToken, LocalDateTime expiresIn) {
+        // Construct and return a structured response containing the new tokens and expiration time
         return RefreshResponse.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
@@ -125,7 +132,9 @@ public class AuthServiceImpl implements AuthService {
      *
      * @return ResponseStatusException with HTTP 401 status
      */
-    private ResponseStatusException invalidRefreshToken() {
+    @Override
+    public ResponseStatusException invalidRefreshToken() {
+        // Generate a 401 Unauthorized exception for any refresh token failures
         return new ResponseStatusException(
                 HttpStatus.UNAUTHORIZED,
                 "Refresh token is invalid or expired"

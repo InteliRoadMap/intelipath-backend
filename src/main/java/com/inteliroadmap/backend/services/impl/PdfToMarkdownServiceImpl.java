@@ -1,6 +1,6 @@
 package com.inteliroadmap.backend.services.impl;
-import com.inteliroadmap.backend.services.PdfToMarkdownService;
 
+import com.inteliroadmap.backend.services.PdfToMarkdownService;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -24,13 +24,13 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Service chuyển đổi PDF sang Markdown bằng GPT-4o-mini Vision.
+ * Service implementation for converting PDF documents to Markdown format using GPT-4o-mini Vision.
  *
- * Luồng xử lý:
- * 1. Nhận file PDF (từ MultipartFile hoặc URL)
- * 2. Dùng PDFBox render từng trang PDF thành ảnh PNG
- * 3. Gửi ảnh cho GPT-4o-mini Vision kèm prompt yêu cầu convert sang Markdown
- * 4. Ghép Markdown của tất cả các trang lại thành một chuỗi hoàn chỉnh
+ * Processing flow:
+ * 1. Receives a PDF file (via MultipartFile or URL).
+ * 2. Renders each PDF page into a PNG image using PDFBox.
+ * 3. Sends the images to GPT-4o-mini Vision with a prompt to convert content to Markdown.
+ * 4. Concatenates the Markdown results from all pages into a complete document.
  */
 @Service
 @Slf4j
@@ -76,34 +76,43 @@ public class PdfToMarkdownServiceImpl implements PdfToMarkdownService {
             - Do not leave empty lines between the header, separator, and body rows of a table.
             """;
 
+    /**
+     * Constructor for PdfToMarkdownServiceImpl.
+     *
+     * @param chatClientBuilder the builder used to construct the {@link ChatClient}
+     */
     public PdfToMarkdownServiceImpl(ChatClient.Builder chatClientBuilder) {
         this.chatClient = chatClientBuilder.build();
     }
 
     /**
-     * Chuyển đổi file PDF (MultipartFile) sang Markdown.
+     * Converts an uploaded PDF file (MultipartFile) to Markdown.
      *
-     * @param file File PDF upload từ user
-     * @return Chuỗi Markdown hoàn chỉnh của toàn bộ file
-     * @throws IOException Nếu đọc file thất bại
+     * @param file the uploaded PDF file
+     * @return a complete Markdown string representing the document
+     * @throws IOException if reading the file fails
      */
+    @Override
     public String convertToMarkdown(MultipartFile file) throws IOException {
         log.info("Starting PDF-to-Markdown conversion for file: {}, size: {} bytes",
                 file.getOriginalFilename(), file.getSize());
 
+        // Extract the file data into an InputStream and read it fully into a byte array
         try (InputStream inputStream = file.getInputStream()) {
             byte[] pdfBytes = inputStream.readAllBytes();
+            // Delegate to the shared processing logic
             return processPages(pdfBytes, file.getOriginalFilename());
         }
     }
 
     /**
-     * Chuyển đổi file PDF từ URL sang Markdown.
+     * Converts a PDF file fetched from a URL to Markdown.
      *
-     * @param pdfUrl URL trỏ tới file PDF
-     * @return Chuỗi Markdown hoàn chỉnh của toàn bộ file
-     * @throws IOException Nếu download hoặc đọc file thất bại
+     * @param pdfUrl the URL pointing to the PDF file
+     * @return a complete Markdown string representing the document
+     * @throws IOException if downloading or reading the file fails
      */
+    @Override
     public String convertToMarkdown(String pdfUrl) throws IOException {
         log.info("Starting PDF-to-Markdown conversion for URL: {}", pdfUrl);
 
@@ -114,13 +123,14 @@ public class PdfToMarkdownServiceImpl implements PdfToMarkdownService {
     }
 
     /**
-     * Chuyển đổi mảng byte PDF sang Markdown.
+     * Converts a PDF byte array to Markdown.
      *
-     * @param pdfBytes Mảng byte của file PDF
-     * @param sourceName Tên file hoặc URL (dùng cho logging)
-     * @return Chuỗi Markdown hoàn chỉnh
-     * @throws IOException Nếu đọc PDF thất bại
+     * @param pdfBytes the byte array of the PDF file
+     * @param sourceName the name of the file or URL (used for logging purposes)
+     * @return a complete Markdown string representing the document
+     * @throws IOException if reading the PDF fails
      */
+    @Override
     public String convertToMarkdown(byte[] pdfBytes, String sourceName) throws IOException {
         log.info("Starting PDF-to-Markdown conversion for: {}, size: {} bytes",
                 sourceName, pdfBytes.length);
@@ -128,12 +138,20 @@ public class PdfToMarkdownServiceImpl implements PdfToMarkdownService {
     }
 
     /**
-     * Xử lý chính: render từng trang PDF thành ảnh, gửi cho Vision AI, ghép kết quả.
+     * Main processing logic: renders each PDF page to an image, sends it to the Vision AI,
+     * and concatenates the resulting Markdown.
+     *
+     * @param pdfBytes the byte array of the PDF file
+     * @param sourceName the name of the source (for logging)
+     * @return the combined Markdown string of all pages
+     * @throws IOException if PDF processing fails
      */
     private String processPages(byte[] pdfBytes, String sourceName) throws IOException {
+        // Convert the PDF bytes into a list of PNG image byte arrays (one per page)
         List<byte[]> pageImages = renderPdfToImages(pdfBytes);
         log.info("Rendered {} pages from PDF: {}", pageImages.size(), sourceName);
 
+        // Handle edge case of an empty PDF
         if (pageImages.isEmpty()) {
             log.warn("PDF has no pages: {}", sourceName);
             return "<!-- Document is empty -->";
@@ -141,43 +159,57 @@ public class PdfToMarkdownServiceImpl implements PdfToMarkdownService {
 
         StringBuilder fullMarkdown = new StringBuilder();
 
+        // Iterate through each rendered page image
         for (int i = 0; i < pageImages.size(); i++) {
             int pageNumber = i + 1;
             log.debug("Processing page {}/{} of {}", pageNumber, pageImages.size(), sourceName);
 
             try {
+                // Send the image to the AI vision model to extract its markdown content
                 String pageMarkdown = convertPageToMarkdown(pageImages.get(i), pageNumber);
 
+                // Add a page separator if this is a multi-page document
                 if (pageImages.size() > 1) {
                     fullMarkdown.append("\n\n<!-- page: ").append(pageNumber).append(" -->\n\n");
                 }
+                // Append the extracted markdown for the current page
                 fullMarkdown.append(pageMarkdown);
 
             } catch (Exception e) {
+                // In case of a processing failure, log the error and embed a failure note in the markdown
                 log.error("Failed to convert page {} of {}: {}", pageNumber, sourceName, e.getMessage());
                 fullMarkdown.append("\n\n<!-- page: ").append(pageNumber)
                         .append(" failed: ").append(e.getMessage()).append(" -->\n\n");
             }
         }
 
+        // Return the accumulated and trimmed markdown string
         String result = fullMarkdown.toString().trim();
         log.info("PDF-to-Markdown conversion completed for {}. Output length: {} chars", sourceName, result.length());
         return result;
     }
 
     /**
-     * Dùng PDFBox render tất cả các trang PDF thành danh sách ảnh PNG (byte array).
+     * Uses PDFBox to render all PDF pages into a list of PNG images (byte arrays).
+     *
+     * @param pdfBytes the byte array of the PDF file
+     * @return a list of byte arrays, each representing a PNG image of a page
+     * @throws IOException if PDF rendering fails
      */
     private List<byte[]> renderPdfToImages(byte[] pdfBytes) throws IOException {
         List<byte[]> images = new ArrayList<>();
 
+        // Load the PDF byte data into a PDFBox document model
         try (PDDocument document = Loader.loadPDF(pdfBytes)) {
             PDFRenderer renderer = new PDFRenderer(document);
             int totalPages = document.getNumberOfPages();
 
+            // Iterate over each page and render it as an image
             for (int i = 0; i < totalPages; i++) {
+                // Render the page to a BufferedImage at the specified DPI (150)
                 BufferedImage image = renderer.renderImageWithDPI(i, RENDER_DPI, ImageType.RGB);
 
+                // Write the rendered image to a byte array as a PNG format
                 try (ByteArrayOutputStream baos = new ByteArrayOutputStream()) {
                     ImageIO.write(image, "png", baos);
                     images.add(baos.toByteArray());
@@ -189,12 +221,17 @@ public class PdfToMarkdownServiceImpl implements PdfToMarkdownService {
     }
 
     /**
-     * Gửi một ảnh trang PDF cho GPT-4o-mini Vision và nhận về Markdown.
+     * Sends a single PDF page image to GPT-4o-mini Vision and retrieves the Markdown result.
+     *
+     * @param imageBytes the byte array of the page image
+     * @param pageNumber the page number being processed
+     * @return the Markdown representation of the page
      */
     private String convertPageToMarkdown(byte[] imageBytes, int pageNumber) {
         log.debug("Sending page {} image ({} bytes) to Vision AI", pageNumber, imageBytes.length);
 
         // Wrap byte[] thành Resource để Spring AI Media có thể đọc
+        // Wrap the raw image bytes into a Spring Resource required by the AI Media wrapper
         ByteArrayResource imageResource = new ByteArrayResource(imageBytes) {
             @Override
             public String getFilename() {
@@ -203,20 +240,24 @@ public class PdfToMarkdownServiceImpl implements PdfToMarkdownService {
         };
 
         // Tạo Media object chứa ảnh PNG để gửi cho Vision API
+        // Create a Media object specifying the MIME type and resource data
         Media imageMedia = new Media(MimeTypeUtils.IMAGE_PNG, imageResource);
 
         // Tạo UserMessage kèm ảnh
+        // Construct the final user prompt injecting the specific page context alongside the image media
         UserMessage userMessage = new UserMessage(
                 VISION_PROMPT + "\n\nThis is page " + pageNumber + " of the document.",
                 List.of(imageMedia)
         );
 
         // Gọi ChatClient (GPT-4o-mini Vision) và nhận kết quả
+        // Execute the call to the configured ChatClient and extract the raw markdown response content
         String markdown = chatClient.prompt()
                 .messages(List.of(userMessage))
                 .call()
                 .content();
 
+        // Handle case where AI fails to return any content
         if (markdown == null || markdown.isBlank()) {
             return "<!-- page: " + pageNumber + " - no content extracted -->";
         }
