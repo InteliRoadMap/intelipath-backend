@@ -114,7 +114,7 @@ public class RoadmapServiceImpl implements RoadmapService {
         // Fetch authenticated student
         Student student = getAuthenticatedStudent();
         // If the student hasn't selected a career, return an empty roadmap
-        if (student.getCareerId() == null) {
+        if (student.getCareerRole().getCareerId() == null) {
             return StudentRoadmapResponse.builder()
                     .progress(0)
                     .nodes(List.of())
@@ -122,7 +122,7 @@ public class RoadmapServiceImpl implements RoadmapService {
         }
 
         // Look up the career role and associated skill nodes
-        CareerRole careerRole = careerRoleRepository.findByCareerId(student.getCareerId());
+        CareerRole careerRole = careerRoleRepository.findByCareerId(student.getCareerRole().getCareerId());
         List<SkillNode> nodes = skillNodeRepository
                 .findByCareerIdOrderByNodeLevelAscNodeNameAsc(careerRole.getCareerId());
 
@@ -178,7 +178,7 @@ public class RoadmapServiceImpl implements RoadmapService {
 
         long completedCount = progresses.stream()
                 .filter(p -> RoadmapStepStatus.COMPLETED == p.getStatus())
-                .filter(p -> p.getNodeId() != null && careerNodeIds.contains(p.getNodeId()))
+                .filter(p -> p.getSkillNode().getNodeId() != null && careerNodeIds.contains(p.getSkillNode().getNodeId()))
                 .count();
 
         double percentage = ((double) completedCount / allNodes.size()) * 100.0;
@@ -265,7 +265,7 @@ public class RoadmapServiceImpl implements RoadmapService {
     public com.inteliroadmap.backend.domain.dto.response.roadmap.StudentRoadmapResponse
     getStudentRoadmap(String authHeader) {
         Student student = getStudentFromAuthHeader(authHeader);
-        CareerRole careerRole = careerRoleRepository.findByCareerId(student.getCareerId());
+        CareerRole careerRole = careerRoleRepository.findByCareerId(student.getCareerRole().getCareerId());
         if (careerRole == null) {
             throw new ResourceNotFoundException("Student has not selected a career path yet.");
         }
@@ -275,7 +275,7 @@ public class RoadmapServiceImpl implements RoadmapService {
         List<StudentProgress> progressList = studentProgressRepository.findByStudentId(student.getUserId());
         Map<UUID, String> progressMap = progressList.stream()
                 .collect(Collectors.toMap(
-                        StudentProgress::getNodeId,
+                        s -> s.getSkillNode().getNodeId(),
                         progress -> progress.getStatus().toFrontendValue()
                 ));
 
@@ -397,8 +397,8 @@ public class RoadmapServiceImpl implements RoadmapService {
             progress = progressOptional.get();
         } else {
             progress = StudentProgress.builder()
-                    .studentId(student.getUserId())
-                    .nodeId(node.getNodeId())
+                    .student(com.inteliroadmap.backend.domain.entity.Student.builder().userId(student.getUserId()).build())
+                    .skillNode(node)
                     .createdAt(LocalDateTime.now())
                     .build();
         }
@@ -424,7 +424,7 @@ public class RoadmapServiceImpl implements RoadmapService {
                         List<SkillNode> allNodesForSkill = skillNodeRepository
                                 .findBySkillIdAndCareerId(
                                         skill.getSkillId(),
-                                        student.getCareerId()
+                                        student.getCareerRole().getCareerId()
                                 );
                         boolean allCompleted = true;
                         
@@ -441,8 +441,8 @@ public class RoadmapServiceImpl implements RoadmapService {
 
                         if (allCompleted) {
                             StudentSkill newSkill = StudentSkill.builder()
-                                    .studentId(student.getUserId())
-                                    .skillId(skill.getSkillId())
+                                    .student(com.inteliroadmap.backend.domain.entity.Student.builder().userId(student.getUserId()).build())
+                                    .skill(skill)
                                     .build();
                             studentSkillRepository.save(newSkill);
                             log.info("Auto-synced skill {} to student {} after all required nodes were completed", skill.getSkillName(), student.getUserId());
@@ -464,14 +464,14 @@ public class RoadmapServiceImpl implements RoadmapService {
     @Override
     public SkillGapResponse compareSkills(String authHeader) {
         Student student = getStudentFromAuthHeader(authHeader);
-        CareerRole careerRole = careerRoleRepository.findByCareerId(student.getCareerId());
+        CareerRole careerRole = careerRoleRepository.findByCareerId(student.getCareerRole().getCareerId());
         if (careerRole == null) {
             throw new ResourceNotFoundException("Student has not selected a career path yet.");
         }
 
         List<StudentSkill> currentStudentSkills = studentSkillRepository.findByStudentId(student.getUserId());
         List<UUID> currentSkillIds = currentStudentSkills.stream()
-                .map(StudentSkill::getSkillId)
+                .map(s -> s.getSkill().getSkillId())
                 .collect(Collectors.toList());
         List<Skill> currentSkills = skillRepository.findAllById(currentSkillIds);
         Set<String> currentSkillNames = currentSkills.stream()
@@ -481,7 +481,7 @@ public class RoadmapServiceImpl implements RoadmapService {
         List<CareerRequiredSkill> requiredSkills =
                 careerRequiredSkillRepository.findByCareerRoleId(careerRole.getCareerId());
         List<UUID> reqSkillIds = requiredSkills.stream()
-                .map(CareerRequiredSkill::getSkillId)
+                .map(s -> s.getSkill().getSkillId())
                 .collect(Collectors.toList());
         List<Skill> reqSkills = skillRepository.findAllById(reqSkillIds);
         
@@ -531,8 +531,8 @@ public class RoadmapServiceImpl implements RoadmapService {
      * @return the mapped {@link RoadmapNodeDto}
      */
     private RoadmapNodeDto mapToLegacyNodeDto(SkillNode node, String status) {
-        String childNodeOf = node.getParentNode() != null ?
-                skillNodeRepository.findByNodeId(node.getParentNode()).getNodeName() : null;
+        String childNodeOf = node.getChildNodeOf() != null ?
+                node.getChildNodeOf().getNodeName() : null;
 
         return RoadmapNodeDto.builder()
                 .nodeId(node.getNodeId())
@@ -555,8 +555,8 @@ public class RoadmapServiceImpl implements RoadmapService {
     private Map<UUID, StudentProgress> mapProgressByNodeId(List<StudentProgress> progresses) {
         Map<UUID, StudentProgress> progressByNodeId = new HashMap<>();
         for (StudentProgress progress : progresses) {
-            if (progress.getNodeId() != null) {
-                progressByNodeId.put(progress.getNodeId(), progress);
+            if (progress.getSkillNode().getNodeId() != null) {
+                progressByNodeId.put(progress.getSkillNode().getNodeId(), progress);
             }
         }
         return progressByNodeId;
@@ -589,10 +589,10 @@ public class RoadmapServiceImpl implements RoadmapService {
                 }
             }
 
-            if (node.getParentNode() == null) {
+            if (node.getChildNodeOf() == null) {
                 statusByNodeId.put(node.getNodeId(), FRONTEND_CURRENT_STATUS);
             } else {
-                String parentStatus = statusByNodeId.get(node.getParentNode());
+                String parentStatus = statusByNodeId.get(node.getChildNodeOf());
                 if (FRONTEND_COMPLETED_STATUS.equals(parentStatus)) {
                     statusByNodeId.put(node.getNodeId(), FRONTEND_CURRENT_STATUS);
                 } else {
@@ -641,12 +641,12 @@ public class RoadmapServiceImpl implements RoadmapService {
         List<SkillNode> rootNodes = new ArrayList<>();
 
         for (SkillNode node : nodes) {
-            if (node.getParentNode() == null) {
+            if (node.getChildNodeOf() == null) {
                 rootNodes.add(node);
                 continue;
             }
 
-            UUID parentId = node.getParentNode();
+            UUID parentId = node.getChildNodeOf() != null ? node.getChildNodeOf().getNodeId() : null;
             childrenByParentId.computeIfAbsent(parentId, key -> new ArrayList<>()).add(node);
         }
 
@@ -680,7 +680,7 @@ public class RoadmapServiceImpl implements RoadmapService {
                 .status(statusByNodeId.getOrDefault(node.getNodeId(), FRONTEND_LOCKED_STATUS))
                 .description(node.getDescription())
                 .nodeLevel(node.getNodeLevel())
-                .parentNode(node.getParentNode() != null ? node.getParentNode() : null)
+                .parentNode(node.getChildNodeOf() != null ? node.getChildNodeOf().getNodeId() : null)
                 .resources(toResourceResponses(node.getResource()))
                 .children(children)
                 .build();

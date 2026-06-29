@@ -80,7 +80,7 @@ public class AuthServiceImpl implements AuthService {
             throw new ResourceNotFoundException("Refresh token or user not found");
         }
 
-        if (!storedToken.getUserId().equals(user.getUserId())) {
+        if (!storedToken.getUser().getUserId().equals(user.getUserId())) {
             log.warn("Refresh token ownership mismatch for user: {}", email);
             throw invalidRefreshToken();
         }
@@ -98,7 +98,7 @@ public class AuthServiceImpl implements AuthService {
 
         RefreshToken newStoredToken = RefreshToken.builder()
                 .token(newRefreshToken)
-                .userId(user.getUserId())
+                .user(com.inteliroadmap.backend.domain.entity.User.builder().userId(user.getUserId()).build())
                 .expiredAt(LocalDateTime.now().plus(Duration.ofMillis(jwtService.getRefreshExpiration())))
                 .build();
 

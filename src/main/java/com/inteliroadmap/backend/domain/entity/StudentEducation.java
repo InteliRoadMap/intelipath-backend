@@ -21,11 +21,11 @@ public class StudentEducation {
     @Column(name = "education_id")
     private UUID educationId;
 
-//    @ManyToOne(fetch = FetchType.LAZY)
-//    @JoinColumn(name = "user_id", nullable = false, foreignKey = @ForeignKey(name = "fk_se_user"))
-//    private Student user;
-    @Column(name = "user_id", nullable = false)
-    private UUID userId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false, foreignKey = @ForeignKey(name = "fk_se_user"))
+    private Student user;
+//    @Column(name = "user_id", nullable = false)
+//    private UUID userId;
 
     @Column(name = "university", nullable = false)
     private String university;

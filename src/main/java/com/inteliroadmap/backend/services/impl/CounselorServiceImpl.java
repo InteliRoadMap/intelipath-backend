@@ -241,11 +241,11 @@ public class CounselorServiceImpl implements CounselorService {
         int nodesCompleted = studentProgressRepository
                 .findRoadmapTotalNodeCompletedByStudentIdAndCareerId(
                         student.getUserId(),
-                        student.getCareerId()
+                        student.getCareerRole().getCareerId()
                 );
 
         int totalRoadmapNode = skillNodeRepository
-                .findTotalNodeOfRoadmap(student.getCareerId());
+                .findTotalNodeOfRoadmap(student.getCareerRole().getCareerId());
 
         // Avoid division by zero if the roadmap is empty
         int progress = (totalRoadmapNode == 0) ? 0 : nodesCompleted / totalRoadmapNode;
@@ -254,7 +254,7 @@ public class CounselorServiceImpl implements CounselorService {
         List<String> missingSkillNames = studentSkillRepository
                 .findMissingSkillsByStudentIdAndCareerId(
                         student.getUserId(),
-                        student.getCareerId()
+                        student.getCareerRole().getCareerId()
                 );
 
         List<Feedback> feedbacks = feedbackRepository

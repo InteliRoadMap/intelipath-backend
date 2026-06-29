@@ -24,15 +24,15 @@ public class StudentMapper {
                 .id(user.getUserId())
                 .fullName(user.getFullName())
                 .role(user.getRole().name())
-                .careerId(student.getCareerId())
+                .careerId(student.getCareerRole().getCareerId())
                 .build();
     }
 
     public StudentResponse toProfileResponse(Student student) {
         User user = userRepository.findByUserId(student.getUserId());
         String careerName = null;
-        if (student.getCareerId() != null) {
-            Optional<CareerRole> optCareer = careerRoleRepository.findById(student.getCareerId());
+        if (student.getCareerRole().getCareerId() != null) {
+            Optional<CareerRole> optCareer = careerRoleRepository.findById(student.getCareerRole().getCareerId());
             if (optCareer.isPresent()) {
                 careerName = optCareer.get().getCareerName();
             }
@@ -48,7 +48,7 @@ public class StudentMapper {
                 .yearOfAdmission(student.getYearOfAdmission())
                 .major(student.getMajor())
                 .githubProfile(student.getGithubProfile())
-                .careerId(student.getCareerId())
+                .careerId(student.getCareerRole().getCareerId())
                 .careerName(careerName)
                 .build();
     }

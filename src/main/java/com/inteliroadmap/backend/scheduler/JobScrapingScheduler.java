@@ -110,8 +110,8 @@ public class JobScrapingScheduler {
                             .findFirstByCompanyIdAndRecruitmentId(comp.getTopCvCompanyId(), rec.getTopCvRecruitmentId());
                     if (existingPost == null) {
                         RecruitmentPost post = new RecruitmentPost();
-                        post.setCompanyId(comp.getTopCvCompanyId());
-                        post.setRecruitmentId(rec.getTopCvRecruitmentId());
+                        post.setCompany(com.inteliroadmap.backend.domain.entity.Company.builder().topCvCompanyId(comp.getTopCvCompanyId()).build());
+                        post.setRecruitment(com.inteliroadmap.backend.domain.entity.Recruitment.builder().topCvRecruitmentId(rec.getTopCvRecruitmentId()).build());
                         if (pDto.getExpireAt() != null) {
                             post.setExpiredAt(LocalDate.parse(pDto.getExpireAt(), formatter));
                         }

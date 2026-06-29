@@ -152,7 +152,7 @@ public class SkillExtractionServiceImpl implements SkillExtractionService {
 
             for (Map.Entry<LocalDate, Integer> dateEntry : entry.getValue().entrySet()) {
                 SkillTrend trend = SkillTrend.builder()
-                        .skillId(skill.getSkillId())
+                        .skill(Skill.builder().skillId(skill.getSkillId()).build())
                         .weekStamp(dateEntry.getKey())
                         .jobsNeeded(dateEntry.getValue())
                         .build();

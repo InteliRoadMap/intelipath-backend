@@ -21,11 +21,11 @@ public class RefreshToken {
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
-//    @ManyToOne(fetch = FetchType.LAZY)
-//    @JoinColumn(name = "user_id", nullable = false)
-//    private User user;
-    @Column(name = "user_id", nullable = false)
-    private UUID userId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
+//    @Column(name = "user_id", nullable = false)
+//    private UUID userId;
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String token;

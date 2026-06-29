@@ -22,11 +22,11 @@ public class ChatMessage {
     @Column(name = "message_id")
     private UUID messageId;
 
-//    @ManyToOne(fetch = FetchType.LAZY)
-//    @JoinColumn(name = "session_id", nullable = false, foreignKey = @ForeignKey(name = "fk_cm_session"))
-//    private ChatSession chatSession;
-    @Column(name = "session_id", nullable = false)
-    private UUID sessionId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "session_id", nullable = false, foreignKey = @ForeignKey(name = "fk_cm_session"))
+    private ChatSession chatSession;
+//    @Column(name = "session_id", nullable = false)
+//    private UUID sessionId;
 
     @Column(name = "role", nullable = false)
     private String role;

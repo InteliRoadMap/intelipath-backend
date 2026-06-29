@@ -39,12 +39,12 @@ public class StudentDashboardMapper {
 
     public SkillGapItemResponse toSkillGapItemResponse(CareerRequiredSkill requiredSkill, Integer progress) {
         Skill skill = null;
-        if (requiredSkill.getSkillId() != null) {
-            skill = skillRepository.findById(requiredSkill.getSkillId()).orElse(null);
+        if (requiredSkill.getSkill().getSkillId() != null) {
+            skill = skillRepository.findById(requiredSkill.getSkill().getSkillId()).orElse(null);
         }
         
         return SkillGapItemResponse.builder()
-                .id(requiredSkill.getSkillId())
+                .id(requiredSkill.getSkill().getSkillId())
                 .type(skillGapType(requiredSkill.getImportanceLevel()))
                 .title(skill != null ? skill.getSkillName() : "Unknown Skill")
                 .description(skill != null ? skillDescription(skill) : "")
@@ -93,12 +93,12 @@ public class StudentDashboardMapper {
 
     public RecommendationItemResponse toRecommendationItemResponse(CareerRequiredSkill requiredSkill) {
         Skill skill = null;
-        if (requiredSkill.getSkillId() != null) {
-            skill = skillRepository.findById(requiredSkill.getSkillId()).orElse(null);
+        if (requiredSkill.getSkill().getSkillId() != null) {
+            skill = skillRepository.findById(requiredSkill.getSkill().getSkillId()).orElse(null);
         }
         
         return RecommendationItemResponse.builder()
-                .id(requiredSkill.getSkillId())
+                .id(requiredSkill.getSkill().getSkillId())
                 .type(RECOMMENDATION_TYPE)
                 .icon(RECOMMENDATION_ICON)
                 .title(skill != null ? skill.getSkillName() : "Unknown Skill")

@@ -49,8 +49,8 @@ public class ScraperServiceImpl implements ScraperService {
         // Iterate through each post to build the response DTO
         for (RecruitmentPost post : posts) {
             // Retrieve associated company and recruitment details using their TopCV IDs
-            Company company = companyRepository.findByTopCvCompanyId(post.getCompanyId());
-            Recruitment recruitment = recruitmentRepository.findByTopCvRecruitmentId(post.getRecruitmentId());
+            Company company = companyRepository.findByTopCvCompanyId(post.getCompany().getTopCvCompanyId());
+            Recruitment recruitment = recruitmentRepository.findByTopCvRecruitmentId(post.getRecruitment().getTopCvRecruitmentId());
 
             // Build company DTO
             RecruitmentPostDto.CompanyDto companyDto = RecruitmentPostDto.CompanyDto.builder()
@@ -62,7 +62,7 @@ public class ScraperServiceImpl implements ScraperService {
             // Flatten the map of tags into a single list
             List<String> flattenedTags = new ArrayList<>();
             if (recruitment.getDescriptions() != null && recruitment.getDescriptions().get("tags") != null) {
-                java.util.Map<String, List<String>> tagsMap = (java.util.Map<String, List<String>>) recruitment.getDescriptions().get("tags");
+                Map<String, List<String>> tagsMap = (Map<String, List<String>>) recruitment.getDescriptions().get("tags");
                 for (List<String> tagList : tagsMap.values()) {
                     if (tagList != null) {
                         flattenedTags.addAll(tagList);
@@ -115,7 +115,7 @@ public class ScraperServiceImpl implements ScraperService {
                 .companyLink(company.getCompanyLink())
                 .name(company.getName())
                 .logo(company.getLogo())
-                .introductions(company.getInfo() != null ? (java.util.List<String>) company.getInfo().get("introduction") : null)
+                .introductions(company.getInfo() != null ? (List<String>) company.getInfo().get("introduction") : null)
                 .infos(company.getInfo())
                 .contacts(company.getContact())
                 .build();

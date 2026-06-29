@@ -45,8 +45,8 @@ public class PortfolioMapper {
         List<PortfolioResponse.StudentSkillResponse> skillResponses = skills.stream()
                 .map(s -> {
                     String skillName = "Unknown Skill";
-                    if (s.getSkillId() != null) {
-                        Optional<Skill> opt = skillRepository.findById(s.getSkillId());
+                    if (s.getSkill().getSkillId() != null) {
+                        Optional<Skill> opt = skillRepository.findById(s.getSkill().getSkillId());
                         if (opt.isPresent()) {
                             skillName = opt.get().getSkillName();
                         }
@@ -97,7 +97,7 @@ public class PortfolioMapper {
         }
         return projectRequests.stream().map(p ->
                 PortfolioProject.builder()
-                        .userId(user.getUserId())
+                        .user(com.inteliroadmap.backend.domain.entity.User.builder().userId(user.getUserId()).build())
                         .projectName(p.getProjectName())
                         .repoUrl(p.getRepoUrl())
                         .demoUrl(p.getDemoUrl())
@@ -115,7 +115,7 @@ public class PortfolioMapper {
         }
         return educationRequests.stream().map(e ->
                 StudentEducation.builder()
-                        .userId(student.getUserId())
+                        .user(com.inteliroadmap.backend.domain.entity.Student.builder().userId(student.getUserId()).build())
                         .university(e.getUniversity())
                         .degree(e.getDegree())
                         .period(e.getPeriod())

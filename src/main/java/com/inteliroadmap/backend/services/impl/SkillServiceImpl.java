@@ -55,7 +55,7 @@ public class SkillServiceImpl implements SkillService {
         List<Skill> allSkills = skillRepository.findAll();
 
         // Step 3: Return selected and available skills when no target career is set
-        if (student.getCareerId() == null) {
+        if (student.getCareerRole().getCareerId() == null) {
             return SkillResponse.builder()
                     .selectedSkills(skillMapper.toSelectedSkillResponses(selectedSkills))
                     .skills(skillMapper.toSkillItemResponses(allSkills))
@@ -64,7 +64,7 @@ public class SkillServiceImpl implements SkillService {
 
         // Step 4: Load required skills for the selected career
         List<CareerRequiredSkill> requiredSkills = careerRequiredSkillRepository
-                .findByCareerRoleId(student.getCareerId());
+                .findByCareerRoleId(student.getCareerRole().getCareerId());
 
         // Step 5: Calculate skills that the student has not selected
         List<Skill> missingSkills = findMissingSkills(requiredSkills, selectedSkills);
@@ -137,7 +137,7 @@ public class SkillServiceImpl implements SkillService {
                 .findByStudentIdAndSkillIdIn(student.getUserId(), List.copyOf(requestedSkillIds));
         Set<UUID> existingSkillIds = new LinkedHashSet<>();
         for (StudentSkill existingStudentSkill : existingStudentSkills) {
-            existingSkillIds.add(existingStudentSkill.getSkillId());
+            existingSkillIds.add(existingStudentSkill.getSkill().getSkillId());
         }
 
         // Step 6: Build only student-skill records that do not already exist
@@ -145,8 +145,8 @@ public class SkillServiceImpl implements SkillService {
         for (Skill requestedSkill : requestedSkills) {
             if (!existingSkillIds.contains(requestedSkill.getSkillId())) {
                 StudentSkill newStudentSkill = StudentSkill.builder()
-                        .studentId(student.getUserId())
-                        .skillId(requestedSkill.getSkillId())
+                        .student(Student.builder().userId(student.getUserId()).build())
+                        .skill(requestedSkill)
                         .build();
                 newSkillsToSave.add(newStudentSkill);
             }
@@ -219,13 +219,13 @@ public class SkillServiceImpl implements SkillService {
         // Collect all skill IDs currently possessed by the student
         Set<UUID> studentSkillIds = new LinkedHashSet<>();
         for (StudentSkill studentSkill : studentSkills) {
-            studentSkillIds.add(studentSkill.getSkillId());
+            studentSkillIds.add(studentSkill.getSkill().getSkillId());
         }
 
         List<Skill> missingSkills = new ArrayList<>();
         // Check each required skill to see if the student already has it
         for (CareerRequiredSkill requiredSkill : requiredSkills) {
-            Skill skill = skillRepository.findById(requiredSkill.getSkillId()).orElse(null);
+            Skill skill = skillRepository.findById(requiredSkill.getSkill().getSkillId()).orElse(null);
             // If the required skill exists and is not in the student's list, it is missing
             if (skill != null && !studentSkillIds.contains(skill.getSkillId())) {
                 missingSkills.add(skill);

@@ -35,7 +35,7 @@ public class SkillMapper {
 
     public List<SkillItemResponse> toSelectedSkillResponses(List<StudentSkill> studentSkills) {
         return studentSkills.stream()
-                .map(ss -> skillRepository.findById(ss.getSkillId()).orElse(null))
+                .map(ss -> skillRepository.findById(ss.getSkill().getSkillId()).orElse(null))
                 .filter(Objects::nonNull)
                 .map(this::toSkillItemResponse)
                 .toList();
@@ -44,7 +44,7 @@ public class SkillMapper {
     public List<RequiredSkillResponse> toRequiredSkillResponses(List<CareerRequiredSkill> requiredSkills) {
         return requiredSkills.stream()
                 .map(requiredSkill -> {
-                    Skill skill = skillRepository.findById(requiredSkill.getSkillId()).orElse(null);
+                    Skill skill = skillRepository.findById(requiredSkill.getSkill().getSkillId()).orElse(null);
                     return RequiredSkillResponse.builder()
                             .skill(skill != null ? toSkillItemResponse(skill) : null)
                             .importanceLevel(requiredSkill.getImportanceLevel())

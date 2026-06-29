@@ -21,17 +21,17 @@ public class RecruitmentPost {
     @Column(name = "post_id", updatable = false, nullable = false)
     private UUID postId;
 
-//    @ManyToOne(fetch = FetchType.LAZY)
-//    @JoinColumn(name = "company_id", nullable = false, foreignKey = @ForeignKey(name = "fk_rp_company"))
-//    private Company company;
-    @Column(name = "company_id", nullable = false)
-    private String companyId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "company_id", nullable = false, foreignKey = @ForeignKey(name = "fk_rp_company"))
+    private Company company;
+//    @Column(name = "company_id", nullable = false)
+//    private String companyId;
 
-//    @ManyToOne(fetch = FetchType.LAZY)
-//    @JoinColumn(name = "recruitment_id", nullable = false, foreignKey = @ForeignKey(name = "fk_rp_recruitment"))
-//    private Recruitment recruitment;
-    @Column(name = "recruitment_id", nullable = false)
-    private String recruitmentId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "recruitment_id", nullable = false, foreignKey = @ForeignKey(name = "fk_rp_recruitment"))
+    private Recruitment recruitment;
+//    @Column(name = "recruitment_id", nullable = false)
+//    private String recruitmentId;
 
     @Column(name = "expired_at")
     private LocalDate expiredAt;

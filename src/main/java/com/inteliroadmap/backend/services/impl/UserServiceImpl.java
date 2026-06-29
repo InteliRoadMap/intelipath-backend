@@ -14,6 +14,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 
@@ -124,7 +125,7 @@ public class UserServiceImpl implements UserService {
      */
     @Transactional
     @Override
-    public UserResponse updateAvatar(org.springframework.web.multipart.MultipartFile file) {
+    public UserResponse updateAvatar(MultipartFile file) {
         log.info("User Module: Update avatar request received");
 
         String email = SecurityContextHolder.getContext().getAuthentication().getName();

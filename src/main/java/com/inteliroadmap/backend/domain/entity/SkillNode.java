@@ -24,23 +24,23 @@ public class SkillNode {
     @Column(name = "node_id")
     private UUID nodeId;
 
-//    @ManyToOne(fetch = FetchType.LAZY)
-//    @JoinColumn(name = "career_id", nullable = false, foreignKey = @ForeignKey(name = "fk_sn_career"))
-//    private CareerRole careerRole;
-    @Column(name = "career_id", nullable = false)
-    private UUID careerId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "career_id", nullable = false, foreignKey = @ForeignKey(name = "fk_sn_career"))
+    private CareerRole careerRole;
+//    @Column(name = "career_id", nullable = false)
+//    private UUID careerId;
 
-//    @ManyToOne(fetch = FetchType.LAZY)
-//    @JoinColumn(name = "connect_to", foreignKey = @ForeignKey(name = "fk_sn_connect_to"))
-//    private SkillNode connectTo;
-    @Column(name = "previous_node")
-    private UUID previousNode;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "connect_to", foreignKey = @ForeignKey(name = "fk_sn_connect_to"))
+    private SkillNode connectTo;
+//    @Column(name = "previous_node")
+//    private UUID previousNode;
 
-//    @ManyToOne(fetch = FetchType.LAZY)
-//    @JoinColumn(name = "child_node_of", foreignKey = @ForeignKey(name = "fk_sn_child_node_of"))
-//    private SkillNode childNodeOf;
-    @Column(name = "parent_node")
-    private UUID parentNode;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "child_node_of", foreignKey = @ForeignKey(name = "fk_sn_child_node_of"))
+    private SkillNode childNodeOf;
+//    @Column(name = "parent_node")
+//    private UUID parentNode;
 
     @Column(name = "node_name", nullable = false)
     private String nodeName;

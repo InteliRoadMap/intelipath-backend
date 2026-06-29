@@ -53,12 +53,12 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
 
         // Fetch current authenticated student and check if they have selected a career
         Student student = getCurrentStudent();
-        if (student == null || student.getCareerId() == null) {
+        if (student == null || student.getCareerRole().getCareerId() == null) {
             return DashboardRoadmapProgressResponse.builder().build();
         }
 
         // Retrieve ordered skill nodes associated with the student's chosen career
-        UUID careerId = student.getCareerId();
+        UUID careerId = student.getCareerRole().getCareerId();
         List<SkillNode> nodes = skillNodeRepository
                 .findByCareerIdOrderByNodeLevelAscNodeNameAsc(careerId);
 
@@ -103,7 +103,7 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
         log.info("Student Dashboard Module: Fetching skill gaps");
 
         Student student = getCurrentStudent();
-        if (student == null || student.getCareerId() == null) {
+        if (student == null || student.getCareerRole().getCareerId() == null) {
             return List.of();
         }
 
@@ -112,7 +112,7 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
                 .map(req -> studentDashboardMapper.toSkillGapItemResponse(
                         req, studentService.calculateSkillProgress(
                                 student,
-                                req.getSkillId()
+                                req.getSkill().getSkillId()
                         )
                 ))
                 .toList();
@@ -179,15 +179,15 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
         log.info("Student Dashboard Module: Fetching market demand");
 
         Student student = getCurrentStudent();
-        if (student == null || student.getCareerId() == null) {
+        if (student == null || student.getCareerRole().getCareerId() == null) {
             return MarketDemandResponse.builder().build();
         }
 
-        CareerRole careerRole = careerRoleRepository.findByCareerId(student.getCareerId());
+        CareerRole careerRole = careerRoleRepository.findByCareerId(student.getCareerRole().getCareerId());
         List<CareerRequiredSkill> requiredSkills = careerRequiredSkillRepository
                 .findByCareerRoleId(careerRole.getCareerId());
         List<UUID> skillIds = requiredSkills.stream()
-                .map(CareerRequiredSkill::getSkillId)
+                .map(s -> s.getSkill().getSkillId())
                 .filter(Objects::nonNull)
                 .toList();
 
@@ -230,7 +230,7 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
         log.info("Student Dashboard Module: Fetching recommendations");
 
         Student student = getCurrentStudent();
-        if (student == null || student.getCareerId() == null) {
+        if (student == null || student.getCareerRole().getCareerId() == null) {
             return List.of();
         }
 
@@ -273,8 +273,8 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
     private Map<UUID, StudentProgress> mapProgressByNodeId(List<StudentProgress> progresses) {
         Map<UUID, StudentProgress> progressByNodeId = new HashMap<>();
         for (StudentProgress progress : progresses) {
-            if (progress.getNodeId() != null) {
-                progressByNodeId.put(progress.getNodeId(), progress);
+            if (progress.getSkillNode().getNodeId() != null) {
+                progressByNodeId.put(progress.getSkillNode().getNodeId(), progress);
             }
         }
         return progressByNodeId;
@@ -318,7 +318,7 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
         ChatMessage firstUserMessage = null;
 
         for (ChatMessage message : messages) {
-            if (!message.getSessionId().equals(session.getSessionId())) {
+            if (!message.getChatSession().getSessionId().equals(session.getSessionId())) {
                 continue;
             }
 

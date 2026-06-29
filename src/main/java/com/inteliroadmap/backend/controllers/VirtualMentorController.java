@@ -144,7 +144,7 @@ public class VirtualMentorController {
     private VirtualMentorMessageResponse mapToMessageResponse(ChatMessage message) {
         return VirtualMentorMessageResponse.builder()
                 .messageId(message.getMessageId())
-                .sessionId(message.getSessionId())
+                .sessionId(message.getChatSession().getSessionId())
                 .role(message.getRole())
                 .content(message.getContent())
                 .createAt(message.getCreatedAt())

@@ -1,9 +1,12 @@
 package com.inteliroadmap.backend.services.impl;
 
+import com.inteliroadmap.backend.domain.dto.request.SetupStudentProfileRequest;
+import com.inteliroadmap.backend.domain.dto.response.RequiredSkillResponse;
 import com.inteliroadmap.backend.domain.dto.response.SkillResponse;
 import com.inteliroadmap.backend.domain.dto.response.StudentResponse;
 import com.inteliroadmap.backend.domain.entity.*;
 import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
+import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.services.AuthenticatedStudentService;
 import com.inteliroadmap.backend.mappers.SkillMapper;
 import com.inteliroadmap.backend.mappers.StudentDashboardMapper;
@@ -51,17 +54,17 @@ public class StudentServiceImpl implements StudentService {
      *
      * @param request the request containing the profile setup information
      * @return StudentResponse containing the updated profile
-     * @throws com.inteliroadmap.backend.exceptions.ResourceNotFoundException if the user or career role is not found
+     * @throws ResourceNotFoundException if the user or career role is not found
      */
     @Transactional
     @Override
-    public StudentResponse setupStudentProfile(com.inteliroadmap.backend.domain.dto.request.SetupStudentProfileRequest request) {
+    public StudentResponse setupStudentProfile(SetupStudentProfileRequest request) {
         log.info("Student Module: Setup Student Profile Request received");
 
         Student student = AuthenticatedStudentService.getOrCreateStudentForUpdate();
         User user = userRepository.findByUserId(student.getUserId());
         if (user == null) {
-            throw new com.inteliroadmap.backend.exceptions.ResourceNotFoundException("User not found");
+            throw new ResourceNotFoundException("User not found");
         }
 
         if (request.getUniversity() != null) student.setUniversity(request.getUniversity());
@@ -77,9 +80,9 @@ public class StudentServiceImpl implements StudentService {
             CareerRole career = careerRoleRepository.findByCareerId(request.getCareerId());
             if (career == null) {
                 log.warn("Career role was not found: {}", request.getCareerId());
-                throw new com.inteliroadmap.backend.exceptions.ResourceNotFoundException("Career role not found");
+                throw new ResourceNotFoundException("Career role not found");
             }
-            student.setCareerId(career.getCareerId());
+            student.setCareerRole(career);
         }
 
         boolean userChanged = false;
@@ -120,7 +123,7 @@ public class StudentServiceImpl implements StudentService {
      *
      * @param careerId the UUID of the new target career
      * @return StudentResponse containing the updated profile
-     * @throws com.inteliroadmap.backend.exceptions.ResourceNotFoundException if the career role is not found
+     * @throws ResourceNotFoundException if the career role is not found
      */
     @Transactional
     @Override
@@ -129,9 +132,9 @@ public class StudentServiceImpl implements StudentService {
         Student student = AuthenticatedStudentService.getOrCreateStudentForUpdate();
         CareerRole career = careerRoleRepository.findByCareerId(careerId);
         if (career == null) {
-            throw new com.inteliroadmap.backend.exceptions.ResourceNotFoundException("Career role not found");
+            throw new ResourceNotFoundException("Career role not found");
         }
-        student.setCareerId(career.getCareerId());
+        student.setCareerRole(career);
         studentRepository.save(student);
         log.info("Student target career updated successfully. careerId: {}", careerId);
         return studentMapper.toProfileResponse(student);
@@ -155,7 +158,7 @@ public class StudentServiceImpl implements StudentService {
 
         // Fetch the list of skills the student has explicitly selected
         List<StudentSkill> selectedSkills = studentSkillRepository.findByStudentId(student.getUserId());
-        if (student.getCareerId() == null) {
+        if (student.getCareerRole().getCareerId() == null) {
             // Return early if no career is selected, showing only what the student selected
             return SkillResponse.builder()
                     .selectedSkills(skillMapper.toSelectedSkillResponses(selectedSkills))
@@ -164,20 +167,20 @@ public class StudentServiceImpl implements StudentService {
 
         // Fetch the required skills for the target career
         List<CareerRequiredSkill> requiredSkills = careerRequiredSkillRepository
-                .findByCareerRoleId(student.getCareerId());
+                .findByCareerRoleId(student.getCareerRole().getCareerId());
                 
         // Filter out required skills that the student already possesses to find the missing ones
         List<CareerRequiredSkill> missingRequiredSkills = filterMissingRequiredSkills(requiredSkills, selectedSkills);
         List<Skill> missingSkills = missingRequiredSkills.stream()
-                .map(req -> skillRepository.findById(req.getSkillId()).orElse(null))
+                .map(req -> skillRepository.findById(req.getSkill().getSkillId()).orElse(null))
                 .filter(Objects::nonNull)
                 .toList();
 
         // Map required skills and calculate progress for each to populate the response
-        List<com.inteliroadmap.backend.domain.dto.response.RequiredSkillResponse> requiredSkillResponses = skillMapper.toRequiredSkillResponses(requiredSkills);
+        List<RequiredSkillResponse> requiredSkillResponses = skillMapper.toRequiredSkillResponses(requiredSkills);
         requiredSkillResponses.forEach(res -> {
             requiredSkills.stream()
-                .filter(r -> r.getSkillId().equals(res.getSkill().getSkillId()))
+                .filter(r -> r.getSkill().getSkillId().equals(res.getSkill().getSkillId()))
                 .findFirst()
                 .ifPresent(r -> res.setProgress(calculateSkillProgress(student, res.getSkill().getSkillId())));
         });
@@ -208,7 +211,7 @@ public class StudentServiceImpl implements StudentService {
     @Override
     public List<CareerRequiredSkill> findMissingRequiredSkills(Student student) {
         List<CareerRequiredSkill> requiredSkills = careerRequiredSkillRepository
-                .findByCareerRoleId(student.getCareerId());
+                .findByCareerRoleId(student.getCareerRole().getCareerId());
         List<StudentSkill> selectedSkills = studentSkillRepository.findByStudentId(student.getUserId());
         return filterMissingRequiredSkills(requiredSkills, selectedSkills);
     }
@@ -225,13 +228,13 @@ public class StudentServiceImpl implements StudentService {
             List<StudentSkill> selectedSkills
     ) {
         Set<UUID> selectedSkillIds = selectedSkills.stream()
-                .map(StudentSkill::getSkillId)
+                .map(s -> s.getSkill().getSkillId())
                 .filter(Objects::nonNull)
                 .collect(java.util.stream.Collectors.toSet());
 
         return requiredSkills.stream()
-                .filter(requiredSkill -> requiredSkill.getSkillId() != null)
-                .filter(requiredSkill -> !selectedSkillIds.contains(requiredSkill.getSkillId()))
+                .filter(requiredSkill -> requiredSkill.getSkill().getSkillId() != null)
+                .filter(requiredSkill -> !selectedSkillIds.contains(requiredSkill.getSkill().getSkillId()))
                 .toList();
     }
 
@@ -249,7 +252,7 @@ public class StudentServiceImpl implements StudentService {
         if (studentSkillRepository.existsByStudentIdAndSkillId(student.getUserId(), skillId)) {
             return 100;
         }
-        List<SkillNode> allNodesForSkill = skillNodeRepository.findBySkillIdAndCareerId(skillId, student.getCareerId());
+        List<SkillNode> allNodesForSkill = skillNodeRepository.findBySkillIdAndCareerId(skillId, student.getCareerRole().getCareerId());
         if (allNodesForSkill.isEmpty()) {
             return 0;
         }

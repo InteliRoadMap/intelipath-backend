@@ -59,8 +59,8 @@ public class CounselorMapper {
     private FeedbackResponse mapFeedbackToResponse(Feedback f) {
         return FeedbackResponse.builder()
                 .feedbackId(f.getFeedbackId())
-                .senderId(f.getSenderId())
-                .receiverId(f.getReceiverId())
+                .senderId(f.getSender().getUserId())
+                .receiverId(f.getReceiver().getUserId())
                 .senderName(f.getSenderName())
                 .content(f.getContent())
                 .type(f.getType())

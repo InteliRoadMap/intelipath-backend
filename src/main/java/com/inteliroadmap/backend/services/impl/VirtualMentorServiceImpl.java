@@ -15,6 +15,12 @@ import com.inteliroadmap.backend.services.VirtualMentorService;
 import com.inteliroadmap.backend.utils.BearerTokenUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.advisor.QuestionAnswerAdvisor;
+import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.messages.Message;
+import org.springframework.ai.chat.messages.SystemMessage;
+import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
@@ -194,7 +200,7 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
 
         // Save User Message to the database
         ChatMessage userMessage = ChatMessage.builder()
-                .sessionId(session.getSessionId())
+                .chatSession(ChatSession.builder().sessionId(session.getSessionId()).build())
                 .role("USER")
                 .content(request.getMessage())
                 .createdAt(LocalDateTime.now())
@@ -207,10 +213,10 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
         String systemPrompt = buildSystemPrompt(user, student);
         
         // 2. Build Message List
-        List<org.springframework.ai.chat.messages.Message> messageHistory = new ArrayList<>();
+        List<Message> messageHistory = new ArrayList<>();
         
         // Add System Message first to provide instructions and persona
-        messageHistory.add(new org.springframework.ai.chat.messages.SystemMessage(systemPrompt));
+        messageHistory.add(new SystemMessage(systemPrompt));
         
         // Add Chat History for the LLM context window
         List<ChatMessage> chatHistory = chatMessageRepository.findBySessionIdOrderByCreateAtAsc(sessionId);
@@ -222,9 +228,9 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
             }
             // Map the persisted roles to Spring AI message types
             if ("USER".equalsIgnoreCase(msg.getRole())) {
-                messageHistory.add(new org.springframework.ai.chat.messages.UserMessage(msg.getContent()));
+                messageHistory.add(new UserMessage(msg.getContent()));
             } else if ("ASSISTANT".equalsIgnoreCase(msg.getRole())) {
-                messageHistory.add(new org.springframework.ai.chat.messages.AssistantMessage(msg.getContent()));
+                messageHistory.add(new AssistantMessage(msg.getContent()));
             }
         }
         
@@ -235,9 +241,9 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
                 .messages(messageHistory)
                 .user(request.getMessage())
                 // Configure Vector Store Search request to attach relevant context retrieved from embedding DB
-                .advisors(new org.springframework.ai.chat.client.advisor.QuestionAnswerAdvisor(
+                .advisors(new QuestionAnswerAdvisor(
                         vectorStore, 
-                        org.springframework.ai.vectorstore.SearchRequest.defaults(),
+                        SearchRequest.defaults(),
                         "\n\n[OPTIONAL RETRIEVED CONTEXT]\n" +
                         "---------------------\n" +
                         "{question_answer_context}\n" +
@@ -251,7 +257,7 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
                 .doOnComplete(() -> {
                     // Save the AI response to DB when streaming is complete
                     ChatMessage assistantMessage = ChatMessage.builder()
-                            .sessionId(session.getSessionId())
+                            .chatSession(ChatSession.builder().sessionId(session.getSessionId()).build())
                             .role("ASSISTANT")
                             .content(fullResponse.toString())
                             .createdAt(LocalDateTime.now())

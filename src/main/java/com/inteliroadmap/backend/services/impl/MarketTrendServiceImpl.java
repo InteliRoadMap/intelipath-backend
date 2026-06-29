@@ -70,10 +70,10 @@ public class MarketTrendServiceImpl implements MarketTrendService {
 
         // Group the trends by the resolved skill name. Filter out trends with null skill IDs.
         Map<String, List<SkillTrend>> trendsBySkill = allTrends.stream()
-                .filter(t -> t.getSkillId() != null)
+                .filter(t -> t.getSkill().getSkillId() != null)
                 .collect(Collectors.groupingBy(t -> {
                     // Look up the actual skill entity to retrieve its name, default to "Unknown" if not found
-                    Skill skill = skillRepository.findById(t.getSkillId()).orElse(null);
+                    Skill skill = skillRepository.findById(t.getSkill().getSkillId()).orElse(null);
                     return skill != null ? skill.getSkillName() : "Unknown";
                 }));
 

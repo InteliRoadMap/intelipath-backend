@@ -24,17 +24,17 @@ public class Feedback {
     @Column(name = "feedback_id")
     private UUID feedbackId;
 
-//    @ManyToOne(fetch = FetchType.LAZY)
-//    @JoinColumn(name = "sender_id", nullable = false, foreignKey = @ForeignKey(name = "fk_fb_sender"))
-//    private User sender;
-    @Column(name = "sender_id", nullable = false)
-    private UUID senderId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "sender_id", nullable = false, foreignKey = @ForeignKey(name = "fk_fb_sender"))
+    private User sender;
+//    @Column(name = "sender_id", nullable = false)
+//    private UUID senderId;
 
-//    @ManyToOne(fetch = FetchType.LAZY)
-//    @JoinColumn(name = "receiver_id", nullable = false, foreignKey = @ForeignKey(name = "fk_fb_receiver"))
-//    private User receiver;
-    @Column(name = "receiver_id", nullable = false)
-    private UUID receiverId;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "receiver_id", nullable = false, foreignKey = @ForeignKey(name = "fk_fb_receiver"))
+    private User receiver;
+//    @Column(name = "receiver_id", nullable = false)
+//    private UUID receiverId;
 
     @Column(name = "sender_name")
     private String senderName;
