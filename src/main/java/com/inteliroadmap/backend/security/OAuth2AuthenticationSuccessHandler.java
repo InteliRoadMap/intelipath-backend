@@ -4,6 +4,7 @@ import com.inteliroadmap.backend.domain.entity.RefreshToken;
 import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.repositories.RefreshTokenRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
+import com.inteliroadmap.backend.utils.CookieUtils;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -77,21 +78,21 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         String accessToken = jwtService.generateAccessToken(email, role);
         String refreshToken = jwtService.generateRefreshToken(email);
 
-        // Save refresh token — delete old tokens first to prevent accumulation
+        // Save refresh token
         User user = userRepository.findByEmail(email);
         if (user != null) {
-            refreshTokenRepository.deleteByUser_UserId(user.getUserId());
-            com.inteliroadmap.backend.domain.entity.RefreshToken token = com.inteliroadmap.backend.domain.entity.RefreshToken.builder()
+            RefreshToken token = RefreshToken.builder()
                     .token(refreshToken)
-                    .user(user)
-                    .expireAt(java.time.LocalDateTime.now().plus(java.time.Duration.ofMillis(jwtService.getRefreshExpiration())))
+                    .user(com.inteliroadmap.backend.domain.entity.User.builder().userId(user.getUserId()).build())
+                    .expiredAt(LocalDateTime.now().plus(Duration.ofMillis(jwtService.getRefreshExpiration())))
                     .build();
             refreshTokenRepository.save(token);
         }
 
+        CookieUtils.addNonHttpOnlyCookie(response, "token", accessToken, 60);
+        CookieUtils.addNonHttpOnlyCookie(response, "refreshToken", refreshToken, 60);
+
         return UriComponentsBuilder.fromUriString(authorizedRedirectUri)
-                .queryParam("token", accessToken)
-                .queryParam("refreshToken", refreshToken)
                 .build().toUriString();
     }
 }

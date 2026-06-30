@@ -28,3 +28,4 @@ public class Skill {
     @Column(name = "skill_name", nullable = false)
     private String skillName;
 }
+

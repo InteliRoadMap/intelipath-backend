@@ -17,4 +17,6 @@ public class CreateFeedbackRequest {
 
     @NotNull(message = "Type is required")
     private FeedbackType type;
+
+    private Integer rating;
 }

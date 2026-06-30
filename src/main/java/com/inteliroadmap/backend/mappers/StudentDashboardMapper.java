@@ -4,6 +4,8 @@ import com.inteliroadmap.backend.domain.dto.response.student.*;
 import com.inteliroadmap.backend.domain.entity.*;
 import com.inteliroadmap.backend.domain.enums.ImportanceLevel;
 import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
+import com.inteliroadmap.backend.repositories.SkillRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.time.Duration;
@@ -11,7 +13,10 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Component
+@RequiredArgsConstructor
 public class StudentDashboardMapper {
+
+    private final SkillRepository skillRepository;
 
     private static final String CRITICAL_TYPE = "critical";
     private static final String MARKET_TYPE = "market";
@@ -33,12 +38,16 @@ public class StudentDashboardMapper {
     }
 
     public SkillGapItemResponse toSkillGapItemResponse(CareerRequiredSkill requiredSkill, Integer progress) {
-        Skill skill = requiredSkill.getSkill();
+        Skill skill = null;
+        if (requiredSkill.getSkill().getSkillId() != null) {
+            skill = skillRepository.findById(requiredSkill.getSkill().getSkillId()).orElse(null);
+        }
+        
         return SkillGapItemResponse.builder()
-                .id(skill.getSkillId())
+                .id(requiredSkill.getSkill().getSkillId())
                 .type(skillGapType(requiredSkill.getImportanceLevel()))
-                .title(skill.getSkillName())
-                .description(skillDescription(skill))
+                .title(skill != null ? skill.getSkillName() : "Unknown Skill")
+                .description(skill != null ? skillDescription(skill) : "")
                 .severity(requiredSkill.getImportanceLevel())
                 .progress(progress)
                 .build();
@@ -47,8 +56,8 @@ public class StudentDashboardMapper {
     public MentorFeedbackItemResponse toMentorFeedbackItemResponse(Feedback feedback) {
         return MentorFeedbackItemResponse.builder()
                 .id(feedback.getFeedbackId())
-                .name(feedback.getSender() != null ? feedback.getSender().getFullName() : null)
-                .time(formatRelativeTime(feedback.getCreateAt()))
+                .name(feedback.getSenderName())
+                .time(formatRelativeTime(feedback.getCreatedAt()))
                 .text(feedback.getContent())
                 .build();
     }
@@ -83,13 +92,17 @@ public class StudentDashboardMapper {
     }
 
     public RecommendationItemResponse toRecommendationItemResponse(CareerRequiredSkill requiredSkill) {
-        Skill skill = requiredSkill.getSkill();
+        Skill skill = null;
+        if (requiredSkill.getSkill().getSkillId() != null) {
+            skill = skillRepository.findById(requiredSkill.getSkill().getSkillId()).orElse(null);
+        }
+        
         return RecommendationItemResponse.builder()
-                .id(skill.getSkillId())
+                .id(requiredSkill.getSkill().getSkillId())
                 .type(RECOMMENDATION_TYPE)
                 .icon(RECOMMENDATION_ICON)
-                .title(skill.getSkillName())
-                .description(skillDescription(skill))
+                .title(skill != null ? skill.getSkillName() : "Unknown Skill")
+                .description(skill != null ? skillDescription(skill) : "")
                 .build();
     }
 

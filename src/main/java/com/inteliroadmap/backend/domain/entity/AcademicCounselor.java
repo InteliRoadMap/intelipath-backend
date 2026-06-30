@@ -29,5 +29,6 @@ public class AcademicCounselor {
     private String department;
 
     @Column(name = "year_of_admission")
-    private LocalDate yearOfAdmission;
+    private Integer yearOfAdmission;
 }
+

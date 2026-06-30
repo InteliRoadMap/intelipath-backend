@@ -136,7 +136,7 @@ public class VirtualMentorController {
                 .sessionId(session.getSessionId())
                 .userId(session.getUser().getUserId())
                 .sessionName(session.getSessionName())
-                .createAt(session.getCreateAt())
+                .createAt(session.getCreatedAt())
                 .build();
     }
 
@@ -146,7 +146,7 @@ public class VirtualMentorController {
                 .sessionId(message.getChatSession().getSessionId())
                 .role(message.getRole())
                 .content(message.getContent())
-                .createAt(message.getCreateAt())
+                .createAt(message.getCreatedAt())
                 .build();
     }
 }

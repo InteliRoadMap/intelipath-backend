@@ -13,13 +13,16 @@ import java.util.Map;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@com.fasterxml.jackson.annotation.JsonInclude(com.fasterxml.jackson.annotation.JsonInclude.Include.NON_NULL)
 public class CounselorResponse {
-    private Integer total;
-    private Map<String, Integer> careerStatistics;
-    private Map<String, Integer> missingSkills;
+    private int total;
+    private int totalPages;
+    private int currentPage;
+    private Map<String, Integer> totalCareerStatistics;
+    private Map<String, Integer> totalMissingSkills;
     private String careerName;
-    private List<Feedback> feedbacks;
-    private Feedback feedback;
+    private List<FeedbackResponse> feedbacks;
     private List<Map<String, Object>> students;
+    private Map<String, Object> studentInfo;
+    private List<String> missingSkills;
+    private int roadmapProgress;
 }

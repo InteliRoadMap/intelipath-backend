@@ -24,13 +24,15 @@ public class Student {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "career_id", foreignKey = @ForeignKey(name = "fk_st_career"))
     private CareerRole careerRole;
+//    @Column(name = "career_id")
+//    private UUID careerId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "university_id", foreignKey = @ForeignKey(name = "fk_st_university"))
     private University university;
 
     @Column(name = "year_of_admission")
-    private LocalDate yearOfAdmission;
+    private Integer yearOfAdmission;
 
     @Column(name = "major")
     private String major;
@@ -44,3 +46,4 @@ public class Student {
     @Column(name = "portfolio_slug", length = 100, unique = true)
     private String portfolioSlug;
 }
+

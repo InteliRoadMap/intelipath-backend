@@ -8,7 +8,7 @@ import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Entity
-@Table(name = "recruitment_posts")
+@Table(name = "processed_recruitment_posts")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -24,11 +24,16 @@ public class RecruitmentPost {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "company_id", nullable = false, foreignKey = @ForeignKey(name = "fk_rp_company"))
     private Company company;
+//    @Column(name = "company_id", nullable = false)
+//    private String companyId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "recruitment_id", nullable = false, foreignKey = @ForeignKey(name = "fk_rp_recruitment"))
     private Recruitment recruitment;
+//    @Column(name = "recruitment_id", nullable = false)
+//    private String recruitmentId;
 
-    @Column(name = "expire_at")
-    private LocalDate expireAt;
+    @Column(name = "expired_at")
+    private LocalDate expiredAt;
 }
+

@@ -6,82 +6,17 @@ import com.inteliroadmap.backend.domain.entity.SkillNode;
 import com.inteliroadmap.backend.repositories.CareerRoleRepository;
 import com.inteliroadmap.backend.repositories.SkillNodeRepository;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
+import com.inteliroadmap.backend.services.CareerService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
-
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
-@Service
-@RequiredArgsConstructor
-@Slf4j
-public class CareerService {
+public interface CareerService {
 
-    private final CareerRoleRepository careerRoleRepository;
-    private final SkillNodeRepository skillNodeRepository;
+    public List<CareerResponse> getAllCareers() ;
 
-    /**
-     * Get all career roles currently stored in the database.
-     *
-     * @return list of career role responses
-     */
-    public List<CareerResponse> getAllCareers() {
-        log.info("Career role retrieval request received");
-
-        // Step 1: Load all career roles from the database
-        List<CareerRole> careers = careerRoleRepository.findAll();
-
-        // Step 2: Map career entities to API response DTOs
-        return careers.stream()
-                .map(this::toCareerResponse)
-                .toList();
-    }
-
-    /**
-     * Get a career role and its roadmap skill node requirements.
-     *
-     * @param careerId database UUID of the requested career role
-     * @return career response containing required skill nodes
-     */
-    public CareerResponse getCareerRequirements(UUID careerId) {
-        log.info("Career requirement retrieval request received. careerId: {}", careerId);
-
-        // Step 1: Find the requested career role
-        Optional<CareerRole> careerRoleOptional = careerRoleRepository.findById(careerId);
-        if (careerRoleOptional.isEmpty()) {
-            log.warn("Career role was not found: {}", careerId);
-            throw new ResourceNotFoundException("Career role not found");
-        }
-
-        CareerRole careerRole = careerRoleOptional.get();
-
-        // Step 2: Load all roadmap nodes assigned to the career
-        List<SkillNode> nodes = skillNodeRepository.findByCareerRole_CareerId(careerId);
-
-        // Step 3: Build the career requirement response
-        return CareerResponse.builder()
-                .careerId(careerRole.getCareerId())
-                .careerName(careerRole.getCareerName())
-                .prerequisite(careerRole.getPrerequisite())
-                .description(careerRole.getDescription())
-                .skillNodes(nodes)
-                .build();
-    }
-
-    /**
-     * Map a career entity to its public response DTO.
-     *
-     * @param careerRole career entity loaded from the database
-     * @return mapped career response
-     */
-    private CareerResponse toCareerResponse(CareerRole careerRole) {
-        return CareerResponse.builder()
-                .careerId(careerRole.getCareerId())
-                .careerName(careerRole.getCareerName())
-                .prerequisite(careerRole.getPrerequisite())
-                .description(careerRole.getDescription())
-                .build();
-    }
+    public CareerResponse getCareerRequirements(UUID careerId) ;
 }

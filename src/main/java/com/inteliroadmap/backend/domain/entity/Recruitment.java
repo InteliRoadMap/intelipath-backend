@@ -11,7 +11,7 @@ import java.util.List;
 import java.util.Map;
 
 @Entity
-@Table(name = "recruitments")
+@Table(name = "processed_recruitments")
 @Getter
 @Setter
 @NoArgsConstructor
@@ -26,17 +26,21 @@ public class Recruitment {
     @Column(name = "recruitment_link", columnDefinition = "TEXT")
     private String recruitmentLink;
 
-    @Column(name = "title", columnDefinition = "TEXT")
-    private String title;
+//    @Column(name = "title", columnDefinition = "TEXT")
+//    private String title;
+//
+//    @Column(name = "salary", columnDefinition = "TEXT")
+//    private String salary;
+//
+//    @Column(name = "location", columnDefinition = "TEXT")
+//    private String location;
+//
+//    @Column(name = "experience", columnDefinition = "TEXT")
+//    private String experience;
 
-    @Column(name = "salary", columnDefinition = "TEXT")
-    private String salary;
-
-    @Column(name = "location", columnDefinition = "TEXT")
-    private String location;
-
-    @Column(name = "experience", columnDefinition = "TEXT")
-    private String experience;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "basic_info", columnDefinition = "jsonb")
+    private Map<String, Object> basicInfo;
 
     @Column(name = "application_deadline")
     private LocalDate applicationDeadline;
@@ -44,11 +48,11 @@ public class Recruitment {
 //    @JdbcTypeCode(SqlTypes.JSON)
 //    @Column(columnDefinition = "jsonb")
 //    private Map<String, List<String>> tags;
-//
-//    @JdbcTypeCode(SqlTypes.JSON)
-//    @Column(columnDefinition = "jsonb")
-//    private Map<String, List<String>> descriptions;
-//
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
+    private Map<String, Object> descriptions;
+
 //    @JdbcTypeCode(SqlTypes.JSON)
 //    @Column(columnDefinition = "jsonb")
 //    private Map<String, String> generalInfos;
@@ -57,23 +61,8 @@ public class Recruitment {
 //    @Column(columnDefinition = "jsonb")
 //    private Map<String, List<String>> relatedTags;
 
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(columnDefinition = "jsonb")
-    private Map<String, Object> tags;
-
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(columnDefinition = "jsonb")
-    private Map<String, Object> descriptions;
-
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(columnDefinition = "jsonb")
-    private Map<String, Object> generalInfos;
-
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(columnDefinition = "jsonb")
-    private Map<String, Object> relatedTags;
-
-    @OneToMany(mappedBy = "recruitment", cascade = CascadeType.ALL, orphanRemoval = true)
-    @Builder.Default
-    private List<RecruitmentPost> recruitmentPosts = new ArrayList<>();
+//    @OneToMany(mappedBy = "recruitment", cascade = CascadeType.ALL, orphanRemoval = true)
+//    @Builder.Default
+//    private List<RecruitmentPost> recruitmentPosts = new ArrayList<>();
 }
+

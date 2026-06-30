@@ -25,12 +25,17 @@ public class CareerRequiredSkill {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "career_id", nullable = false, foreignKey = @ForeignKey(name = "fk_crs_career"))
     private CareerRole careerRole;
+//    @Column(name = "career_id", nullable = false)
+//    private UUID careerRoleId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "skill_id", nullable = false, foreignKey = @ForeignKey(name = "fk_crs_skill"))
     private Skill skill;
+//    @Column(name = "skill_id", nullable = false)
+//    private UUID skillId;
 
     @Column(name = "importance_level")
     @Enumerated(EnumType.STRING)
     private ImportanceLevel importanceLevel;
 }
+

@@ -5,7 +5,9 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
 
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -25,31 +27,42 @@ public class SkillNode {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "career_id", nullable = false, foreignKey = @ForeignKey(name = "fk_sn_career"))
     private CareerRole careerRole;
-
-    @Column(name = "subtree_name")
-    private String subtreeName;
+//    @Column(name = "career_id", nullable = false)
+//    private UUID careerId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "connect_to", foreignKey = @ForeignKey(name = "fk_sn_connect_to"))
     private SkillNode connectTo;
+//    @Column(name = "previous_node")
+//    private UUID previousNode;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "child_node_of", foreignKey = @ForeignKey(name = "fk_sn_child_node_of"))
     private SkillNode childNodeOf;
+//    @Column(name = "parent_node")
+//    private UUID parentNode;
 
     @Column(name = "node_name", nullable = false)
     private String nodeName;
 
-    @Column(name = "level")
-    private Integer level;
+    @Column(name = "node_level")
+    private Integer nodeLevel;
 
     @Column(name = "skill_id")
     private UUID skillId;
 
+    @Column(name = "type_id")
+    private UUID typeId;
+
+    @JdbcTypeCode(org.hibernate.type.SqlTypes.ARRAY)
+    @Column(name = "prerequisite", columnDefinition = "uuid[]")
+    private List<UUID> prerequisite;
+
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 
-    @org.hibernate.annotations.JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
+    @JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "resource", columnDefinition = "jsonb")
     private com.fasterxml.jackson.databind.JsonNode resource;
 }
+

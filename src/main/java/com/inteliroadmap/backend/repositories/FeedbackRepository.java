@@ -13,17 +13,10 @@ import java.util.UUID;
 
 @Repository
 public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
-    List<Feedback> findTop5ByReceiver_UserIdOrderByCreateAtDesc(UUID userId);
-
-    List<Feedback> findByReceiver(User receiver);
-
     Feedback findByFeedbackId(UUID feedbackId);
+    List<Feedback> findTop5ByReceiverIdOrderByCreatedAtDesc(UUID receiverId);
+    List<Feedback> findByReceiverId(UUID receiverId);
 
-    List<Feedback> findBySenderOrReceiverOrderByCreateAtDesc(User sender, User receiver);
-
-    @Query("SELECT AVG(f.rating) FROM Feedback f WHERE f.sender.userId = :senderId AND f.rating IS NOT NULL")
-    Double getAverageRatingBySenderId(@Param("senderId") UUID senderId);
-
-    @Query("SELECT COUNT(f) FROM Feedback f WHERE f.sender.userId = :senderId AND f.createAt >= :startDate")
-    long countFeedbacksBySenderIdSince(@Param("senderId") UUID senderId, @Param("startDate") java.time.LocalDateTime startDate);
+    @Query("SELECT f FROM Feedback f WHERE (f.senderId = :userId1 AND f.receiverId = :userId2) OR (f.senderId = :userId2 AND f.receiverId = :userId1) ORDER BY f.createdAt DESC")
+    List<Feedback> findBySenderOrReceiverOrderByCreatedAtDesc(@Param("userId1") UUID userId1, @Param("userId2") UUID userId2);
 }

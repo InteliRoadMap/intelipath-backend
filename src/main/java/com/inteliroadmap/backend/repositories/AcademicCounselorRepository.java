@@ -9,4 +9,5 @@ import java.util.UUID;
 
 @Repository
 public interface AcademicCounselorRepository extends JpaRepository<AcademicCounselor, UUID> {
+    AcademicCounselor findByUserId(UUID id);
 }

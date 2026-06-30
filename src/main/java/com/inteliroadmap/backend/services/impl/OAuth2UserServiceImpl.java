@@ -1,4 +1,4 @@
-package com.inteliroadmap.backend.services;
+package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.domain.dto.internal.OAuth2UserInfoInternal;
 import com.inteliroadmap.backend.domain.dto.internal.info.GitHubOauth2UserInfo;
@@ -29,10 +29,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
+/**
+ * Custom implementation of {@link DefaultOAuth2UserService} to handle OAuth2 login flows.
+ * This service intercepts the OAuth2 authentication process, retrieves user information
+ * from the provider (like Google or GitHub), normalizes it, and manages the local user
+ * and student records, including linking OAuth2 accounts.
+ */
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class OAuth2UserService extends DefaultOAuth2UserService {
+public class OAuth2UserServiceImpl extends DefaultOAuth2UserService {
 
     private final UserRepository userRepository;
     private final OauthAccountRepository oauthAccountRepository;
@@ -48,30 +54,50 @@ public class OAuth2UserService extends DefaultOAuth2UserService {
     @Override
     @Transactional
     public OAuth2User loadUser(OAuth2UserRequest request) throws OAuth2AuthenticationException {
+        // Retrieve the provider (e.g., github, google) from the OAuth2 client registration
         String provider = request.getClientRegistration().getRegistrationId();
         log.info("Loading OAuth2 user from provider: {}", provider);
 
+        // Delegate to DefaultOAuth2UserService to fetch the basic user info
         OAuth2User oauthUser = super.loadUser(request);
+        // Extract and normalize the attributes (handling specific cases like missing GitHub email)
         Map<String, Object> attributes = resolveAttributes(provider, oauthUser, request);
+        // Create an internal DTO that maps attributes uniformly regardless of provider
         OAuth2UserInfoInternal userInfo = createUserInfo(provider, attributes);
 
+        // Ensure the email is present and valid
         validateEmail(userInfo);
 
+        // Retrieve existing local user or create a new one using the OAuth2 details
         User user = getOrCreateUser(userInfo);
+        // Link the OAuth account to the user record if not already linked
         linkOauthAccountIfNeeded(user, userInfo, provider);
 
         log.info("OAuth2 login completed for email: {}, role: {}", user.getEmail(), user.getRole());
 
+        // Return a custom user principal holding the email and role for Spring Security
         return new CustomOAuth2User(oauthUser, user.getEmail(), user.getRole().name());
     }
 
+    /**
+     * Resolves and normalizes attributes from the OAuth2 provider.
+     * Special handling is included for GitHub to fetch the primary email if it is hidden.
+     *
+     * @param provider The OAuth2 provider name (e.g., github, google)
+     * @param oauthUser The authenticated OAuth2 user
+     * @param request The OAuth2 user request containing the access token
+     * @return A map of resolved user attributes
+     */
     private Map<String, Object> resolveAttributes(
             String provider,
             OAuth2User oauthUser,
             OAuth2UserRequest request
     ) {
+        // Initialize a mutable map with the default attributes
         Map<String, Object> attributes = new HashMap<>(oauthUser.getAttributes());
 
+        // For GitHub, the email might be private and excluded from default attributes
+        // In this case, we explicitly fetch it from GitHub's email API
         if ("github".equalsIgnoreCase(provider) && attributes.get("email") == null) {
             fetchPrimaryGithubEmail(request.getAccessToken().getTokenValue())
                     .ifPresent(email -> attributes.put("email", email));
@@ -80,6 +106,12 @@ public class OAuth2UserService extends DefaultOAuth2UserService {
         return attributes;
     }
 
+    /**
+     * Fetches the primary, verified email address from the GitHub API using the user's access token.
+     *
+     * @param accessToken The GitHub OAuth2 access token
+     * @return An {@link Optional} containing the primary email address, or empty if not found or on error
+     */
     private Optional<String> fetchPrimaryGithubEmail(String accessToken) {
         try {
             List<Map<String, Object>> emails = RestClient.create("https://api.github.com")
@@ -114,13 +146,16 @@ public class OAuth2UserService extends DefaultOAuth2UserService {
      * @return existing or newly created user
      */
     private User getOrCreateUser(OAuth2UserInfoInternal userInfo) {
+        // Attempt to find a user matching the provided email
         User user = userRepository.findByEmail(userInfo.getEmail());
 
         if (user == null) {
+            // If the user doesn't exist, proceed to create a new one
             log.info("No existing user found. Creating new OAuth2 user: {}", userInfo.getEmail());
             return createUser(userInfo);
         }
 
+        // If the user exists, log the discovery and potentially update missing fields
         log.info("Existing user found for OAuth2 login: {}", user.getEmail());
         return updateUserIfNeeded(user, userInfo);
     }
@@ -132,19 +167,23 @@ public class OAuth2UserService extends DefaultOAuth2UserService {
      * @return saved user entity
      */
     private User createUser(OAuth2UserInfoInternal userInfo) {
+        // Build a new User entity using information retrieved from the OAuth2 provider
         User user = User.builder()
                 .email(userInfo.getEmail())
                 .fullName(userInfo.getFullName())
                 .bio(userInfo.getBio())
-                .role(UserRole.STUDENT)
+                .role(UserRole.STUDENT) // Defaulting all new OAuth users to STUDENT role
                 .build();
 
+        // Save the new User entity to the database
         User savedUser = userRepository.save(user);
         log.info("Created new OAuth2 user with id: {}, email: {}", savedUser.getUserId(), savedUser.getEmail());
 
+        // Automatically create a corresponding Student profile associated with the new User
         Student student = Student.builder()
                 .userId(savedUser.getUserId())
                 .githubProfile(userInfo.getHtmlUrl())
+                // Generate a unique portfolio slug based on the user's name and ID
                 .portfolioSlug(com.inteliroadmap.backend.utils.SlugUtils.generateSlug(savedUser.getFullName(), savedUser.getUserId()))
                 .build();
         studentRepository.save(student);
@@ -190,21 +229,25 @@ public class OAuth2UserService extends DefaultOAuth2UserService {
             OAuth2UserInfoInternal userInfo,
             String provider
     ) {
+        // Check if an OAuth link for this provider and user already exists
         boolean exists = oauthAccountRepository
                 .findByProviderIdAndProviderName(userInfo.getProviderId(), provider)
                 .isPresent();
 
         if (exists) {
+            // Already linked, no action needed
             log.debug("OAuth2 account already linked. provider: {}, providerId: {}", provider, userInfo.getProviderId());
             return;
         }
 
+        // Create a new OauthAccount record to link the external provider ID to the local user
         OauthAccount oauthAccount = OauthAccount.builder()
-                .user(user)
+                .user(com.inteliroadmap.backend.domain.entity.User.builder().userId(user.getUserId()).build())
                 .providerId(userInfo.getProviderId())
                 .providerName(provider)
                 .build();
 
+        // Persist the mapping
         oauthAccountRepository.save(oauthAccount);
         log.info("Linked OAuth2 account. user: {}, provider: {}, providerId: {}",
                 user.getEmail(), provider, userInfo.getProviderId());

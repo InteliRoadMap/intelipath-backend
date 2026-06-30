@@ -14,7 +14,7 @@ public class SetupStudentProfileRequest {
 
     private UUID universityId;
 
-    private String yearOfAdmission;
+    private Integer yearOfAdmission;
 
     private String major;
 

@@ -1,10 +1,9 @@
 package com.inteliroadmap.backend.repositories;
 
-import com.inteliroadmap.backend.domain.entity.AcademicCounselor;
-import com.inteliroadmap.backend.domain.entity.CareerRole;
+import com.inteliroadmap.backend.domain.dto.response.StudentInfoProjection;
 import com.inteliroadmap.backend.domain.entity.Student;
-import com.inteliroadmap.backend.domain.entity.User;
-import com.inteliroadmap.backend.mappers.DatasetMapper;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
@@ -18,18 +17,17 @@ import java.util.UUID;
 
 @Repository
 public interface StudentRepository extends JpaRepository<Student, UUID> {
-
     Student findByUserId(UUID userId);
-    List<Student> findByCareerRole(CareerRole careerRole);
-    List<Student> findByCareerRoleAndUniversity_UniversityId(CareerRole careerRole, UUID universityId);
+    List<Student> findByCareerId(UUID careerId);
 
-    @Query("SELECT s FROM Student s JOIN User u ON s.userId = u.userId WHERE (LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(s.careerRole.careerName) LIKE LOWER(CONCAT('%', :search, '%')))")
-    List<Student> searchStudentsInfo(@Param("search") String search);
-
-    List<Student> findByUniversity_UniversityId(UUID universityId);
-
-    @Query("SELECT s FROM Student s JOIN User u ON s.userId = u.userId WHERE s.university.universityId = :universityId AND (LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(s.careerRole.careerName) LIKE LOWER(CONCAT('%', :search, '%')))")
-    List<Student> searchStudentsInfoByUniversity(@Param("search") String search, @Param("universityId") UUID universityId);
+    @Query("SELECT s.userId as studentId, u.fullName as fullName, u.email as email, s.university as university, c.careerName as careerName " +
+           "FROM Student s " +
+           "JOIN User u ON s.userId = u.userId " +
+           "LEFT JOIN CareerRole c ON s.careerId = c.careerId " +
+           "WHERE (LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%'))) " +
+           "AND s.university = :uni " +
+           "AND u.role = UserRole.STUDENT")
+    Page<StudentInfoProjection> findStudentInfos(@Param("search") String search, @Param("uni") String uni, Pageable pageable);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select student from Student student where student.userId = :userId")

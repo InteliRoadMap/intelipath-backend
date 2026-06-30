@@ -30,12 +30,13 @@ public class ChatSession {
     private String sessionName;
 
     @Column(name = "create_at", nullable = false)
-    private LocalDateTime createAt;
+    private LocalDateTime createdAt;
 
     @PrePersist
     public void prePersist() {
-        if (createAt == null) {
-            createAt = LocalDateTime.now();
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
         }
     }
 }
+

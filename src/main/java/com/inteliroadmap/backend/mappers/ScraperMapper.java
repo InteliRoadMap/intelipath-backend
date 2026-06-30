@@ -27,7 +27,7 @@ public class ScraperMapper {
                 .companyLink(company.getCompanyLink())
                 .name(company.getName())
                 .logo(company.getLogo())
-                .introductions(company.getIntroduction())
+                .introductions(company.getInfo() != null ? (java.util.List<String>) company.getInfo().get("introduction") : null)
                 .infos(company.getInfo())
                 .contacts(company.getContact())
                 .build();
@@ -37,15 +37,15 @@ public class ScraperMapper {
         return RecruitmentResponse.builder()
                 .topCvRecruitmentId(recruitment.getTopCvRecruitmentId())
                 .recruitmentLink(recruitment.getRecruitmentLink())
-                .title(recruitment.getTitle())
-                .salary(recruitment.getSalary())
-                .location(recruitment.getLocation())
-                .experience(recruitment.getExperience())
+                .title(recruitment.getBasicInfo() != null ? (String) recruitment.getBasicInfo().get("title") : null)
+                .salary(recruitment.getBasicInfo() != null ? (String) recruitment.getBasicInfo().get("salary") : null)
+                .location(recruitment.getBasicInfo() != null ? (String) recruitment.getBasicInfo().get("location") : null)
+                .experience(recruitment.getBasicInfo() != null ? (String) recruitment.getBasicInfo().get("experience") : null)
                 .applicationDeadline(recruitment.getApplicationDeadline())
-                .tags(recruitment.getTags())
-                .descriptions(recruitment.getDescriptions())
-                .generalInfos(recruitment.getGeneralInfos())
-                .relatedTags(recruitment.getRelatedTags())
+                .tags(recruitment.getDescriptions() != null ? recruitment.getDescriptions().get("tags") : null)
+                .descriptions(recruitment.getDescriptions() != null ? recruitment.getDescriptions() : null)
+                .generalInfos(recruitment.getDescriptions() != null ? recruitment.getDescriptions().get("generalInfos") : null)
+                .relatedTags(recruitment.getDescriptions() != null ? recruitment.getDescriptions().get("relatedTags") : null)
                 .build();
     }
 }

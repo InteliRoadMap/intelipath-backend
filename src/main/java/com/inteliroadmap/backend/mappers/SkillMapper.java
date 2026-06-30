@@ -5,12 +5,18 @@ import com.inteliroadmap.backend.domain.dto.response.SkillItemResponse;
 import com.inteliroadmap.backend.domain.entity.CareerRequiredSkill;
 import com.inteliroadmap.backend.domain.entity.Skill;
 import com.inteliroadmap.backend.domain.entity.StudentSkill;
+import com.inteliroadmap.backend.repositories.SkillRepository;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Objects;
 
 @Component
+@RequiredArgsConstructor
 public class SkillMapper {
+
+    private final SkillRepository skillRepository;
 
     public SkillItemResponse toSkillItemResponse(Skill skill) {
         return SkillItemResponse.builder()
@@ -29,17 +35,21 @@ public class SkillMapper {
 
     public List<SkillItemResponse> toSelectedSkillResponses(List<StudentSkill> studentSkills) {
         return studentSkills.stream()
-                .map(StudentSkill::getSkill)
+                .map(ss -> skillRepository.findById(ss.getSkill().getSkillId()).orElse(null))
+                .filter(Objects::nonNull)
                 .map(this::toSkillItemResponse)
                 .toList();
     }
 
     public List<RequiredSkillResponse> toRequiredSkillResponses(List<CareerRequiredSkill> requiredSkills) {
         return requiredSkills.stream()
-                .map(requiredSkill -> RequiredSkillResponse.builder()
-                        .skill(toSkillItemResponse(requiredSkill.getSkill()))
-                        .importanceLevel(requiredSkill.getImportanceLevel())
-                        .build())
+                .map(requiredSkill -> {
+                    Skill skill = skillRepository.findById(requiredSkill.getSkill().getSkillId()).orElse(null);
+                    return RequiredSkillResponse.builder()
+                            .skill(skill != null ? toSkillItemResponse(skill) : null)
+                            .importanceLevel(requiredSkill.getImportanceLevel())
+                            .build();
+                })
                 .toList();
     }
 }
