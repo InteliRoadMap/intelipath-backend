@@ -25,8 +25,6 @@ public class ChatMessage {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "session_id", nullable = false, foreignKey = @ForeignKey(name = "fk_cm_session"))
     private ChatSession chatSession;
-//    @Column(name = "session_id", nullable = false)
-//    private UUID sessionId;
 
     @Column(name = "role", nullable = false)
     private String role;
@@ -34,7 +32,7 @@ public class ChatMessage {
     @Column(name = "content",nullable = false, columnDefinition = "TEXT")
     private String content;
 
-    @Column(name = "create_at", nullable = false)
+    @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
     @PrePersist

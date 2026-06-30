@@ -24,12 +24,10 @@ public class RefreshToken {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
-//    @Column(name = "user_id", nullable = false)
-//    private UUID userId;
 
     @Column(nullable = false, columnDefinition = "TEXT")
     private String token;
 
-    @Column(name = "expire_at", nullable = false)
+    @Column(name = "expired_at", nullable = false)
     private LocalDateTime expiredAt;
 }

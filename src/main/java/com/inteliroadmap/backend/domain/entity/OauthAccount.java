@@ -25,8 +25,6 @@ public class OauthAccount {
     @ManyToOne
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
-//    @Column(name = "user_id", nullable = false)
-//    private UUID userId;
 
     @Column(name = "provider_id", nullable = false)
     private String providerId;

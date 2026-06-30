@@ -16,7 +16,7 @@ import java.util.UUID;
 
 public interface CareerService {
 
-    public List<CareerResponse> getAllCareers() ;
+    List<CareerResponse> getAllCareers() ;
 
-    public CareerResponse getCareerRequirements(UUID careerId) ;
+    CareerResponse getCareerRequirements(UUID careerId) ;
 }

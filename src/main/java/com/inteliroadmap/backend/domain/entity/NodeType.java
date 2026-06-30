@@ -1,7 +1,7 @@
 package com.inteliroadmap.backend.domain.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
-import com.inteliroadmap.backend.domain.enums.NodeType;
+import com.inteliroadmap.backend.domain.enums.StageType;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -18,7 +18,7 @@ import java.util.UUID;
 @AllArgsConstructor
 @Builder
 @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
-public class NodeTypeEntity {
+public class NodeType {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -26,11 +26,8 @@ public class NodeTypeEntity {
     private UUID typeId;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "type", nullable = false)
-    private NodeType type;
-
-    @Column(name = "stage")
-    private String stage;
+    @Column(name = "stage", nullable = false)
+    private StageType stage;
 
     @Column(name = "unlock_key_required")
     private Boolean unlockKeyRequired;

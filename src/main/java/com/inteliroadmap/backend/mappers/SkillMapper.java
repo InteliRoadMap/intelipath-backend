@@ -3,6 +3,7 @@ package com.inteliroadmap.backend.mappers;
 import com.inteliroadmap.backend.domain.dto.response.RequiredSkillResponse;
 import com.inteliroadmap.backend.domain.dto.response.SkillItemResponse;
 import com.inteliroadmap.backend.domain.entity.CareerRequiredSkill;
+import com.inteliroadmap.backend.domain.entity.CareerRole;
 import com.inteliroadmap.backend.domain.entity.Skill;
 import com.inteliroadmap.backend.domain.entity.StudentSkill;
 import com.inteliroadmap.backend.repositories.SkillRepository;
@@ -11,6 +12,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -23,7 +25,7 @@ public class SkillMapper {
                 .skillId(skill.getSkillId())
                 .skillName(skill.getSkillName())
                 .category(skill.getCategory())
-                .career(skill.getCareer())
+                .career(skill.getCareers() != null && !skill.getCareers().isEmpty() ? skill.getCareers().stream().map(CareerRole::getCareerName).collect(Collectors.joining(", ")) : null)
                 .build();
     }
 

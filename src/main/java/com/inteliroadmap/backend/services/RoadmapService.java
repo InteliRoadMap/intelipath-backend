@@ -41,11 +41,9 @@ public interface RoadmapService {
 
     public RoadmapResponse updateNodeProgress(UpdateUserProgressRequest request) ;
 
-    public com.inteliroadmap.backend.domain.dto.response.roadmap.StudentRoadmapResponse
-    getStudentRoadmap(String authHeader) ;
+    public StudentRoadmapResponse getStudentRoadmap(String authHeader) ;
 
-    public com.inteliroadmap.backend.domain.dto.response.roadmap.StudentRoadmapResponse
-    getCareerRoadmapTemplate(UUID careerId) ;
+    public StudentRoadmapResponse getCareerRoadmapTemplate(UUID careerId) ;
 
     public Integer getCareerProgress(UUID careerId, String authHeader) ;
 
