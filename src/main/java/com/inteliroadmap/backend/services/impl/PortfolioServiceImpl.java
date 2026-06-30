@@ -135,7 +135,7 @@ public class PortfolioServiceImpl implements PortfolioService {
         if (configRequest == null) return;
         PortfolioConfig config = portfolioConfigRepository.findByUserId(student.getUserId());
         if (config == null) {
-            config = PortfolioConfig.builder().userId(student.getUserId()).build();
+            config = PortfolioConfig.builder().user(student).build();
         }
         config.setTheme(configRequest.getTheme());
         config.setThemeColors(configRequest.getThemeColors());

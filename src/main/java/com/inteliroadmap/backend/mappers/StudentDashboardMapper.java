@@ -11,6 +11,7 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Component
 @RequiredArgsConstructor
@@ -128,8 +129,8 @@ public class StudentDashboardMapper {
         if (skill.getCategory() != null && !skill.getCategory().isBlank()) {
             return skill.getCategory();
         }
-        if (skill.getCareer() != null && !skill.getCareer().isBlank()) {
-            return skill.getCareer();
+        if (skill.getCareers() != null && !skill.getCareers().isEmpty()) {
+            return skill.getCareers().stream().map(CareerRole::getCareerName).collect(Collectors.joining(", "));
         }
         return null;
     }

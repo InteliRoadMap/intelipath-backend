@@ -14,7 +14,6 @@ import java.util.UUID;
 public class RoadmapNodeDto {
     private UUID nodeId;
     private String nodeName;
-    private java.util.List<UUID> prerequisite;
     private String parentNode;
     private Integer nodeLevel;
     private String description;

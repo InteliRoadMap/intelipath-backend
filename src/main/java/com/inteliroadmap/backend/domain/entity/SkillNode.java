@@ -27,36 +27,26 @@ public class SkillNode {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "career_id", nullable = false, foreignKey = @ForeignKey(name = "fk_sn_career"))
     private CareerRole careerRole;
-//    @Column(name = "career_id", nullable = false)
-//    private UUID careerId;
+
+    @JoinColumn(name = "skill_id", foreignKey = @ForeignKey(name = "fk_s_skill"))
+    private Skill skill;
+
+    @JoinColumn(name = "type_id", foreignKey = @ForeignKey(name = "fk_t_node_type"))
+    private NodeType type;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "connect_to", foreignKey = @ForeignKey(name = "fk_sn_connect_to"))
-    private SkillNode connectTo;
-//    @Column(name = "previous_node")
-//    private UUID previousNode;
+    @JoinColumn(name = "previous_node", foreignKey = @ForeignKey(name = "fk_sn_previous_node"))
+    private SkillNode previousNode;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "child_node_of", foreignKey = @ForeignKey(name = "fk_sn_child_node_of"))
-    private SkillNode childNodeOf;
-//    @Column(name = "parent_node")
-//    private UUID parentNode;
+    @JoinColumn(name = "parent_node", foreignKey = @ForeignKey(name = "fk_sn_parent_node"))
+    private SkillNode parentNode;
 
     @Column(name = "node_name", nullable = false)
     private String nodeName;
 
     @Column(name = "node_level")
     private Integer nodeLevel;
-
-    @Column(name = "skill_id")
-    private UUID skillId;
-
-    @Column(name = "type_id")
-    private UUID typeId;
-
-    @JdbcTypeCode(org.hibernate.type.SqlTypes.ARRAY)
-    @Column(name = "prerequisite", columnDefinition = "uuid[]")
-    private List<UUID> prerequisite;
 
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;

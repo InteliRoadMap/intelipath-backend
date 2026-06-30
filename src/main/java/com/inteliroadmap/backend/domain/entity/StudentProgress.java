@@ -26,24 +26,20 @@ public class StudentProgress {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false, foreignKey = @ForeignKey(name = "fk_sp_student"))
     private Student student;
-//    @Column(name = "user_id", nullable = false)
-//    private UUID studentId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "node_id", nullable = false, foreignKey = @ForeignKey(name = "fk_sp_node"))
     private SkillNode skillNode;
-//    @Column(name = "node_id", nullable = false)
-//    private UUID nodeId;
 
     @Column(name = "status", nullable = false)
     @Enumerated(EnumType.STRING)
     @Builder.Default
     private RoadmapStepStatus status = RoadmapStepStatus.IN_PROGRESS;
 
-    @Column(name = "create_at", nullable = false)
+    @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
-    @Column(name = "complete_at")
+    @Column(name = "completed_at")
     private LocalDateTime completedAt;
 
     @PrePersist

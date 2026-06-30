@@ -145,7 +145,7 @@ public class SkillExtractionServiceImpl implements SkillExtractionService {
             if (skill == null) {
                 skill = Skill.builder()
                         .skillName(skillName)
-                        .career("IT") // Default
+                        // .career("IT") // Default
                         .build();
                 skill = skillRepository.save(skill);
             }

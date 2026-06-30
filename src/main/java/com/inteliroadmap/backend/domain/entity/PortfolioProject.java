@@ -25,8 +25,6 @@ public class PortfolioProject {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false, foreignKey = @ForeignKey(name = "fk_pp_user"))
     private User user;
-//    @Column(name = "user_id", nullable = false)
-//    private UUID userId;
 
     @Column(name = "repo_id")
     private Long repoId;

@@ -1,5 +1,6 @@
 package com.inteliroadmap.backend.domain.dto.response;
 
+import com.inteliroadmap.backend.domain.entity.CareerRole;
 import com.inteliroadmap.backend.domain.entity.SkillNode;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -16,7 +17,7 @@ import java.util.UUID;
 public class CareerResponse {
     private UUID careerId;
     private String careerName;
-    private String prerequisite;
+    private List<CareerRole> prerequisite;
     private String description;
 
     @Builder.Default

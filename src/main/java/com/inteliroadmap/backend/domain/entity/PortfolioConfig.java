@@ -25,11 +25,9 @@ public class PortfolioConfig {
     @Column(name = "config_id")
     private UUID configId;
 
-//    @OneToOne(fetch = FetchType.LAZY)
-//    @JoinColumn(name = "user_id", nullable = false, unique = true, foreignKey = @ForeignKey(name = "fk_pc_user"))
-//    private Student user;
-    @Column(name = "user_id", nullable = false, unique = true)
-    private UUID userId;
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false, unique = true, foreignKey = @ForeignKey(name = "fk_pc_user"))
+    private Student user;
 
     @Column(name = "theme", length = 50)
     @Builder.Default
@@ -51,10 +49,10 @@ public class PortfolioConfig {
     @Column(name = "skills_section", columnDefinition = "jsonb")
     private Map<String, Object> skillsSection;
 
-    @Column(name = "create_at")
+    @Column(name = "created_at")
     private LocalDateTime createdAt;
 
-    @Column(name = "update_at")
+    @Column(name = "updated_at")
     private LocalDateTime updatedAt;
 
     @PrePersist

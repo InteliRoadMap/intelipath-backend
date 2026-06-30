@@ -6,7 +6,10 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -26,8 +29,9 @@ public class CareerRole {
     @Column(name = "career_name", nullable = false)
     private String careerName;
 
-    @Column(name = "prerequisite")
-    private String prerequisite;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "prerequisite", columnDefinition = "jsonb")
+    private List<CareerRole> prerequisite;
 
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
