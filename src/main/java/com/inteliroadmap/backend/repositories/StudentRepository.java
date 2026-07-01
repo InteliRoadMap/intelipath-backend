@@ -1,6 +1,7 @@
 package com.inteliroadmap.backend.repositories;
 
 import com.inteliroadmap.backend.domain.dto.response.StudentInfoProjection;
+import com.inteliroadmap.backend.domain.entity.CareerRole;
 import com.inteliroadmap.backend.domain.entity.Student;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -18,12 +19,12 @@ import java.util.UUID;
 @Repository
 public interface StudentRepository extends JpaRepository<Student, UUID> {
     Student findByUserId(UUID userId);
-    List<Student> findByCareerId(UUID careerId);
+    List<Student> findByCareerRole(CareerRole career);
 
     @Query("SELECT s.userId as studentId, u.fullName as fullName, u.email as email, s.university as university, c.careerName as careerName " +
            "FROM Student s " +
            "JOIN User u ON s.userId = u.userId " +
-           "LEFT JOIN CareerRole c ON s.careerId = c.careerId " +
+           "LEFT JOIN CareerRole c ON s.careerRole.careerId = c.careerId " +
            "WHERE (LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%'))) " +
            "AND s.university = :uni " +
            "AND u.role = UserRole.STUDENT")

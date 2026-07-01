@@ -107,7 +107,7 @@ public class JobScrapingScheduler {
                 
                 if (comp != null && rec != null) {
                     RecruitmentPost existingPost = recruitmentPostRepository
-                            .findFirstByCompanyIdAndRecruitmentId(comp.getTopCvCompanyId(), rec.getTopCvRecruitmentId());
+                            .findFirstByCompany_TopCvCompanyIdAndRecruitment_TopCvRecruitmentId(comp.getTopCvCompanyId(), rec.getTopCvRecruitmentId());
                     if (existingPost == null) {
                         RecruitmentPost post = new RecruitmentPost();
                         post.setCompany(com.inteliroadmap.backend.domain.entity.Company.builder().topCvCompanyId(comp.getTopCvCompanyId()).build());

@@ -11,6 +11,6 @@ import java.util.List;
 public interface CompanyRepository extends JpaRepository<Company, String> {
     Company findByTopCvCompanyId(String topCvCompanyId);
 
-    @Query("SELECT c FROM Company c LEFT JOIN RecruitmentPost rp ON c.topCvCompanyId = rp.companyId GROUP BY c ORDER BY COUNT(rp.postId) DESC")
+    @Query("SELECT c FROM Company c LEFT JOIN RecruitmentPost rp ON c.topCvCompanyId = rp.company.topCvCompanyId GROUP BY c ORDER BY COUNT(rp.postId) DESC")
     List<Company> findTopHiringCompanies(org.springframework.data.domain.Pageable pageable);
 }

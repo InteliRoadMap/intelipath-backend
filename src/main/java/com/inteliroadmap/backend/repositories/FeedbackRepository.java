@@ -14,9 +14,9 @@ import java.util.UUID;
 @Repository
 public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     Feedback findByFeedbackId(UUID feedbackId);
-    List<Feedback> findTop5ByReceiverIdOrderByCreatedAtDesc(UUID receiverId);
-    List<Feedback> findByReceiverId(UUID receiverId);
+    List<Feedback> findTop5ByReceiver_UserIdOrderByCreatedAtDesc(UUID receiverId);
+    List<Feedback> findByReceiver(User receiver);
 
-    @Query("SELECT f FROM Feedback f WHERE (f.senderId = :userId1 AND f.receiverId = :userId2) OR (f.senderId = :userId2 AND f.receiverId = :userId1) ORDER BY f.createdAt DESC")
+    @Query("SELECT f FROM Feedback f WHERE (f.sender.userId = :userId1 AND f.receiver.userId = :userId2) OR (f.sender.userId = :userId2 AND f.receiver.userId = :userId1) ORDER BY f.createdAt DESC")
     List<Feedback> findBySenderOrReceiverOrderByCreatedAtDesc(@Param("userId1") UUID userId1, @Param("userId2") UUID userId2);
 }

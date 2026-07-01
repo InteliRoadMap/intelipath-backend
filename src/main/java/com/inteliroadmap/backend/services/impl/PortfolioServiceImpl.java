@@ -55,10 +55,10 @@ public class PortfolioServiceImpl implements PortfolioService {
         User user = userOpt.get();
 
         // Fetch portfolio configuration, skills, projects, and education for the student
-        PortfolioConfig config = portfolioConfigRepository.findByUserId(student.getUserId());
-        List<StudentSkill> skills = studentSkillRepository.findByStudentId(student.getUserId());
-        List<PortfolioProject> projects = portfolioProjectRepository.findByUserId(user.getUserId());
-        List<StudentEducation> education = studentEducationRepository.findByUserId(student.getUserId());
+        PortfolioConfig config = portfolioConfigRepository.findByUser_UserId(student.getUserId());
+        List<StudentSkill> skills = studentSkillRepository.findByStudent_UserId(student.getUserId());
+        List<PortfolioProject> projects = portfolioProjectRepository.findByUser_UserId(user.getUserId());
+        List<StudentEducation> education = studentEducationRepository.findByUser_UserId(student.getUserId());
 
         // Map the collected data into a PortfolioResponse object
         return portfolioMapper.toPortfolioResponse(user, student, config, skills, projects, education);
@@ -88,10 +88,10 @@ public class PortfolioServiceImpl implements PortfolioService {
         }
         User user = userOpt.get();
 
-        PortfolioConfig config = portfolioConfigRepository.findByUserId(student.getUserId());
-        List<StudentSkill> skills = studentSkillRepository.findByStudentId(student.getUserId());
-        List<PortfolioProject> projects = portfolioProjectRepository.findByUserId(user.getUserId());
-        List<StudentEducation> education = studentEducationRepository.findByUserId(student.getUserId());
+        PortfolioConfig config = portfolioConfigRepository.findByUser_UserId(student.getUserId());
+        List<StudentSkill> skills = studentSkillRepository.findByStudent_UserId(student.getUserId());
+        List<PortfolioProject> projects = portfolioProjectRepository.findByUser_UserId(user.getUserId());
+        List<StudentEducation> education = studentEducationRepository.findByUser_UserId(student.getUserId());
 
         return portfolioMapper.toPortfolioResponse(user, student, config, skills, projects, education);
     }
@@ -133,7 +133,7 @@ public class PortfolioServiceImpl implements PortfolioService {
      */
     private void syncPortfolioConfig(PortfolioUpsertRequest.PortfolioConfigRequest configRequest, Student student) {
         if (configRequest == null) return;
-        PortfolioConfig config = portfolioConfigRepository.findByUserId(student.getUserId());
+        PortfolioConfig config = portfolioConfigRepository.findByUser_UserId(student.getUserId());
         if (config == null) {
             config = PortfolioConfig.builder().user(student).build();
         }
@@ -154,7 +154,7 @@ public class PortfolioServiceImpl implements PortfolioService {
      */
     private void syncPortfolioProjects(List<PortfolioUpsertRequest.PortfolioProjectRequest> projectRequests, User user) {
         if (projectRequests == null) return;
-        portfolioProjectRepository.deleteByUserId(user.getUserId());
+        portfolioProjectRepository.deleteByUser_UserId(user.getUserId());
         List<PortfolioProject> newProjects = portfolioMapper.toPortfolioProjects(projectRequests, user);
         portfolioProjectRepository.saveAll(newProjects);
     }
@@ -168,7 +168,7 @@ public class PortfolioServiceImpl implements PortfolioService {
      */
     private void syncPortfolioEducation(List<PortfolioUpsertRequest.StudentEducationRequest> educationRequests, Student student) {
         if (educationRequests == null) return;
-        studentEducationRepository.deleteByUserId(student.getUserId());
+        studentEducationRepository.deleteByUser_UserId(student.getUserId());
         List<StudentEducation> newEducation = portfolioMapper.toStudentEducationList(educationRequests, student);
         studentEducationRepository.saveAll(newEducation);
     }

@@ -10,5 +10,5 @@ import java.util.UUID;
 
 @Repository
 public interface RecruitmentPostRepository extends JpaRepository<RecruitmentPost, UUID> {
-    RecruitmentPost findFirstByCompanyIdAndRecruitmentId(String companyId, String recruitmentId);
+    RecruitmentPost findFirstByCompany_TopCvCompanyIdAndRecruitment_TopCvRecruitmentId(String companyId, String recruitmentId);
 }

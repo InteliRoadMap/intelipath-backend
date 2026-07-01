@@ -21,6 +21,6 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     @Query("select user from User user where user.email = :email")
     Optional<User> findByEmailForUpdate(String email);
 
-    @Query("SELECT u FROM User u ORDER BY u.createAt DESC")
+    @Query("SELECT u FROM User u ORDER BY u.createdAt DESC")
     List<User> findAllUsers();
 }

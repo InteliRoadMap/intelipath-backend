@@ -1,5 +1,6 @@
 package com.inteliroadmap.backend.domain.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -16,7 +17,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@com.fasterxml.jackson.annotation.JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class SkillNode {
 
     @Id
@@ -28,10 +29,12 @@ public class SkillNode {
     @JoinColumn(name = "career_id", nullable = false, foreignKey = @ForeignKey(name = "fk_sn_career"))
     private CareerRole careerRole;
 
-    @JoinColumn(name = "skill_id", foreignKey = @ForeignKey(name = "fk_s_skill"))
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "skill_id", foreignKey = @ForeignKey(name = "fk_sn_skill"))
     private Skill skill;
 
-    @JoinColumn(name = "type_id", foreignKey = @ForeignKey(name = "fk_t_node_type"))
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "type_id", foreignKey = @ForeignKey(name = "fk_sn_type"))
     private NodeType type;
 
     @ManyToOne(fetch = FetchType.LAZY)

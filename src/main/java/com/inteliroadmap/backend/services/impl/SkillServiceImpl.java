@@ -51,7 +51,7 @@ public class SkillServiceImpl implements SkillService {
         Student student = AuthenticatedStudentService.getOrCreateStudent();
 
         // Step 2: Load the student's selected skills and all available skills
-        List<StudentSkill> selectedSkills = studentSkillRepository.findByStudentId(student.getUserId());
+        List<StudentSkill> selectedSkills = studentSkillRepository.findByStudent_UserId(student.getUserId());
         List<Skill> allSkills = skillRepository.findAll();
 
         // Step 3: Return selected and available skills when no target career is set
@@ -64,7 +64,7 @@ public class SkillServiceImpl implements SkillService {
 
         // Step 4: Load required skills for the selected career
         List<CareerRequiredSkill> requiredSkills = careerRequiredSkillRepository
-                .findByCareerRoleId(student.getCareerRole().getCareerId());
+                .findByCareerRole_CareerId(student.getCareerRole().getCareerId());
 
         // Step 5: Calculate skills that the student has not selected
         List<Skill> missingSkills = findMissingSkills(requiredSkills, selectedSkills);
@@ -134,7 +134,7 @@ public class SkillServiceImpl implements SkillService {
 
         // Step 5: Load skill IDs that are already assigned to the student
         List<StudentSkill> existingStudentSkills = studentSkillRepository
-                .findByStudentIdAndSkillIdIn(student.getUserId(), List.copyOf(requestedSkillIds));
+                .findByStudent_UserIdAndSkill_SkillIdIn(student.getUserId(), List.copyOf(requestedSkillIds));
         Set<UUID> existingSkillIds = new LinkedHashSet<>();
         for (StudentSkill existingStudentSkill : existingStudentSkills) {
             existingSkillIds.add(existingStudentSkill.getSkill().getSkillId());
@@ -158,7 +158,7 @@ public class SkillServiceImpl implements SkillService {
         }
 
         // Step 8: Return the complete selected skill list after the update
-        List<StudentSkill> studentSkills = studentSkillRepository.findByStudentId(student.getUserId());
+        List<StudentSkill> studentSkills = studentSkillRepository.findByStudent_UserId(student.getUserId());
         log.info("Student skill selection completed. selectedSkillCount: {}", studentSkills.size());
 
         return SkillResponse.builder()
@@ -191,8 +191,8 @@ public class SkillServiceImpl implements SkillService {
         CareerRole career = careerOptional.get();
 
         // Step 3: Load career requirements and the student's selected skills
-        List<CareerRequiredSkill> requiredSkills = careerRequiredSkillRepository.findByCareerRoleId(career.getCareerId());
-        List<StudentSkill> studentSkills = studentSkillRepository.findByStudentId(student.getUserId());
+        List<CareerRequiredSkill> requiredSkills = careerRequiredSkillRepository.findByCareerRole_CareerId(career.getCareerId());
+        List<StudentSkill> studentSkills = studentSkillRepository.findByStudent_UserId(student.getUserId());
 
         // Step 4: Calculate missing skills
         List<Skill> missingSkills = findMissingSkills(requiredSkills, studentSkills);

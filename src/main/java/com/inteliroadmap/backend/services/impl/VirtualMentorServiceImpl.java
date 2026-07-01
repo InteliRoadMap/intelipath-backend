@@ -105,7 +105,7 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
     @Override
     public List<ChatSession> getUserSessions(String authorizationHeader) {
         User user = getAuthenticatedUser(authorizationHeader);
-        return chatSessionRepository.findByUser_UserIdOrderByCreateAtDesc(user.getUserId());
+        return chatSessionRepository.findByUser_UserIdOrderByCreatedAtDesc(user.getUserId());
     }
 
     /**
@@ -126,7 +126,7 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
             throw new ResourceNotFoundException("Access denied to this session");
         }
         
-        return chatMessageRepository.findBySessionIdOrderByCreateAtAsc(sessionId);
+        return chatMessageRepository.findByChatSession_SessionIdOrderByCreatedAtAsc(sessionId);
     }
 
     /**
@@ -172,7 +172,7 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
         }
 
         // Delete all messages belonging to this session first to prevent foreign key constraint violations
-        chatMessageRepository.deleteBySessionId(sessionId);
+        chatMessageRepository.deleteByChatSession_SessionId(sessionId);
         // Delete the session itself
         chatSessionRepository.delete(session);
     }
@@ -219,7 +219,7 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
         messageHistory.add(new SystemMessage(systemPrompt));
         
         // Add Chat History for the LLM context window
-        List<ChatMessage> chatHistory = chatMessageRepository.findBySessionIdOrderByCreateAtAsc(sessionId);
+        List<ChatMessage> chatHistory = chatMessageRepository.findByChatSession_SessionIdOrderByCreatedAtAsc(sessionId);
         for (int i = 0; i < chatHistory.size(); i++) {
             ChatMessage msg = chatHistory.get(i);
             // Skip the VERY LAST message if it's the one we just saved

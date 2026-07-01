@@ -9,5 +9,5 @@ import java.util.UUID;
 
 @Repository
 public interface PortfolioConfigRepository extends JpaRepository<PortfolioConfig, UUID> {
-    PortfolioConfig findByUserId(UUID userId);
+    PortfolioConfig findByUser_UserId(UUID userId);
 }
