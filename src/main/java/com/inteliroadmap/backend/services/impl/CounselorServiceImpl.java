@@ -74,7 +74,7 @@ public class CounselorServiceImpl implements CounselorService {
         
         // If missing, auto-generate a new counselor profile to ensure consistency
         if (counselor == null) {
-            log.info("Counselor profile not found. Creating a new one for user: {}", user.getEmail());
+            log.info("CounselorServiceImpl: Counselor profile not found. Creating a new one for user: {}", user.getEmail());
             counselor = AcademicCounselor.builder().userId(user.getUserId()).build();
             counselor = academicCounselorRepository.save(counselor);
         }
@@ -89,7 +89,7 @@ public class CounselorServiceImpl implements CounselorService {
     @Transactional
     @Override
     public CounselorResponse getCareerStatistics() {
-        log.info("Get careers statistic request received");
+        log.info("CounselorServiceImpl: Get careers statistic request received");
         getAuthenticatedCounselor();
 
         // Initialize a map to hold the count of students per career
@@ -109,7 +109,7 @@ public class CounselorServiceImpl implements CounselorService {
             total += number;
         }
 
-        log.info("Careers statistic retrieval successful");
+        log.info("CounselorServiceImpl: Careers statistic retrieval successful");
         return counselorMapper.toRoadmapStatisticResponse(total, careerStatistics);
     }
 
@@ -124,7 +124,7 @@ public class CounselorServiceImpl implements CounselorService {
     @Transactional
     @Override
     public CounselorResponse getStudentsMissingSkills(String searchName) {
-        log.info("Get students skill gap of a career request received");
+        log.info("CounselorServiceImpl: Get students skill gap of a career request received");
         getAuthenticatedCounselor();
 
         // Look up careers matching the provided search name (case-insensitive)
@@ -154,7 +154,7 @@ public class CounselorServiceImpl implements CounselorService {
 
         int totalStudent = studentRepository.findByCareerRole(matchedCareer).size();
 
-        log.info("Get students skill gap of a career successfully");
+        log.info("CounselorServiceImpl: Get students skill gap of a career successfully");
         return counselorMapper
                 .toMissingSkillsResponse(totalStudent, totalMissingSkills, matchedCareer.getCareerName());
     }
@@ -167,14 +167,14 @@ public class CounselorServiceImpl implements CounselorService {
     @Transactional
     @Override
     public CounselorResponse getAllFeedbacksSentToMe() {
-        log.info("Get feedback request received");
+        log.info("CounselorServiceImpl: Get feedback request received");
         // Identify the counselor and fetch all feedbacks where they are the receiver
         AcademicCounselor counselor = getAuthenticatedCounselor();
         User me = userRepository.findByUserId(counselor.getUserId());
 
         List<Feedback> feedbacks = feedbackRepository.findByReceiver(me);
 
-        log.info("Get feedback successfully");
+        log.info("CounselorServiceImpl: Get feedback successfully");
         return counselorMapper.toGetFeedbacksResponse(feedbacks, feedbacks.size());
     }
 
@@ -189,19 +189,21 @@ public class CounselorServiceImpl implements CounselorService {
     @Transactional
     @Override
     public CounselorResponse getStudentInfos(String search, int page, int size) {
-        log.info("Get students info request received");
+        log.info("CounselorServiceImpl: Get students info request received");
         if (search == null) search = "";
 
         // Filter students to only include those at the counselor's university
         AcademicCounselor counselor = getAuthenticatedCounselor();
-        String uni = counselor.getUniversity() != null ? counselor.getUniversity().getName() : "";
+        if (counselor.getUniversity() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Counselor university is not configured.");
+        }
 
         // Offset = page * size | page count begins form 0
         // Ex: Load page 3 with size = 10 --> Offset = 30
         // Pageable get Student from (Offset + 1) to (Offset + size)
         Pageable pageable = PageRequest.of(page, size);
         // Fetch the specific page of students from the database using projection
-        Page<StudentInfoProjection> studentPage = studentRepository.findStudentInfos(search, uni, pageable);
+        Page<StudentInfoProjection> studentPage = studentRepository.findStudentInfos(search, counselor.getUniversity().getUniversityId(), pageable);
         
         List<Map<String, Object>> stInfos = new ArrayList<>();
 
@@ -218,7 +220,7 @@ public class CounselorServiceImpl implements CounselorService {
             log.info(stInfo.toString());
         }
 
-        log.info("Get students info successfully");
+        log.info("CounselorServiceImpl: Get students info successfully");
         return counselorMapper.toGetStudentInfos(stInfos, studentPage.getTotalPages(), studentPage.getNumber());
     }
 
@@ -231,7 +233,7 @@ public class CounselorServiceImpl implements CounselorService {
     @Transactional
     @Override
     public CounselorResponse getStudentStatisticAndFeedback(UUID studentId) {
-        log.info("Getting student statistic and feedback...");
+        log.info("CounselorServiceImpl: Getting student statistic and feedback...");
 
         AcademicCounselor counselor = getAuthenticatedCounselor();
         User me = userRepository.findByUserId(counselor.getUserId());
@@ -249,7 +251,7 @@ public class CounselorServiceImpl implements CounselorService {
                 .findTotalNodeOfRoadmap(student.getCareerRole().getCareerId());
 
         // Avoid division by zero if the roadmap is empty
-        int progress = (totalRoadmapNode == 0) ? 0 : nodesCompleted / totalRoadmapNode;
+        int progress = (totalRoadmapNode == 0) ? 0 : (nodesCompleted * 100) / totalRoadmapNode;
 
         // Fetch the list of skills the student has yet to acquire for their current career
         List<String> missingSkillNames = studentSkillRepository
@@ -261,7 +263,7 @@ public class CounselorServiceImpl implements CounselorService {
         List<Feedback> feedbacks = feedbackRepository
                 .findBySenderOrReceiverOrderByCreatedAtDesc(me.getUserId(), st.getUserId());
 
-        log.info("Get student statistic and feedback successfully");
+        log.info("CounselorServiceImpl: Get student statistic and feedback successfully");
         return counselorMapper.toGetStudentStatisticAndFeedback(progress, missingSkillNames, feedbacks);
     }
 
@@ -273,12 +275,12 @@ public class CounselorServiceImpl implements CounselorService {
     @Transactional
     @Override
     public UpdateProfileResponse getProfile() {
-        log.info("Getting counselor profile...");
+        log.info("CounselorServiceImpl: Getting counselor profile...");
 
         AcademicCounselor counselor = getAuthenticatedCounselor();
         User user = getAuthenticatedUser();
 
-        log.info("Get counselor profile successfully");
+        log.info("CounselorServiceImpl: Get counselor profile successfully");
         return counselorMapper.toCrudProfileResponse(user, counselor);
     }
 
@@ -291,7 +293,7 @@ public class CounselorServiceImpl implements CounselorService {
     @Transactional
     @Override
     public UpdateProfileResponse updateProfile(UpdateProfileRequest request) {
-        log.info("Update profile request received");
+        log.info("CounselorServiceImpl: Update profile request received");
         AcademicCounselor counselor = getAuthenticatedCounselor();
         User user = getAuthenticatedUser();
 
@@ -309,7 +311,7 @@ public class CounselorServiceImpl implements CounselorService {
         user = userRepository.save(user);
         counselor = academicCounselorRepository.save(counselor);
 
-        log.info("Update profile successfully");
+        log.info("CounselorServiceImpl: Update profile successfully");
         return counselorMapper.toCrudProfileResponse(user, counselor);
     }
 }

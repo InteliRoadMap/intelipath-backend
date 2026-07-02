@@ -39,13 +39,6 @@ spring:
       hibernate:
         format_sql: true
 
-  flyway:
-    enabled: false
-    baseline-on-migrate: true
-    baseline-version: 0
-    connect-retries: 10
-    connect-retries-interval: 5s
-
   security:
     oauth2:
       client:
@@ -103,3 +96,6 @@ springdoc:
 scraper:
   limit: ${SCRAPER_LIMIT}
   topcv-api: ${SCRAPER_API}
+
+ai-service:
+  api-key: ${AI_SERVICE_API_KEY:}

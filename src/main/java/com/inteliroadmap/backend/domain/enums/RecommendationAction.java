@@ -11,7 +11,7 @@ public enum RecommendationAction {
     REMOVE;
 
     @JsonValue
-    public RecommendationAction fromString(String value) {
+    public static RecommendationAction fromString(String value) {
         return RecommendationAction.valueOf(value.toUpperCase());
     }
 }

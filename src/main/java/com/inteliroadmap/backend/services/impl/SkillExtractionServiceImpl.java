@@ -10,6 +10,9 @@ import com.inteliroadmap.backend.services.SkillExtractionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -38,6 +41,9 @@ public class SkillExtractionServiceImpl implements SkillExtractionService {
     @Value("${ai.service.base-url:http://localhost:8000}")
     private String aiServiceBaseUrl;
 
+    @Value("${ai-service.api-key:}")
+    private String aiServiceApiKey;
+
     public record SkillExtractRequest(List<String> descriptions) {}
     public record SkillExtractResponse(List<List<String>> skills_per_doc) {}
 
@@ -49,12 +55,12 @@ public class SkillExtractionServiceImpl implements SkillExtractionService {
     @Transactional
     @Override
     public void extractAndRebuildSkillTrends() {
-        log.info("Starting Skill Trends extraction process via AI Service...");
+        log.info("SkillExtractionServiceImpl: Starting Skill Trends extraction process via AI Service...");
 
         // 1. Get all Recruitment
         List<Recruitment> recruitments = recruitmentRepository.findAll();
         if (recruitments.isEmpty()) {
-            log.info("No Recruitment data to process.");
+            log.info("SkillExtractionServiceImpl: No Recruitment data to process.");
             return;
         }
 
@@ -101,21 +107,26 @@ public class SkillExtractionServiceImpl implements SkillExtractionService {
 
         RestTemplate restTemplate = new RestTemplate();
         String extractUrl = aiServiceBaseUrl + "/api/extract-skills";
-        
-        log.info("Sending {} descriptions to AI Service at: {}", descriptions.size(), extractUrl);
-        ResponseEntity<SkillExtractResponse> response = restTemplate.postForEntity(
+
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("X-API-Key", aiServiceApiKey);
+        HttpEntity<SkillExtractRequest> requestEntity = new HttpEntity<>(new SkillExtractRequest(descriptions), headers);
+
+        log.info("SkillExtractionServiceImpl: Sending {} descriptions to AI Service at: {}", descriptions.size(), extractUrl);
+        ResponseEntity<SkillExtractResponse> response = restTemplate.exchange(
                 extractUrl,
-                new SkillExtractRequest(descriptions),
+                HttpMethod.POST,
+                requestEntity,
                 SkillExtractResponse.class
         );
 
         if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
-            log.error("Error occurred while calling AI Service.");
+            log.error("SkillExtractionServiceImpl: Error occurred while calling AI Service.");
             return;
         }
 
         List<List<String>> extractedSkills = response.getBody().skills_per_doc();
-        log.info("AI Service extraction completed successfully.");
+        log.info("SkillExtractionServiceImpl: AI Service extraction completed successfully.");
 
         // 3. Group by (SkillName, Date) -> Count
         Map<String, Map<LocalDate, Integer>> skillDateCountMap = new HashMap<>();
@@ -133,7 +144,7 @@ public class SkillExtractionServiceImpl implements SkillExtractionService {
 
         // 4. Delete old SkillTrend data to rebuild
         skillTrendRepository.deleteAllInBatch();
-        log.info("Cleared old SkillTrend data.");
+        log.info("SkillExtractionServiceImpl: Cleared old SkillTrend data.");
 
         // 5. Save to Database
         List<SkillTrend> newTrends = new ArrayList<>();
@@ -161,6 +172,6 @@ public class SkillExtractionServiceImpl implements SkillExtractionService {
         }
 
         skillTrendRepository.saveAll(newTrends);
-        log.info("Successfully saved {} new SkillTrend records to the database.", newTrends.size());
+        log.info("SkillExtractionServiceImpl: Successfully saved {} new SkillTrend records to the database.", newTrends.size());
     }
 }

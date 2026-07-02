@@ -9,7 +9,7 @@ public enum RecommendationStatus {
     EXPIRED;
 
     @JsonValue
-    public RecommendationStatus fromString(String value) {
+    public static RecommendationStatus fromString(String value) {
         return RecommendationStatus.valueOf(value.toUpperCase());
     }
 }

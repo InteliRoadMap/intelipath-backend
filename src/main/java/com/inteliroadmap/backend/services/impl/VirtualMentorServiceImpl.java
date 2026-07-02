@@ -280,7 +280,7 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
         prompt.append("User Name: ").append(user.getFullName()).append("\n");
         
         if (student != null) {
-            prompt.append("University: ").append(student.getUniversity() != null ? student.getUniversity() : "N/A").append("\n");
+            prompt.append("University: ").append(student.getUniversity() != null ? student.getUniversity().getName() : "N/A").append("\n");
             prompt.append("Major: ").append(student.getMajor() != null ? student.getMajor() : "N/A").append("\n");
             prompt.append("GitHub Profile: ").append(student.getGithubProfile() != null ? student.getGithubProfile() : "N/A").append("\n");
             prompt.append("Transcript Info: ").append(student.getTranscriptUrl() != null ? student.getTranscriptUrl() : "N/A").append("\n");

@@ -3,6 +3,8 @@ package com.inteliroadmap.backend.tools;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Description;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.ResourceAccessException;
@@ -21,13 +23,16 @@ public class MarkItDownTool implements Function<MarkItDownTool.Request, String> 
     @Value("${ai.service.url:http://localhost:8000/api/extract}")
     private String aiServiceUrl;
 
+    @Value("${ai-service.api-key:}")
+    private String aiServiceApiKey;
+
     private final RestTemplate restTemplate = new RestTemplate();
 
     public record Request(String fileUrl) {}
 
     @Override
     public String apply(Request request) {
-        log.info("AI Called MarkItDownTool for URL: {}", request.fileUrl());
+        log.info("MarkItDownTool: AI Called MarkItDownTool for URL: {}", request.fileUrl());
 
         if (request.fileUrl() == null || request.fileUrl().isBlank()) {
             return "[TOOL_ERROR] No URL provided. Please ask the user to share the document URL.";
@@ -37,23 +42,27 @@ public class MarkItDownTool implements Function<MarkItDownTool.Request, String> 
             Map<String, String> requestBody = new HashMap<>();
             requestBody.put("url", request.fileUrl());
 
-            ResponseEntity<Map> response = restTemplate.postForEntity(aiServiceUrl, requestBody, Map.class);
+            HttpHeaders headers = new HttpHeaders();
+            headers.set("X-API-Key", aiServiceApiKey);
+            HttpEntity<Map<String, String>> requestEntity = new HttpEntity<>(requestBody, headers);
+
+            ResponseEntity<Map> response = restTemplate.postForEntity(aiServiceUrl, requestEntity, Map.class);
 
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 String markdown = (String) response.getBody().get("markdown");
                 if (markdown == null || markdown.isBlank()) {
                     return "[TOOL_ERROR] The document was fetched but no text could be extracted. The file may be empty, corrupted, or an unsupported format.";
                 }
-                log.info("MarkItDownTool extracted {} chars from: {}", markdown.length(), request.fileUrl());
+                log.info("MarkItDownTool: MarkItDownTool extracted {} chars from: {}", markdown.length(), request.fileUrl());
                 return markdown;
             } else {
                 return "[TOOL_ERROR] Document extraction service returned status: " + response.getStatusCode();
             }
         } catch (ResourceAccessException e) {
-            log.error("MarkItDown Python service is unreachable at: {}", aiServiceUrl, e);
+            log.error("MarkItDownTool: MarkItDown Python service is unreachable at: {}", aiServiceUrl, e);
             return "[TOOL_ERROR] The document extraction service is currently unavailable. Tell the user: 'Dịch vụ đọc tài liệu hiện đang bảo trì, vui lòng thử lại sau.'";
         } catch (Exception e) {
-            log.error("MarkItDownTool unexpected error for URL: {}", request.fileUrl(), e);
+            log.error("MarkItDownTool: MarkItDownTool unexpected error for URL: {}", request.fileUrl(), e);
             return "[TOOL_ERROR] Unexpected error: " + e.getMessage() + ". Ask the user to verify the document URL is publicly accessible.";
         }
     }

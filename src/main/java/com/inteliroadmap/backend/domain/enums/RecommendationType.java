@@ -9,7 +9,7 @@ public enum RecommendationType {
     ADD_ADVANCED_TOPICS;
 
     @JsonValue
-    public RecommendationType fromString(String value) {
+    public static RecommendationType fromString(String value) {
         return RecommendationType.valueOf(value.toUpperCase());
     }
 }

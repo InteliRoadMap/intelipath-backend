@@ -6,6 +6,7 @@ import com.inteliroadmap.backend.domain.dto.response.MentorResponse;
 import com.inteliroadmap.backend.domain.dto.response.mentor.*;
 import com.inteliroadmap.backend.domain.entity.*;
 import com.inteliroadmap.backend.domain.enums.ReviewStatus;
+import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
 import com.inteliroadmap.backend.domain.enums.UserRole;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.repositories.*;
@@ -20,6 +21,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -29,11 +31,15 @@ import java.util.stream.Collectors;
 @Slf4j
 public class MentorServiceImpl implements MentorService {
 
+    private static final long STUCK_THRESHOLD_DAYS = 7;
+    private static final int SKILL_GAP_HIGH_THRESHOLD = 3;
+
     private final UserRepository userRepository;
     private final FeedbackRepository feedbackRepository;
     private final PortfolioReviewRequestRepository reviewRequestRepository;
     private final StudentRepository studentRepository;
     private final StudentProgressRepository studentProgressRepository;
+    private final StudentSkillRepository studentSkillRepository;
     private final SkillNodeRepository skillNodeRepository;
     private final IndustryMentorRepository industryMentorRepository;
     private final RoadmapService roadmapService;
@@ -50,7 +56,7 @@ public class MentorServiceImpl implements MentorService {
     @Transactional
     @Override
     public MentorDashboardMetrics getDashboardMetrics() {
-        log.info("Get mentor dashboard metrics request received");
+        log.info("MentorServiceImpl: Get mentor dashboard metrics request received");
         User mentor = getAuthenticatedMentor();
 
         Double avgRating = feedbackRepository.getAverageRatingBySenderId(mentor.getUserId());
@@ -261,27 +267,79 @@ public class MentorServiceImpl implements MentorService {
     @Transactional
     @Override
     public MentorProgressReportDto getProgressReports() {
+        log.info("MentorServiceImpl: Get mentor progress reports request received");
         User mentor = getAuthenticatedMentor();
-        
-        // Mock data for Progress Reports as requested by frontend requirements
-        List<MentorProgressReportDto.Metric> metrics = Arrays.asList(
-                new MentorProgressReportDto.Metric("COMPLETED NODES", "128", "text-[#00838f]"),
-                new MentorProgressReportDto.Metric("IN PROGRESS", "45", "text-[#0ea5e9]")
+
+        List<User> mentorStudents = reviewRequestRepository
+                .findDistinctStudentsByMentorId(mentor.getUserId(), Pageable.unpaged())
+                .getContent();
+
+        List<MentorProgressReportDto.StudentProgress> studentsProgress = new ArrayList<>();
+        List<MentorProgressReportDto.NeedsAttention> needsAttention = new ArrayList<>();
+        Map<String, Integer> missingSkillCounts = new HashMap<>();
+        int totalCompletedNodes = 0;
+        int totalInProgressNodes = 0;
+
+        for (User studentUser : mentorStudents) {
+            Student student = studentRepository.findByUserId(studentUser.getUserId());
+            if (student == null || student.getCareerRole() == null) {
+                continue;
+            }
+
+            UUID careerId = student.getCareerRole().getCareerId();
+            List<StudentProgress> progressEntries = studentProgressRepository.findByStudent_UserId(studentUser.getUserId());
+
+            int completed = (int) progressEntries.stream()
+                    .filter(p -> p.getStatus() == RoadmapStepStatus.COMPLETED)
+                    .count();
+            int inProgress = (int) progressEntries.stream()
+                    .filter(p -> p.getStatus() == RoadmapStepStatus.IN_PROGRESS)
+                    .count();
+            int totalNodes = skillNodeRepository.findTotalNodeOfRoadmap(careerId);
+            int progressPercent = totalNodes == 0 ? 0 : (completed * 100) / totalNodes;
+
+            totalCompletedNodes += completed;
+            totalInProgressNodes += inProgress;
+
+            studentsProgress.add(MentorProgressReportDto.StudentProgress.builder()
+                    .name(studentUser.getFullName())
+                    .role(student.getCareerRole().getCareerName())
+                    .completed(completed)
+                    .total(totalNodes)
+                    .progress(progressPercent)
+                    .build());
+
+            progressEntries.stream()
+                    .filter(p -> p.getStatus() == RoadmapStepStatus.IN_PROGRESS && p.getCreatedAt() != null)
+                    .min(Comparator.comparing(StudentProgress::getCreatedAt))
+                    .ifPresent(oldest -> {
+                        long daysStuck = Duration.between(oldest.getCreatedAt(), LocalDateTime.now()).toDays();
+                        if (daysStuck >= STUCK_THRESHOLD_DAYS) {
+                            needsAttention.add(MentorProgressReportDto.NeedsAttention.builder()
+                                    .name(studentUser.getFullName())
+                                    .issue("Stuck on " + oldest.getSkillNode().getNodeName() + " for " + daysStuck + " days")
+                                    .days(daysStuck + "d")
+                                    .build());
+                        }
+                    });
+
+            studentSkillRepository.findMissingSkillsByStudentIdAndCareerId(studentUser.getUserId(), careerId)
+                    .forEach(skillName -> missingSkillCounts.merge(skillName, 1, Integer::sum));
+        }
+
+        List<MentorProgressReportDto.Metric> metrics = List.of(
+                new MentorProgressReportDto.Metric("COMPLETED NODES", String.valueOf(totalCompletedNodes), "text-[#00838f]"),
+                new MentorProgressReportDto.Metric("IN PROGRESS", String.valueOf(totalInProgressNodes), "text-[#0ea5e9]")
         );
 
-        List<MentorProgressReportDto.StudentProgress> studentsProgress = Arrays.asList(
-                new MentorProgressReportDto.StudentProgress("Nguyen The A", "Frontend", 12, 24, 50),
-                new MentorProgressReportDto.StudentProgress("Tran B", "Backend", 20, 24, 83)
-        );
-
-        List<MentorProgressReportDto.NeedsAttention> needsAttention = Arrays.asList(
-                new MentorProgressReportDto.NeedsAttention("Vu Xuan B", "Stuck on React Basics for 2 weeks", "14d")
-        );
-
-        List<MentorProgressReportDto.SkillGap> skillGaps = Arrays.asList(
-                new MentorProgressReportDto.SkillGap("Docker", 8, "High"),
-                new MentorProgressReportDto.SkillGap("Kubernetes", 5, "Medium")
-        );
+        List<MentorProgressReportDto.SkillGap> skillGaps = missingSkillCounts.entrySet().stream()
+                .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+                .limit(5)
+                .map(entry -> new MentorProgressReportDto.SkillGap(
+                        entry.getKey(),
+                        entry.getValue(),
+                        entry.getValue() >= SKILL_GAP_HIGH_THRESHOLD ? "High" : "Medium"))
+                .collect(Collectors.toList());
 
         return MentorProgressReportDto.builder()
                 .metrics(metrics)
