@@ -42,6 +42,7 @@ public class CounselorServiceImpl implements CounselorService {
     private final StudentRepository studentRepository;
     private final AcademicCounselorRepository academicCounselorRepository;
     private final StudentSkillRepository studentSkillRepository;
+    private final UniversityRepository universityRepository;
 
 
     /**
@@ -193,7 +194,7 @@ public class CounselorServiceImpl implements CounselorService {
 
         // Filter students to only include those at the counselor's university
         AcademicCounselor counselor = getAuthenticatedCounselor();
-        String uni = counselor.getUniversity();
+        String uni = counselor.getUniversity() != null ? counselor.getUniversity().getName() : "";
 
         // Offset = page * size | page count begins form 0
         // Ex: Load page 3 with size = 10 --> Offset = 30
@@ -298,7 +299,11 @@ public class CounselorServiceImpl implements CounselorService {
         if(request.getFullName() != null) user.setFullName(request.getFullName());
         if(request.getYob() != null) user.setYob(request.getYob());
         if(request.getBio() != null) user.setBio(request.getBio());
-        if(request.getUniversity() != null) counselor.setUniversity(request.getUniversity());
+        if(request.getUniversityId() != null) {
+            University university = universityRepository.findById(request.getUniversityId())
+                    .orElseThrow(() -> new ResourceNotFoundException("University not found"));
+            counselor.setUniversity(university);
+        }
         if(request.getDepartment() != null) counselor.setDepartment(request.getDepartment());
 
         user = userRepository.save(user);

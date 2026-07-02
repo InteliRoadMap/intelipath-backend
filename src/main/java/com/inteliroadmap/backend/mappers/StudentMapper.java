@@ -31,7 +31,7 @@ public class StudentMapper {
     public StudentResponse toProfileResponse(Student student) {
         User user = userRepository.findByUserId(student.getUserId());
         String careerName = null;
-        if (student.getCareerRole().getCareerId() != null) {
+        if (student.getCareerRole() != null && student.getCareerRole().getCareerId() != null) {
             Optional<CareerRole> optCareer = careerRoleRepository.findById(student.getCareerRole().getCareerId());
             if (optCareer.isPresent()) {
                 careerName = optCareer.get().getCareerName();
@@ -44,11 +44,11 @@ public class StudentMapper {
                 .email(user.getEmail())
                 .yob(user.getYob())
                 .bio(user.getBio())
-                .university(student.getUniversity())
+                .university(student.getUniversity() != null ? student.getUniversity().getName() : null)
                 .yearOfAdmission(student.getYearOfAdmission())
                 .major(student.getMajor())
                 .githubProfile(student.getGithubProfile())
-                .careerId(student.getCareerRole().getCareerId())
+                .careerId(student.getCareerRole() != null ? student.getCareerRole().getCareerId() : null)
                 .careerName(careerName)
                 .build();
     }

@@ -34,6 +34,7 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
     private final RefreshTokenRepository refreshTokenRepository;
     private final UserRepository userRepository;
     private final HttpCookieOAuth2AuthorizationRequestRepository httpCookieOAuth2AuthorizationRequestRepository;
+    private final AuthenticationCookieService authenticationCookieService;
 
     @Value("${AUTHORIZED_REDIRECT_URI}")
     private String authorizedRedirectUri;
@@ -89,8 +90,10 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
             refreshTokenRepository.save(token);
         }
 
+        // Keep accessToken available to the callback page for OAuth login,
+        // but store refreshToken only in an HttpOnly cookie.
         CookieUtils.addNonHttpOnlyCookie(response, "token", accessToken, 60);
-        CookieUtils.addNonHttpOnlyCookie(response, "refreshToken", refreshToken, 60);
+        authenticationCookieService.addRefreshTokenCookie(response, refreshToken);
 
         return UriComponentsBuilder.fromUriString(authorizedRedirectUri)
                 .build().toUriString();

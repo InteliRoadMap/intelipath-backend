@@ -11,8 +11,8 @@ RUN mvn -B -q dependency:go-offline
 # Copy the source code
 COPY src ./src
 
-# Package the application (skip tests for faster build in docker)
-RUN mvn -B -q clean package -DskipTests
+# Package the application (skip compiling/running tests for faster Docker builds)
+RUN mvn -B -q clean package -Dmaven.test.skip=true
 
 # Stage 2: Run the application using a lightweight JRE image
 FROM eclipse-temurin:21-jre-alpine

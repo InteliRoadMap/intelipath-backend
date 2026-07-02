@@ -1,8 +1,7 @@
 package com.inteliroadmap.backend.controllers;
 
-import com.inteliroadmap.backend.domain.dto.request.RefreshRequest;
 import com.inteliroadmap.backend.domain.dto.response.RefreshResponse;
-import com.inteliroadmap.backend.domain.entity.User;
+import com.inteliroadmap.backend.security.AuthenticationCookieService;
 import com.inteliroadmap.backend.services.AuthService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -10,10 +9,12 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
+import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.*;
 
 /**
@@ -29,17 +30,18 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final AuthenticationCookieService authenticationCookieService;
 
     /**
-     * Rotates a valid refresh token and returns a new access/refresh token pair.
+     * Rotates a valid refresh token stored in an HttpOnly cookie and returns a new access token.
      *
-     * @param refreshRequest RefreshRequest containing refresh token
-     * @return response containing newly issued tokens
+     * @param refreshToken refresh token read from HttpOnly cookie
+     * @return response containing newly issued access token
      */
     @PostMapping("/refresh")
     @Operation(
             summary = "Refresh access token",
-            description = "Rotate a valid refresh token and generate a new JWT access token"
+            description = "Read refreshToken from HttpOnly cookie, rotate it, and generate a new JWT access token"
     )
     @ApiResponses(value = {
             @ApiResponse(
@@ -60,20 +62,32 @@ public class AuthController {
             )
     })
     public ResponseEntity<RefreshResponse> refreshAccount(
-            @io.swagger.v3.oas.annotations.parameters.RequestBody(
-                    description = "Refresh token payload",
-                    required = true,
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = RefreshRequest.class)
-                    )
-            )
-            @RequestBody @Valid RefreshRequest refreshRequest
+            @CookieValue(name = AuthenticationCookieService.REFRESH_TOKEN_COOKIE_NAME, required = false) String refreshToken,
+            HttpServletResponse servletResponse
     ) {
         log.info("Refresh token request received");
-        return ResponseEntity.ok(
-                authService.refreshAccount(refreshRequest)
-        );
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token is missing");
+        }
+
+        RefreshResponse refreshResponse = authService.refreshAccount(refreshToken);
+        authenticationCookieService.addRefreshTokenCookie(servletResponse, refreshResponse.getRefreshToken());
+        return ResponseEntity.ok(refreshResponse);
+    }
+
+    @PostMapping("/logout")
+    @Operation(
+            summary = "Logout",
+            description = "Delete the refreshToken HttpOnly cookie and revoke it server-side when present"
+    )
+    public ResponseEntity<String> logout(
+            @CookieValue(name = AuthenticationCookieService.REFRESH_TOKEN_COOKIE_NAME, required = false) String refreshToken,
+            HttpServletResponse servletResponse
+    ) {
+        log.info("Logout request received");
+        authService.logout(refreshToken);
+        authenticationCookieService.clearRefreshTokenCookie(servletResponse);
+        return ResponseEntity.ok("Logged out successfully");
     }
 
 }

@@ -10,9 +10,9 @@ services:
 
   ai-service:
     build:
-      context: ../ai-service
+      context: ../intelipath-service
       dockerfile: Dockerfile
-    container_name: intelipath-ai-service
+    container_name: intelipath-service
     ports:
       - "8000:8000"
     healthcheck:

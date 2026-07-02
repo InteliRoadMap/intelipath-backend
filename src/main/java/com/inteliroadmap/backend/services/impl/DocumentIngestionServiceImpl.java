@@ -54,7 +54,7 @@ public class DocumentIngestionServiceImpl implements DocumentIngestionService {
 
         // BƯỚC 3: Cắt nhỏ thêm nếu một trang quá dài (> 800 tokens)
         // Step 3: Configure a TokenTextSplitter to break down large page-level documents into smaller chunks
-        TokenTextSplitter tokenTextSplitter = new TokenTextSplitter(800, 200, 5, 10000, true);
+        TokenTextSplitter tokenTextSplitter = new TokenTextSplitter(800, 200, 5, 10000, true, List.of());
         // Apply the splitter to the documents to get chunked representations
         List<Document> chunkedDocuments = tokenTextSplitter.apply(documents);
 

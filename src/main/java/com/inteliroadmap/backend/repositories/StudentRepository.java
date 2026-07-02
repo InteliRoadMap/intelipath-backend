@@ -21,12 +21,12 @@ public interface StudentRepository extends JpaRepository<Student, UUID> {
     Student findByUserId(UUID userId);
     List<Student> findByCareerRole(CareerRole career);
 
-    @Query("SELECT s.userId as studentId, u.fullName as fullName, u.email as email, s.university as university, c.careerName as careerName " +
+    @Query("SELECT s.userId as studentId, u.fullName as fullName, u.email as email, s.university.name as university, c.careerName as careerName " +
            "FROM Student s " +
            "JOIN User u ON s.userId = u.userId " +
            "LEFT JOIN CareerRole c ON s.careerRole.careerId = c.careerId " +
            "WHERE (LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%'))) " +
-           "AND s.university = :uni " +
+           "AND s.university.name = :uni " +
            "AND u.role = UserRole.STUDENT")
     Page<StudentInfoProjection> findStudentInfos(@Param("search") String search, @Param("uni") String uni, Pageable pageable);
 

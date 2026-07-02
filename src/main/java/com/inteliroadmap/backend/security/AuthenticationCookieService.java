@@ -12,17 +12,18 @@ import org.springframework.stereotype.Component;
 import java.time.Duration;
 import java.util.Optional;
 
-/** Handles the HTTP-only cookies used by the OAuth2 login flow. */
+/** Handles the HTTP-only cookies used by authentication flows. */
 @Component
 @RequiredArgsConstructor
 public class AuthenticationCookieService {
 
     public static final String ACCESS_TOKEN_COOKIE_NAME = "access_token";
-    public static final String REFRESH_TOKEN_COOKIE_NAME = "refresh_token";
+    public static final String REFRESH_TOKEN_COOKIE_NAME = "refreshToken";
+    public static final String REFRESH_TOKEN_COOKIE_PATH = "/api/v1/auth/refresh";
 
     private final JwtService jwtService;
 
-    @Value("${app.security.cookie.secure:false}")
+    @Value("${app.security.cookie.secure:true}")
     private boolean secure;
 
     @Value("${app.security.cookie.same-site:Lax}")
@@ -34,7 +35,15 @@ public class AuthenticationCookieService {
             String refreshToken
     ) {
         addCookie(response, ACCESS_TOKEN_COOKIE_NAME, accessToken, jwtService.getAccessExpiration(), "/");
-        addCookie(response, REFRESH_TOKEN_COOKIE_NAME, refreshToken, jwtService.getRefreshExpiration(), "/api/v1/auth/refresh");
+        addRefreshTokenCookie(response, refreshToken);
+    }
+
+    public void addRefreshTokenCookie(HttpServletResponse response, String refreshToken) {
+        addCookie(response, REFRESH_TOKEN_COOKIE_NAME, refreshToken, jwtService.getRefreshExpiration(), REFRESH_TOKEN_COOKIE_PATH);
+    }
+
+    public void clearRefreshTokenCookie(HttpServletResponse response) {
+        addCookie(response, REFRESH_TOKEN_COOKIE_NAME, "", 0, REFRESH_TOKEN_COOKIE_PATH);
     }
 
     public Optional<String> getAccessToken(HttpServletRequest request) {

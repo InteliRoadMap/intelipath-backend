@@ -1,6 +1,5 @@
 package com.inteliroadmap.backend.services.impl;
 
-import com.inteliroadmap.backend.domain.dto.request.RefreshRequest;
 import com.inteliroadmap.backend.domain.dto.response.RefreshResponse;
 import com.inteliroadmap.backend.domain.entity.RefreshToken;
 import com.inteliroadmap.backend.domain.entity.User;
@@ -36,15 +35,16 @@ public class AuthServiceImpl implements AuthService {
     /**
      * Refresh access token and rotate refresh token.
      *
-     * @param refreshRequest request body containing refresh token
+     * @param refreshToken refresh token read from HttpOnly cookie
      * @return RefreshResponse containing new access token, refresh token and expiration time
      */
     @Transactional
     @Override
-    public RefreshResponse refreshAccount(RefreshRequest refreshRequest) {
-        // Step 1: Get refresh token from request body
-        String refreshToken = refreshRequest.getRefreshToken();
-
+    public RefreshResponse refreshAccount(String refreshToken) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            log.warn("Refresh token cookie is missing");
+            throw invalidRefreshToken();
+        }
         // Step 2: Validate JWT signature and expiration
         if (!jwtService.isTokenValid(refreshToken)) {
             log.warn("Refresh token validation failed");
@@ -107,6 +107,15 @@ public class AuthServiceImpl implements AuthService {
         // Step 8: Return new token pair
         log.info("Refresh token rotated successfully for user: {}", email);
         return refreshResponse(newAccessToken, newRefreshToken, expiresIn);
+    }
+
+    @Transactional
+    @Override
+    public void logout(String refreshToken) {
+        if (refreshToken == null || refreshToken.isBlank()) {
+            return;
+        }
+        refreshTokenRepository.deleteByToken(refreshToken);
     }
 
     /**

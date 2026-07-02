@@ -15,11 +15,12 @@ import com.inteliroadmap.backend.services.VirtualMentorService;
 import com.inteliroadmap.backend.utils.BearerTokenUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.advisor.QuestionAnswerAdvisor;
+import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
 import org.springframework.ai.chat.messages.AssistantMessage;
 import org.springframework.ai.chat.messages.Message;
 import org.springframework.ai.chat.messages.SystemMessage;
 import org.springframework.ai.chat.messages.UserMessage;
+import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.stereotype.Service;
@@ -241,16 +242,15 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
                 .messages(messageHistory)
                 .user(request.getMessage())
                 // Configure Vector Store Search request to attach relevant context retrieved from embedding DB
-                .advisors(new QuestionAnswerAdvisor(
-                        vectorStore, 
-                        SearchRequest.defaults(),
-                        "\n\n[OPTIONAL RETRIEVED CONTEXT]\n" +
+                .advisors(QuestionAnswerAdvisor.builder(vectorStore)
+                        .searchRequest(SearchRequest.builder().build())
+                        .promptTemplate(new PromptTemplate("\n\n[OPTIONAL RETRIEVED CONTEXT]\n" +
                         "---------------------\n" +
                         "{question_answer_context}\n" +
                         "---------------------\n" +
-                        "If the above context is relevant to the user's question, use it. Otherwise, ignore it and rely completely on the conversation history, the attached PDF (if any), and your own knowledge. DO NOT say you cannot answer just because the context is empty or irrelevant."
-                ))
-                .functions("jobMarketTool", "studentProgressTool", "markItDownTool")
+                        "If the above context is relevant to the user's question, use it. Otherwise, ignore it and rely completely on the conversation history, the attached PDF (if any), and your own knowledge. DO NOT say you cannot answer just because the context is empty or irrelevant."))
+                        .build())
+                .toolNames("jobMarketTool", "studentProgressTool", "markItDownTool")
                 .stream()
                 .content()
                 .doOnNext(fullResponse::append)

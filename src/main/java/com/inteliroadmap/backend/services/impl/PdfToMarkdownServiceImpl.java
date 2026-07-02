@@ -8,7 +8,7 @@ import org.apache.pdfbox.rendering.PDFRenderer;
 import org.apache.pdfbox.rendering.ImageType;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.messages.UserMessage;
-import org.springframework.ai.chat.messages.Media;
+import org.springframework.ai.content.Media;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.stereotype.Service;
 import org.springframework.util.MimeTypeUtils;
@@ -245,10 +245,10 @@ public class PdfToMarkdownServiceImpl implements PdfToMarkdownService {
 
         // Tạo UserMessage kèm ảnh
         // Construct the final user prompt injecting the specific page context alongside the image media
-        UserMessage userMessage = new UserMessage(
-                VISION_PROMPT + "\n\nThis is page " + pageNumber + " of the document.",
-                List.of(imageMedia)
-        );
+        UserMessage userMessage = UserMessage.builder()
+                .text(VISION_PROMPT + "\n\nThis is page " + pageNumber + " of the document.")
+                .media(List.of(imageMedia))
+                .build();
 
         // Gọi ChatClient (GPT-4o-mini Vision) và nhận kết quả
         // Execute the call to the configured ChatClient and extract the raw markdown response content

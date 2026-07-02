@@ -19,7 +19,11 @@ public interface StudentDashboardService {
 
     public DashboardRoadmapProgressResponse getRoadmapProgress() ;
 
+    DashboardRoadmapProgressResponse getRoadmapProgress(Student student);
+
     public List<SkillGapItemResponse> getSkillGaps() ;
+
+    List<SkillGapItemResponse> getSkillGaps(Student student);
 
     public List<MentorFeedbackItemResponse> getMentorFeedback() ;
 

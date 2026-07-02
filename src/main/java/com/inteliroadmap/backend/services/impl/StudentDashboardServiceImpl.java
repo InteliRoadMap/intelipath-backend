@@ -53,6 +53,12 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
 
         // Fetch current authenticated student and check if they have selected a career
         Student student = getCurrentStudent();
+        return getRoadmapProgress(student);
+    }
+
+    @Transactional
+    @Override
+    public DashboardRoadmapProgressResponse getRoadmapProgress(Student student) {
         if (student == null || student.getCareerRole().getCareerId() == null) {
             return DashboardRoadmapProgressResponse.builder().build();
         }
@@ -103,6 +109,12 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
         log.info("Student Dashboard Module: Fetching skill gaps");
 
         Student student = getCurrentStudent();
+        return getSkillGaps(student);
+    }
+
+    @Transactional
+    @Override
+    public List<SkillGapItemResponse> getSkillGaps(Student student) {
         if (student == null || student.getCareerRole().getCareerId() == null) {
             return List.of();
         }

@@ -17,6 +17,7 @@ import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 import java.util.*;
@@ -47,6 +48,7 @@ public class StudentServiceImpl implements StudentService {
     private final StudentDashboardMapper studentDashboardMapper;
     private final StudentMapper studentMapper;
     private final CareerRoleRepository careerRoleRepository;
+    private final UniversityRepository universityRepository;
     private final AuthenticatedStudentService AuthenticatedStudentService;
 
     /**
@@ -67,7 +69,11 @@ public class StudentServiceImpl implements StudentService {
             throw new ResourceNotFoundException("User not found");
         }
 
-        if (request.getUniversity() != null) student.setUniversity(request.getUniversity());
+        if (request.getUniversityId() != null) {
+            University university = universityRepository.findById(request.getUniversityId())
+                    .orElseThrow(() -> new ResourceNotFoundException("University not found"));
+            student.setUniversity(university);
+        }
         if (request.getYearOfAdmission() != null) {
             student.setYearOfAdmission(request.getYearOfAdmission());
         }
@@ -264,5 +270,17 @@ public class StudentServiceImpl implements StudentService {
             }
         }
         return (int) Math.round((double) completedCount / allNodesForSkill.size() * 100);
+    }
+
+    @Transactional
+    @Override
+    public StudentResponse uploadTranscript(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("Transcript file is required");
+        }
+        Student student = AuthenticatedStudentService.getOrCreateStudentForUpdate();
+        student.setTranscriptUrl(file.getOriginalFilename());
+        studentRepository.save(student);
+        return studentMapper.toProfileResponse(student);
     }
 }

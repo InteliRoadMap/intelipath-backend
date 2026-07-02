@@ -1,8 +1,11 @@
 package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.domain.dto.request.PortfolioUpsertRequest;
+import com.inteliroadmap.backend.domain.dto.request.RequestReviewRequest;
 import com.inteliroadmap.backend.domain.dto.response.PortfolioResponse;
 import com.inteliroadmap.backend.domain.entity.*;
+import com.inteliroadmap.backend.domain.enums.ReviewStatus;
+import com.inteliroadmap.backend.domain.enums.UserRole;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.services.AuthenticatedStudentService;
 import com.inteliroadmap.backend.repositories.*;
@@ -32,6 +35,7 @@ public class PortfolioServiceImpl implements PortfolioService {
     private final PortfolioProjectRepository portfolioProjectRepository;
     private final StudentEducationRepository studentEducationRepository;
     private final StudentSkillRepository studentSkillRepository;
+    private final PortfolioReviewRequestRepository portfolioReviewRequestRepository;
     private final StudentRepository studentRepository;
     private final UserRepository userRepository;
 
@@ -96,6 +100,22 @@ public class PortfolioServiceImpl implements PortfolioService {
         return portfolioMapper.toPortfolioResponse(user, student, config, skills, projects, education);
     }
 
+    @Transactional(readOnly = true)
+    @Override
+    public PortfolioResponse getPortfolioByStudentId(java.util.UUID studentId) {
+        Student student = studentRepository.findById(studentId)
+                .orElseThrow(() -> new ResourceNotFoundException("Portfolio not found for student: " + studentId));
+        User user = userRepository.findById(student.getUserId())
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        PortfolioConfig config = portfolioConfigRepository.findByUser_UserId(student.getUserId());
+        List<StudentSkill> skills = studentSkillRepository.findByStudent_UserId(student.getUserId());
+        List<PortfolioProject> projects = portfolioProjectRepository.findByUser_UserId(user.getUserId());
+        List<StudentEducation> education = studentEducationRepository.findByUser_UserId(student.getUserId());
+
+        return portfolioMapper.toPortfolioResponse(user, student, config, skills, projects, education);
+    }
+
     /**
      * Upserts (updates or inserts) the portfolio data for the currently authenticated student.
      *
@@ -123,6 +143,34 @@ public class PortfolioServiceImpl implements PortfolioService {
 
         // Return the fully updated portfolio
         return getPortfolio();
+    }
+
+    @Transactional
+    @Override
+    public void requestReview(RequestReviewRequest request) {
+        Student student = AuthenticatedStudentService.getRequiredStudent();
+        User mentor = userRepository.findByEmail(request.getEmail());
+        if (mentor == null || mentor.getRole() != UserRole.MENTOR) {
+            throw new ResourceNotFoundException("Mentor not found");
+        }
+
+        boolean exists = portfolioReviewRequestRepository.existsByStudent_UserIdAndMentor_UserIdAndStatus(
+                student.getUserId(),
+                mentor.getUserId(),
+                ReviewStatus.PENDING
+        );
+        if (exists) {
+            throw new IllegalStateException("Review request already exists");
+        }
+
+        User studentUser = userRepository.findById(student.getUserId())
+                .orElseThrow(() -> new ResourceNotFoundException("Student user not found"));
+
+        portfolioReviewRequestRepository.save(PortfolioReviewRequest.builder()
+                .student(studentUser)
+                .mentor(mentor)
+                .status(ReviewStatus.PENDING)
+                .build());
     }
 
     /**
