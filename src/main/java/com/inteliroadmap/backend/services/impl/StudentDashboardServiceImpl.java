@@ -60,7 +60,7 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
         // Retrieve ordered skill nodes associated with the student's chosen career
         UUID careerId = student.getCareerRole().getCareerId();
         List<SkillNode> nodes = skillNodeRepository
-                .findByCareerIdOrderByNodeLevelAscNodeNameAsc(careerId);
+                .findByCareerRole_CareerIdOrderByNodeLevelAscNodeNameAsc(careerId);
 
         if (nodes.isEmpty()) {
             return DashboardRoadmapProgressResponse.builder().build();
@@ -71,7 +71,7 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
                 .map(SkillNode::getNodeId)
                 .toList();
         List<StudentProgress> progresses = studentProgressRepository
-                .findByStudentIdAndNodeIdIn(student.getUserId(), nodeIds);
+                .findByStudent_UserIdAndSkillNode_NodeIdIn(student.getUserId(), nodeIds);
         
         // Map progress records by node ID for fast lookup during iteration
         Map<UUID, StudentProgress> progressByNodeId = mapProgressByNodeId(progresses);
@@ -130,7 +130,7 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
 
         User user = getCurrentUser();
         List<Feedback> feedbackList = feedbackRepository
-                .findTop5ByReceiverIdOrderByCreatedAtDesc(user.getUserId());
+                .findTop5ByReceiver_UserIdOrderByCreatedAtDesc(user.getUserId());
 
         return feedbackList.stream()
                 .map(studentDashboardMapper::toMentorFeedbackItemResponse)
@@ -149,13 +149,13 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
 
         User user = getCurrentUser();
         List<ChatSession> sessions = chatSessionRepository
-                .findByUser_UserIdOrderByCreateAtDesc(user.getUserId());
+                .findByUser_UserIdOrderByCreatedAtDesc(user.getUserId());
         if (sessions.isEmpty()) {
             return List.of();
         }
 
         List<UUID> sessionIds = sessions.stream().map(ChatSession::getSessionId).toList();
-        List<ChatMessage> messages = chatMessageRepository.findBySessionIdInOrderByCreateAtAsc(sessionIds);
+        List<ChatMessage> messages = chatMessageRepository.findByChatSession_SessionIdInOrderByCreatedAtAsc(sessionIds);
         List<AiHistoryItemResponse> historyItems = new ArrayList<>();
         for (ChatSession session : sessions) {
             ChatMessage message = selectDashboardMessage(session, messages);
@@ -185,7 +185,7 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
 
         CareerRole careerRole = careerRoleRepository.findByCareerId(student.getCareerRole().getCareerId());
         List<CareerRequiredSkill> requiredSkills = careerRequiredSkillRepository
-                .findByCareerRoleId(careerRole.getCareerId());
+                .findByCareerRole_CareerId(careerRole.getCareerId());
         List<UUID> skillIds = requiredSkills.stream()
                 .map(s -> s.getSkill().getSkillId())
                 .filter(Objects::nonNull)
@@ -195,7 +195,7 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
             return studentDashboardMapper.toEmptyMarketDemandResponse(careerRole);
         }
 
-        List<SkillTrend> trends = skillTrendRepository.findBySkillIdInOrderByweekStampAsc(skillIds);
+        List<SkillTrend> trends = skillTrendRepository.findBySkill_SkillIdInOrderByWeekStampAsc(skillIds);
         Map<LocalDate, Integer> jobsByWeek = sumJobsByWeek(trends);
         if (jobsByWeek.size() < 2) {
             return studentDashboardMapper.toEmptyMarketDemandResponse(careerRole);

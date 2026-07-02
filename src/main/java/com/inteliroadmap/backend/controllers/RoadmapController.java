@@ -1,7 +1,5 @@
 package com.inteliroadmap.backend.controllers;
 
-import com.inteliroadmap.backend.domain.dto.request.UpdateUserProgressRequest;
-import com.inteliroadmap.backend.domain.dto.response.RoadmapResponse;
 import com.inteliroadmap.backend.domain.dto.request.UpdateNodeProgressRequest;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapNodeDto;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.SkillGapResponse;
@@ -44,7 +42,7 @@ public class RoadmapController {
             @ApiResponse(responseCode = "401", description = "Unauthorized - Not logged in or invalid token"),
             @ApiResponse(responseCode = "404", description = "Not Found - Student not found or student does not have a Career")
     })
-    public ResponseEntity<com.inteliroadmap.backend.domain.dto.response.StudentRoadmapResponse> getStudentRoadmap() {
+    public ResponseEntity<StudentRoadmapResponse> getStudentRoadmap() {
         return ResponseEntity.ok(roadmapService.getStudentRoadmap());
     }
 

@@ -157,7 +157,7 @@ public class StudentServiceImpl implements StudentService {
         }
 
         // Fetch the list of skills the student has explicitly selected
-        List<StudentSkill> selectedSkills = studentSkillRepository.findByStudentId(student.getUserId());
+        List<StudentSkill> selectedSkills = studentSkillRepository.findByStudent_UserId(student.getUserId());
         if (student.getCareerRole().getCareerId() == null) {
             // Return early if no career is selected, showing only what the student selected
             return SkillResponse.builder()
@@ -167,7 +167,7 @@ public class StudentServiceImpl implements StudentService {
 
         // Fetch the required skills for the target career
         List<CareerRequiredSkill> requiredSkills = careerRequiredSkillRepository
-                .findByCareerRoleId(student.getCareerRole().getCareerId());
+                .findByCareerRole_CareerId(student.getCareerRole().getCareerId());
                 
         // Filter out required skills that the student already possesses to find the missing ones
         List<CareerRequiredSkill> missingRequiredSkills = filterMissingRequiredSkills(requiredSkills, selectedSkills);
@@ -211,8 +211,8 @@ public class StudentServiceImpl implements StudentService {
     @Override
     public List<CareerRequiredSkill> findMissingRequiredSkills(Student student) {
         List<CareerRequiredSkill> requiredSkills = careerRequiredSkillRepository
-                .findByCareerRoleId(student.getCareerRole().getCareerId());
-        List<StudentSkill> selectedSkills = studentSkillRepository.findByStudentId(student.getUserId());
+                .findByCareerRole_CareerId(student.getCareerRole().getCareerId());
+        List<StudentSkill> selectedSkills = studentSkillRepository.findByStudent_UserId(student.getUserId());
         return filterMissingRequiredSkills(requiredSkills, selectedSkills);
     }
 
@@ -249,16 +249,16 @@ public class StudentServiceImpl implements StudentService {
      */
     @Override
     public Integer calculateSkillProgress(Student student, UUID skillId) {
-        if (studentSkillRepository.existsByStudentIdAndSkillId(student.getUserId(), skillId)) {
+        if (studentSkillRepository.existsByStudent_UserIdAndSkill_SkillId(student.getUserId(), skillId)) {
             return 100;
         }
-        List<SkillNode> allNodesForSkill = skillNodeRepository.findBySkillIdAndCareerId(skillId, student.getCareerRole().getCareerId());
+        List<SkillNode> allNodesForSkill = skillNodeRepository.findBySkill_SkillIdAndCareerRole_CareerId(skillId, student.getCareerRole().getCareerId());
         if (allNodesForSkill.isEmpty()) {
             return 0;
         }
         int completedCount = 0;
         for (SkillNode skillNode : allNodesForSkill) {
-            StudentProgress nodeProgress = studentProgressRepository.findByStudentIdAndNodeId(student.getUserId(), skillNode.getNodeId()).orElse(null);
+            StudentProgress nodeProgress = studentProgressRepository.findByStudent_UserIdAndSkillNode_NodeId(student.getUserId(), skillNode.getNodeId()).orElse(null);
             if (nodeProgress != null && nodeProgress.getStatus() == RoadmapStepStatus.COMPLETED) {
                 completedCount++;
             }

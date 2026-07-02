@@ -9,7 +9,7 @@ import java.util.UUID;
 
 @Repository
 public interface SkillRepository extends JpaRepository<Skill, UUID> {
-    List<Skill> findBySkillNameContainingIgnoreCaseOrCareerContainingIgnoreCase(String skillName, String career);
+
     List<Skill> findBySkillNameContainingIgnoreCase(String skillName);
 
     Skill findBySkillName(String skillName);

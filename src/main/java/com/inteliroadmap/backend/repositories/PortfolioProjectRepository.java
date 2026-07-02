@@ -10,6 +10,6 @@ import java.util.UUID;
 
 @Repository
 public interface PortfolioProjectRepository extends JpaRepository<PortfolioProject, UUID> {
-    List<PortfolioProject> findByUserId(UUID userId);
-    void deleteByUserId(UUID userId);
+    List<PortfolioProject> findByUser_UserId(UUID userId);
+    void deleteByUser_UserId(UUID userId);
 }

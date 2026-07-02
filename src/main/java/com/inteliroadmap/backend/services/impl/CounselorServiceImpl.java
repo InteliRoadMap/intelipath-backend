@@ -100,7 +100,7 @@ public class CounselorServiceImpl implements CounselorService {
 
         // Iterate through each career and count the number of students assigned to it
         for(CareerRole career: careers) {
-            List<Student> students = studentRepository.findByCareerId(career.getCareerId());
+            List<Student> students = studentRepository.findByCareerRole(career);
             int number =  students.size();
             if(number > 0) {
                 careerStatistics.put(career.getCareerName(), number);
@@ -151,7 +151,7 @@ public class CounselorServiceImpl implements CounselorService {
             totalMissingSkills.put(skillName, count);
         }
 
-        int totalStudent = studentRepository.findByCareerId(matchedCareer.getCareerId()).size();
+        int totalStudent = studentRepository.findByCareerRole(matchedCareer).size();
 
         log.info("Get students skill gap of a career successfully");
         return counselorMapper
@@ -171,7 +171,7 @@ public class CounselorServiceImpl implements CounselorService {
         AcademicCounselor counselor = getAuthenticatedCounselor();
         User me = userRepository.findByUserId(counselor.getUserId());
 
-        List<Feedback> feedbacks = feedbackRepository.findByReceiverId(me.getUserId());
+        List<Feedback> feedbacks = feedbackRepository.findByReceiver(me);
 
         log.info("Get feedback successfully");
         return counselorMapper.toGetFeedbacksResponse(feedbacks, feedbacks.size());

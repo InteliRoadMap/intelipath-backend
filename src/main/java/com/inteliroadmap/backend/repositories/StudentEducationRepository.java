@@ -10,6 +10,6 @@ import java.util.UUID;
 
 @Repository
 public interface StudentEducationRepository extends JpaRepository<StudentEducation, UUID> {
-    List<StudentEducation> findByUserId(UUID userId);
-    void deleteByUserId(UUID userId);
+    List<StudentEducation> findByUser_UserId(UUID userId);
+    void deleteByUser_UserId(UUID userId);
 }

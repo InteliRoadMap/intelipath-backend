@@ -1,5 +1,6 @@
 package com.inteliroadmap.backend.domain.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -21,9 +22,9 @@ public class StudentSkill {
     @Column(name = "student_skill_id")
     private UUID studentSkillId;
 
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false, foreignKey = @ForeignKey(name = "fk_ss_student"))
-    @com.fasterxml.jackson.annotation.JsonIgnore
     private Student student;
 
     @ManyToOne(fetch = FetchType.LAZY)

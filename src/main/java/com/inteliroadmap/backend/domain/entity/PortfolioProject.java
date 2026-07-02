@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 
+import java.util.Map;
 import java.util.UUID;
 
 @Entity
@@ -51,6 +52,6 @@ public class PortfolioProject {
 
     @JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "tech_stack", columnDefinition = "jsonb")
-    private java.util.Map<String, Object> techStack;
+    private Map<String, Object> techStack;
 }
 
