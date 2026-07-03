@@ -1,7 +1,7 @@
 package com.inteliroadmap.backend.services;
 
-import com.inteliroadmap.backend.domain.dto.request.RefreshRequest;
 import com.inteliroadmap.backend.domain.dto.response.RefreshResponse;
+import com.inteliroadmap.backend.services.impl.AuthServiceImpl;
 import com.inteliroadmap.backend.domain.entity.RefreshToken;
 import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.domain.enums.UserRole;
@@ -33,7 +33,7 @@ class AuthServiceTest {
         userRepository = mock(UserRepository.class);
         refreshTokenRepository = mock(RefreshTokenRepository.class);
         jwtService = mock(JwtService.class);
-        authService = new AuthService(userRepository, refreshTokenRepository, jwtService);
+        authService = new AuthServiceImpl(userRepository, refreshTokenRepository, jwtService);
     }
 
     @Test
@@ -46,7 +46,7 @@ class AuthServiceTest {
         when(jwtService.getAccessExpiration()).thenReturn(900000L);
         when(jwtService.getRefreshExpiration()).thenReturn(604800000L);
 
-        RefreshResponse response = authService.refreshAccount(request());
+        RefreshResponse response = authService.refreshAccount("old-refresh");
 
         assertEquals("new-access", response.getAccessToken());
         assertEquals("new-refresh", response.getRefreshToken());
@@ -57,14 +57,14 @@ class AuthServiceTest {
         ArgumentCaptor<RefreshToken> tokenCaptor = ArgumentCaptor.forClass(RefreshToken.class);
         verify(refreshTokenRepository).save(tokenCaptor.capture());
         assertEquals("new-refresh", tokenCaptor.getValue().getToken());
-        assertEquals(user, tokenCaptor.getValue().getUser());
+        assertEquals(user.getUserId(), tokenCaptor.getValue().getUser().getUserId());
     }
 
     @Test
     void rejectsExpiredJwt() {
         when(jwtService.isTokenValid("old-refresh")).thenReturn(false);
 
-        assertThrows(ResponseStatusException.class, () -> authService.refreshAccount(request()));
+        assertThrows(ResponseStatusException.class, () -> authService.refreshAccount("old-refresh"));
 
         verifyNoInteractions(userRepository);
         verify(refreshTokenRepository, never()).save(any());
@@ -74,7 +74,7 @@ class AuthServiceTest {
     void rejectsInvalidJwt() {
         when(jwtService.isTokenValid("old-refresh")).thenReturn(false);
 
-        assertThrows(ResponseStatusException.class, () -> authService.refreshAccount(request()));
+        assertThrows(ResponseStatusException.class, () -> authService.refreshAccount("old-refresh"));
     }
 
     @Test
@@ -83,7 +83,7 @@ class AuthServiceTest {
         when(jwtService.extractEmail("old-refresh")).thenReturn("student@example.com");
         when(refreshTokenRepository.findByTokenForUpdate("old-refresh")).thenReturn(Optional.empty());
 
-        assertThrows(ResourceNotFoundException.class, () -> authService.refreshAccount(request()));
+        assertThrows(ResourceNotFoundException.class, () -> authService.refreshAccount("old-refresh"));
     }
 
     @Test
@@ -95,7 +95,7 @@ class AuthServiceTest {
         when(refreshTokenRepository.findByTokenForUpdate("old-refresh")).thenReturn(Optional.of(storedToken));
         when(userRepository.findByEmail(user.getEmail())).thenReturn(null);
 
-        assertThrows(ResourceNotFoundException.class, () -> authService.refreshAccount(request()));
+        assertThrows(ResourceNotFoundException.class, () -> authService.refreshAccount("old-refresh"));
     }
 
     @Test
@@ -106,7 +106,7 @@ class AuthServiceTest {
         when(jwtService.extractEmail("old-refresh")).thenReturn(user.getEmail());
         when(refreshTokenRepository.findByTokenForUpdate("old-refresh")).thenReturn(Optional.of(storedToken));
 
-        assertThrows(ResponseStatusException.class, () -> authService.refreshAccount(request()));
+        assertThrows(ResponseStatusException.class, () -> authService.refreshAccount("old-refresh"));
     }
 
     private void stubValidToken(RefreshToken storedToken, User user) {
@@ -114,12 +114,6 @@ class AuthServiceTest {
         when(jwtService.extractEmail("old-refresh")).thenReturn(user.getEmail());
         when(refreshTokenRepository.findByTokenForUpdate("old-refresh")).thenReturn(Optional.of(storedToken));
         when(userRepository.findByEmail(user.getEmail())).thenReturn(user);
-    }
-
-    private RefreshRequest request() {
-        RefreshRequest request = new RefreshRequest();
-        request.setRefreshToken("old-refresh");
-        return request;
     }
 
     private User user() {
@@ -130,12 +124,12 @@ class AuthServiceTest {
                 .build();
     }
 
-    private RefreshToken storedToken(User user, LocalDateTime expireAt) {
+    private RefreshToken storedToken(User user, LocalDateTime expiredAt) {
         return RefreshToken.builder()
                 .id(UUID.randomUUID())
                 .token("old-refresh")
                 .user(user)
-                .expireAt(expireAt)
+                .expiredAt(expiredAt)
                 .build();
     }
 }

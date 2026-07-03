@@ -13,9 +13,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.mcp.SyncMcpToolCallbackProvider;
 import org.springframework.ai.vectorstore.VectorStore;
-import org.springframework.beans.factory.ObjectProvider;
 
 import java.util.List;
 import java.util.UUID;
@@ -44,23 +42,20 @@ class VirtualMentorServiceSecurityContextTest {
     private ChatClient chatClient;
     @Mock
     private VectorStore vectorStore;
-    @Mock
-    private ObjectProvider<SyncMcpToolCallbackProvider> documentToolCallbackProvider;
 
     private VirtualMentorService virtualMentorService;
 
     @BeforeEach
     void setUp() {
         when(chatClientBuilder.build()).thenReturn(chatClient);
-        virtualMentorService = new VirtualMentorService(
+        virtualMentorService = new com.inteliroadmap.backend.services.impl.VirtualMentorServiceImpl(
                 chatSessionRepository,
                 chatMessageRepository,
                 studentRepository,
                 userRepository,
                 jwtService,
                 chatClientBuilder,
-                vectorStore,
-                documentToolCallbackProvider
+                vectorStore
         );
     }
 
@@ -69,7 +64,7 @@ class VirtualMentorServiceSecurityContextTest {
         User user = User.builder().userId(UUID.randomUUID()).email("student@example.com").build();
         when(jwtService.extractEmail("access-token")).thenReturn(user.getEmail());
         when(userRepository.findByEmail(user.getEmail())).thenReturn(user);
-        when(chatSessionRepository.findByUser_UserIdOrderByCreateAtDesc(user.getUserId())).thenReturn(List.of());
+        when(chatSessionRepository.findByUser_UserIdOrderByCreatedAtDesc(user.getUserId())).thenReturn(List.of());
 
         assertDoesNotThrow(() -> virtualMentorService.getUserSessions("Bearer access-token"));
     }

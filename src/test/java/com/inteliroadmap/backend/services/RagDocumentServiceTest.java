@@ -36,7 +36,7 @@ class RagDocumentServiceTest {
                 user.getUserId(), RagDocumentSourceType.TRANSCRIPT)).thenReturn(Optional.empty());
         when(ragDocumentRepository.save(any(RagDocument.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        RagDocument result = new RagDocumentService(ragDocumentRepository)
+        RagDocument result = new com.inteliroadmap.backend.services.impl.RagDocumentServiceImpl(ragDocumentRepository)
                 .startStudentTranscript(user, "https://storage/transcript.pdf", file);
 
         assertEquals(RagDocumentScope.STUDENT, result.getScope());
@@ -62,7 +62,7 @@ class RagDocumentServiceTest {
                 user.getUserId(), RagDocumentSourceType.TRANSCRIPT)).thenReturn(Optional.of(existing));
         when(ragDocumentRepository.save(any(RagDocument.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
-        new RagDocumentService(ragDocumentRepository).startStudentTranscript(user, "https://storage/new.pdf", file);
+        new com.inteliroadmap.backend.services.impl.RagDocumentServiceImpl(ragDocumentRepository).startStudentTranscript(user, "https://storage/new.pdf", file);
 
         ArgumentCaptor<RagDocument> captor = ArgumentCaptor.forClass(RagDocument.class);
         verify(ragDocumentRepository).save(captor.capture());

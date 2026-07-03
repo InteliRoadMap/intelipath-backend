@@ -41,7 +41,7 @@ class RagVectorStoreServiceTest {
                 .build();
         Document chunk = new Document("Transcript content");
 
-        new RagVectorStoreService(vectorStore, jdbcTemplate)
+        new com.inteliroadmap.backend.services.impl.RagVectorStoreServiceImpl(vectorStore, jdbcTemplate)
                 .replaceDocumentChunks(ragDocument, List.of(chunk));
 
         verify(jdbcTemplate).update(anyString(), eq(documentId.toString()));
