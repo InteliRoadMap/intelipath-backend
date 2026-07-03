@@ -54,7 +54,7 @@ public class FeedbackServiceImpl implements FeedbackService {
     @Transactional
     @Override
     public FeedbackResponse createFeedback(CreateFeedbackRequest request) {
-        log.info("Creating feedback...");
+        log.info("FeedbackServiceImpl: Creating feedback...");
 
         User sender = getAuthenticatedUser();
 
@@ -82,7 +82,7 @@ public class FeedbackServiceImpl implements FeedbackService {
                 request.getContent()
         );
 
-        log.info("New feedback created successfully");
+        log.info("FeedbackServiceImpl: New feedback created successfully");
         return toCrudFeedbackResponse(feedback);
     }
 
@@ -96,7 +96,7 @@ public class FeedbackServiceImpl implements FeedbackService {
     @Transactional
     @Override
     public FeedbackResponse modifyFeedback(ModifyFeedbackRequest request) {
-        log.info("Modify feedback request received");
+        log.info("FeedbackServiceImpl: Modify feedback request received");
         // Verify user is authenticated
         getAuthenticatedUser();
 
@@ -112,7 +112,7 @@ public class FeedbackServiceImpl implements FeedbackService {
         feedback.setRating(request.getRating());
         feedback.setStatus(FeedbackStatus.UPDATED);
 
-        log.info("Feedback updated successfully");
+        log.info("FeedbackServiceImpl: Feedback updated successfully");
         // Save the modifications
         feedback = feedbackRepository.save(feedback);
         return toCrudFeedbackResponse(feedback);
@@ -127,7 +127,7 @@ public class FeedbackServiceImpl implements FeedbackService {
     @Transactional
     @Override
     public FeedbackResponse markReadFeedback(UUID feedbackId) {
-        log.info("Mark read feedback request received");
+        log.info("FeedbackServiceImpl: Mark read feedback request received");
         // Verify user is authenticated
         getAuthenticatedUser();
 
@@ -141,7 +141,7 @@ public class FeedbackServiceImpl implements FeedbackService {
         feedback.setStatus(FeedbackStatus.READ);
         feedback = feedbackRepository.save(feedback);
 
-        log.info("Feedback marked read successfully");
+        log.info("FeedbackServiceImpl: Feedback marked read successfully");
         return toCrudFeedbackResponse(feedback);
     }
 
@@ -154,7 +154,7 @@ public class FeedbackServiceImpl implements FeedbackService {
     @Transactional
     @Override
     public void deleteFeedback(UUID feedbackId) {
-        log.info("Delete feedback request received");
+        log.info("FeedbackServiceImpl: Delete feedback request received");
         // Verify user is authenticated
         getAuthenticatedUser();
 
@@ -168,7 +168,7 @@ public class FeedbackServiceImpl implements FeedbackService {
         feedback.setStatus(FeedbackStatus.DELETED);
         feedbackRepository.save(feedback);
 
-        log.info("Feedback deleted successfully");
+        log.info("FeedbackServiceImpl: Feedback deleted successfully");
     }
 
     private FeedbackResponse toCrudFeedbackResponse(Feedback feedback) {

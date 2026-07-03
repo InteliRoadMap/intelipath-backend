@@ -3,9 +3,7 @@ package com.inteliroadmap.backend.utils;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import org.springframework.util.SerializationUtils;
 
-import java.util.Base64;
 import java.util.Optional;
 
 public class CookieUtils {
@@ -50,16 +48,5 @@ public class CookieUtils {
                 }
             }
         }
-    }
-
-    public static String serialize(Object object) {
-        return Base64.getUrlEncoder()
-                .encodeToString(SerializationUtils.serialize(object));
-    }
-
-    @SuppressWarnings("unchecked")
-    public static <T> T deserialize(Cookie cookie, Class<T> cls) {
-        return cls.cast(SerializationUtils.deserialize(
-                Base64.getUrlDecoder().decode(cookie.getValue())));
     }
 }

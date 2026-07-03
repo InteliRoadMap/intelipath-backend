@@ -1,17 +1,42 @@
 package com.inteliroadmap.backend.services.impl;
 
+import com.inteliroadmap.backend.components.RoadmapProgressCalculator;
 import com.inteliroadmap.backend.domain.dto.request.SetupStudentProfileRequest;
 import com.inteliroadmap.backend.domain.dto.response.RequiredSkillResponse;
 import com.inteliroadmap.backend.domain.dto.response.SkillResponse;
 import com.inteliroadmap.backend.domain.dto.response.StudentResponse;
-import com.inteliroadmap.backend.domain.entity.*;
+import com.inteliroadmap.backend.domain.entity.CareerRequiredSkill;
+import com.inteliroadmap.backend.domain.entity.CareerRole;
+import com.inteliroadmap.backend.domain.entity.RagDocument;
+import com.inteliroadmap.backend.domain.entity.Skill;
+import com.inteliroadmap.backend.domain.entity.SkillNode;
+import com.inteliroadmap.backend.domain.entity.Student;
+import com.inteliroadmap.backend.domain.entity.StudentProgress;
+import com.inteliroadmap.backend.domain.entity.StudentSkill;
+import com.inteliroadmap.backend.domain.entity.University;
+import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.services.AuthenticatedStudentService;
+import com.inteliroadmap.backend.services.DocumentIngestionService;
+import com.inteliroadmap.backend.services.RagDocumentService;
+import com.inteliroadmap.backend.services.SupabaseStorageService;
 import com.inteliroadmap.backend.mappers.SkillMapper;
 import com.inteliroadmap.backend.mappers.StudentDashboardMapper;
 import com.inteliroadmap.backend.mappers.StudentMapper;
-import com.inteliroadmap.backend.repositories.*;
+import com.inteliroadmap.backend.repositories.CareerRequiredSkillRepository;
+import com.inteliroadmap.backend.repositories.CareerRoleRepository;
+import com.inteliroadmap.backend.repositories.ChatMessageRepository;
+import com.inteliroadmap.backend.repositories.ChatSessionRepository;
+import com.inteliroadmap.backend.repositories.FeedbackRepository;
+import com.inteliroadmap.backend.repositories.SkillNodeRepository;
+import com.inteliroadmap.backend.repositories.SkillRepository;
+import com.inteliroadmap.backend.repositories.SkillTrendRepository;
+import com.inteliroadmap.backend.repositories.StudentProgressRepository;
+import com.inteliroadmap.backend.repositories.StudentRepository;
+import com.inteliroadmap.backend.repositories.StudentSkillRepository;
+import com.inteliroadmap.backend.repositories.UniversityRepository;
+import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.services.StudentService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -20,7 +45,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
-import java.util.*;
+import java.util.List;
+import java.util.Objects;
+import java.util.Set;
+import java.util.UUID;
 
 /**
  * Implementation of the {@link StudentService}.
@@ -33,6 +61,7 @@ public class StudentServiceImpl implements StudentService {
 
     private static final int AI_TEXT_LIMIT = 80;
 
+    private final RoadmapProgressCalculator roadmapProgressCalculator;
     private final UserRepository userRepository;
     private final SkillRepository skillRepository;
     private final StudentRepository studentRepository;
@@ -49,6 +78,9 @@ public class StudentServiceImpl implements StudentService {
     private final StudentMapper studentMapper;
     private final CareerRoleRepository careerRoleRepository;
     private final UniversityRepository universityRepository;
+    private final SupabaseStorageService supabaseStorageService;
+    private final RagDocumentService ragDocumentService;
+    private final DocumentIngestionService documentIngestionService;
     private final AuthenticatedStudentService AuthenticatedStudentService;
 
     /**
@@ -61,7 +93,7 @@ public class StudentServiceImpl implements StudentService {
     @Transactional
     @Override
     public StudentResponse setupStudentProfile(SetupStudentProfileRequest request) {
-        log.info("Student Module: Setup Student Profile Request received");
+        log.info("StudentServiceImpl: Setup Student Profile Request received");
 
         Student student = AuthenticatedStudentService.getOrCreateStudentForUpdate();
         User user = userRepository.findByUserId(student.getUserId());
@@ -73,6 +105,27 @@ public class StudentServiceImpl implements StudentService {
             University university = universityRepository.findById(request.getUniversityId())
                     .orElseThrow(() -> new ResourceNotFoundException("University not found"));
             student.setUniversity(university);
+            if (request.getUniversityName() == null || request.getUniversityName().isBlank()) {
+                student.setUniversityName(university.getName());
+            }
+        }
+
+        if (request.getUniversityName() != null) {
+            String universityName = request.getUniversityName().trim();
+            if (universityName.isEmpty()) {
+                student.setUniversityName(null);
+                if (request.getUniversityId() == null) {
+                    student.setUniversity(null);
+                }
+            } else {
+                student.setUniversityName(universityName);
+                if (request.getUniversityId() == null) {
+                    University matchedUniversity = universityRepository
+                            .findFirstByNameIgnoreCase(universityName)
+                            .orElse(null);
+                    student.setUniversity(matchedUniversity);
+                }
+            }
         }
         if (request.getYearOfAdmission() != null) {
             student.setYearOfAdmission(request.getYearOfAdmission());
@@ -85,7 +138,7 @@ public class StudentServiceImpl implements StudentService {
         if (request.getCareerId() != null) {
             CareerRole career = careerRoleRepository.findByCareerId(request.getCareerId());
             if (career == null) {
-                log.warn("Career role was not found: {}", request.getCareerId());
+                log.warn("StudentServiceImpl: Career role was not found: {}", request.getCareerId());
                 throw new ResourceNotFoundException("Career role not found");
             }
             student.setCareerRole(career);
@@ -107,7 +160,7 @@ public class StudentServiceImpl implements StudentService {
 
         studentRepository.save(student);
 
-        log.info("Student profile updated successfully for user: {}", user.getEmail());
+        log.info("StudentServiceImpl: Student profile updated successfully for user: {}", user.getEmail());
         return studentMapper.toProfileResponse(student);
     }
 
@@ -119,7 +172,7 @@ public class StudentServiceImpl implements StudentService {
     @Transactional
     @Override
     public StudentResponse getStudentProfile() {
-        log.info("Student profile retrieval request received");
+        log.info("StudentServiceImpl: Student profile retrieval request received");
         Student student = AuthenticatedStudentService.getRequiredStudent();
         return studentMapper.toProfileResponse(student);
     }
@@ -134,7 +187,7 @@ public class StudentServiceImpl implements StudentService {
     @Transactional
     @Override
     public StudentResponse updateTargetCareer(UUID careerId) {
-        log.info("Student target career update request received. careerId: {}", careerId);
+        log.info("StudentServiceImpl: Student target career update request received. careerId: {}", careerId);
         Student student = AuthenticatedStudentService.getOrCreateStudentForUpdate();
         CareerRole career = careerRoleRepository.findByCareerId(careerId);
         if (career == null) {
@@ -142,7 +195,7 @@ public class StudentServiceImpl implements StudentService {
         }
         student.setCareerRole(career);
         studentRepository.save(student);
-        log.info("Student target career updated successfully. careerId: {}", careerId);
+        log.info("StudentServiceImpl: Student target career updated successfully. careerId: {}", careerId);
         return studentMapper.toProfileResponse(student);
     }
 
@@ -154,7 +207,7 @@ public class StudentServiceImpl implements StudentService {
     @Transactional
     @Override
     public SkillResponse compareCurrentStudentSkills() {
-        log.info("Student Dashboard Module: Comparing selected skills with required skills");
+        log.info("StudentServiceImpl: Comparing selected skills with required skills");
 
         // Fetch current student and verify they exist
         Student student = getCurrentStudent();
@@ -262,14 +315,10 @@ public class StudentServiceImpl implements StudentService {
         if (allNodesForSkill.isEmpty()) {
             return 0;
         }
-        int completedCount = 0;
-        for (SkillNode skillNode : allNodesForSkill) {
-            StudentProgress nodeProgress = studentProgressRepository.findByStudent_UserIdAndSkillNode_NodeId(student.getUserId(), skillNode.getNodeId()).orElse(null);
-            if (nodeProgress != null && nodeProgress.getStatus() == RoadmapStepStatus.COMPLETED) {
-                completedCount++;
-            }
-        }
-        return (int) Math.round((double) completedCount / allNodesForSkill.size() * 100);
+        List<UUID> nodeIds = allNodesForSkill.stream().map(SkillNode::getNodeId).toList();
+        List<StudentProgress> progresses = studentProgressRepository
+                .findByStudent_UserIdAndSkillNode_NodeIdIn(student.getUserId(), nodeIds);
+        return roadmapProgressCalculator.calculateProgress(allNodesForSkill, progresses);
     }
 
     @Transactional
@@ -279,7 +328,23 @@ public class StudentServiceImpl implements StudentService {
             throw new IllegalArgumentException("Transcript file is required");
         }
         Student student = AuthenticatedStudentService.getOrCreateStudentForUpdate();
-        student.setTranscriptUrl(file.getOriginalFilename());
+        User user = userRepository.findByUserId(student.getUserId());
+        if (user == null) {
+            throw new ResourceNotFoundException("User not found");
+        }
+
+        String transcriptUrl = supabaseStorageService.uploadTranscript(file, student.getUserId().toString());
+        RagDocument document = ragDocumentService.startStudentTranscript(user, transcriptUrl, file);
+
+        try {
+            documentIngestionService.ingestPdfDocument(file);
+            ragDocumentService.markCompleted(document.getDocumentId());
+        } catch (Exception exception) {
+            ragDocumentService.markFailed(document.getDocumentId(), exception);
+            throw new RuntimeException("Failed to process transcript for RAG", exception);
+        }
+
+        student.setTranscriptUrl(transcriptUrl);
         studentRepository.save(student);
         return studentMapper.toProfileResponse(student);
     }

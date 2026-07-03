@@ -32,7 +32,12 @@ public class StudentSkillEvidence {
     @Column(name = "evidence_id")
     private UUID evidenceId;
 
-    @Column(name = "student_skill_id", nullable = false)
+    @Column(name = "user_id", nullable = false)
+    private UUID userId;
+
+    // Stays NULL until the student accepts a recommendation backed by this
+    // evidence; only then is the student_skills row created and linked here.
+    @Column(name = "student_skill_id")
     private UUID studentSkillId;
 
     @Column(name = "node_id")

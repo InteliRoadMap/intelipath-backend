@@ -10,9 +10,6 @@ import com.inteliroadmap.backend.services.SkillExtractionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,9 +37,6 @@ public class SkillExtractionServiceImpl implements SkillExtractionService {
 
     @Value("${ai.service.base-url:http://localhost:8000}")
     private String aiServiceBaseUrl;
-
-    @Value("${ai-service.api-key:}")
-    private String aiServiceApiKey;
 
     public record SkillExtractRequest(List<String> descriptions) {}
     public record SkillExtractResponse(List<List<String>> skills_per_doc) {}
@@ -107,16 +101,11 @@ public class SkillExtractionServiceImpl implements SkillExtractionService {
 
         RestTemplate restTemplate = new RestTemplate();
         String extractUrl = aiServiceBaseUrl + "/api/extract-skills";
-
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("X-API-Key", aiServiceApiKey);
-        HttpEntity<SkillExtractRequest> requestEntity = new HttpEntity<>(new SkillExtractRequest(descriptions), headers);
-
+        
         log.info("SkillExtractionServiceImpl: Sending {} descriptions to AI Service at: {}", descriptions.size(), extractUrl);
-        ResponseEntity<SkillExtractResponse> response = restTemplate.exchange(
+        ResponseEntity<SkillExtractResponse> response = restTemplate.postForEntity(
                 extractUrl,
-                HttpMethod.POST,
-                requestEntity,
+                new SkillExtractRequest(descriptions),
                 SkillExtractResponse.class
         );
 

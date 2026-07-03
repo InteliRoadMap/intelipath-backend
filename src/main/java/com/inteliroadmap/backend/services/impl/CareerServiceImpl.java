@@ -34,7 +34,7 @@ public class CareerServiceImpl implements CareerService {
      */
     @Override
     public List<CareerResponse> getAllCareers() {
-        log.info("Career role retrieval request received");
+        log.info("CareerServiceImpl: Career role retrieval request received");
 
         // Step 1: Load all career roles from the database
         List<CareerRole> careers = careerRoleRepository.findAll();
@@ -53,12 +53,12 @@ public class CareerServiceImpl implements CareerService {
      */
     @Override
     public CareerResponse getCareerRequirements(UUID careerId) {
-        log.info("Career requirement retrieval request received. careerId: {}", careerId);
+        log.info("CareerServiceImpl: Career requirement retrieval request received. careerId: {}", careerId);
 
         // Step 1: Find the requested career role
         Optional<CareerRole> careerRoleOptional = careerRoleRepository.findById(careerId);
         if (careerRoleOptional.isEmpty()) {
-            log.warn("Career role was not found: {}", careerId);
+            log.warn("CareerServiceImpl: Career role was not found: {}", careerId);
             throw new ResourceNotFoundException("Career role not found");
         }
 

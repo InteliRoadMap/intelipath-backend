@@ -48,16 +48,16 @@ public class JobScrapingScheduler {
     public void fetchJobsFromPython() {
         int limit = scraperLimit; // Define a default limit or configure it
         String pythonApiUrl = scraperTopCVApi + limit;
-        log.info("Triggering Python Scraper API at {}", pythonApiUrl);
+        log.info("JobScrapingScheduler: Triggering Python Scraper API at {}", pythonApiUrl);
 
         try {
             ScraperResponseDto response = restTemplate.getForObject(pythonApiUrl, ScraperResponseDto.class);
             if (response == null) {
-                log.warn("Received empty response from Scraper API");
+                log.warn("JobScrapingScheduler: Received empty response from Scraper API");
                 return;
             }
 
-            log.info("Received {} companies, {} recruitments, {} posts", 
+            log.info("JobScrapingScheduler: Received {} companies, {} recruitments, {} posts",
                 response.getCompanies().size(), response.getRecruitments().size(), response.getRecruitmentPosts().size());
 
             // 1. Save Companies
@@ -124,10 +124,10 @@ public class JobScrapingScheduler {
                     }
                 }
             }
-            log.info("Successfully persisted scraped data into the database.");
-            
+            log.info("JobScrapingScheduler: Successfully persisted scraped data into the database.");
+
         } catch (Exception e) {
-            log.error("Failed to scrape jobs from Python API: ", e);
+            log.error("JobScrapingScheduler: Failed to scrape jobs from Python API: ", e);
         }
     }
 }

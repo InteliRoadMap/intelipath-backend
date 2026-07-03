@@ -36,21 +36,21 @@ public class DocumentIngestionServiceImpl implements DocumentIngestionService {
      */
     @Override
     public void ingestPdfDocument(MultipartFile file) throws IOException {
-        log.info("Starting ingestion for PDF document: {}", file.getOriginalFilename());
+        log.info("DocumentIngestionServiceImpl: Starting ingestion for PDF document: {}", file.getOriginalFilename());
 
         // BƯỚC 1: Dùng GPT-4o-mini Vision để parse PDF → Markdown
         // Thay vì dùng PagePdfDocumentReader (chỉ bóc text thô, mất hết bảng biểu),
         // giờ ta dùng Vision AI để "nhìn" từng trang PDF và xuất ra Markdown chuẩn.
         // Step 1: Use the AI service to convert the PDF content to a Markdown string
         String markdown = pdfToMarkdownService.convertToMarkdown(file);
-        log.info("Converted PDF to Markdown. Length: {} chars", markdown.length());
+        log.info("DocumentIngestionServiceImpl: Converted PDF to Markdown. Length: {} chars", markdown.length());
 
         // BƯỚC 2: Tách Markdown thành các Document để chunking
         // Mỗi trang PDF đã được phân tách bằng comment <!-- page: X -->
         // Ta split theo page separator trước, rồi mới chunk nhỏ hơn nếu cần
         // Step 2: Split the full Markdown text into a list of Document objects, one per page
         List<Document> documents = splitMarkdownIntoDocuments(markdown, file.getOriginalFilename());
-        log.info("Split Markdown into {} page-level documents.", documents.size());
+        log.info("DocumentIngestionServiceImpl: Split Markdown into {} page-level documents.", documents.size());
 
         // BƯỚC 3: Cắt nhỏ thêm nếu một trang quá dài (> 800 tokens)
         // Step 3: Configure a TokenTextSplitter to break down large page-level documents into smaller chunks
@@ -65,13 +65,13 @@ public class DocumentIngestionServiceImpl implements DocumentIngestionService {
             doc.getMetadata().put("content_type", "markdown");
         }
 
-        log.info("Split into {} final chunks. Saving to Vector DB...", chunkedDocuments.size());
+        log.info("DocumentIngestionServiceImpl: Split into {} final chunks. Saving to Vector DB...", chunkedDocuments.size());
 
         // BƯỚC 4: Lưu vào VectorStore (tự động gọi EmbeddingModel)
         // Step 5: Save the chunked documents into the Vector DB, which automatically computes and stores embeddings
         vectorStore.accept(chunkedDocuments);
 
-        log.info("Successfully ingested PDF document: {}", file.getOriginalFilename());
+        log.info("DocumentIngestionServiceImpl: Successfully ingested PDF document: {}", file.getOriginalFilename());
     }
 
     /**

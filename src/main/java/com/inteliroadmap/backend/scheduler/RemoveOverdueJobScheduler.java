@@ -14,7 +14,7 @@ public class RemoveOverdueJobScheduler {
     // Runs every day at 8:00 AM // Remove Overdue Recruitment Posts
     @Scheduled(cron = "0 0 8 * * *")
     public void removeOverdueRecruitmentPosts() {
-        log.info("Checking Overdue Recruitment Posts...");
+        log.info("RemoveOverdueJobScheduler: Checking Overdue Recruitment Posts...");
 
     }
 }

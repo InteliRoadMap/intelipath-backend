@@ -46,11 +46,11 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         String targetUrl = determineTargetUrl(request, response, authentication);
 
         if (response.isCommitted()) {
-            log.debug("Response has already been committed. Unable to redirect to {}", targetUrl);
+            log.debug("OAuth2AuthenticationSuccessHandler: Response has already been committed. Unable to redirect to {}", targetUrl);
             return;
         }
 
-        log.info("Authentication success for user: {}", email);
+        log.info("OAuth2AuthenticationSuccessHandler: Authentication success for user: {}", email);
         clearAuthenticationAttributes(request, response);
         getRedirectStrategy().sendRedirect(request, response, targetUrl);
     }
@@ -73,7 +73,7 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         String email = oauth2User.getEmail();
         String role = oauth2User.getRole();
 
-        log.info("Generating tokens for OAuth2 user: {}", email);
+        log.info("OAuth2AuthenticationSuccessHandler: Generating tokens for OAuth2 user: {}", email);
 
         // Generate tokens
         String accessToken = jwtService.generateAccessToken(email, role);

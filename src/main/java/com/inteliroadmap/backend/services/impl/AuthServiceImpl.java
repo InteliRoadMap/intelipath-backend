@@ -42,19 +42,19 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public RefreshResponse refreshAccount(String refreshToken) {
         if (refreshToken == null || refreshToken.isBlank()) {
-            log.warn("Refresh token cookie is missing");
+            log.warn("AuthServiceImpl: Refresh token cookie is missing");
             throw invalidRefreshToken();
         }
         // Step 2: Validate JWT signature and expiration
         if (!jwtService.isTokenValid(refreshToken)) {
-            log.warn("Refresh token validation failed");
+            log.warn("AuthServiceImpl: Refresh token validation failed");
             throw invalidRefreshToken();
         }
 
         // Step 3: Extract user email from refresh token subject
         String email = jwtService.extractEmail(refreshToken);
         if (email == null || email.isBlank()) {
-            log.warn("Refresh token subject is missing");
+            log.warn("AuthServiceImpl: Refresh token subject is missing");
             throw invalidRefreshToken();
         }
 
@@ -63,25 +63,25 @@ public class AuthServiceImpl implements AuthService {
                 refreshTokenRepository.findByTokenForUpdate(refreshToken);
 
         if (storedTokenOptional.isEmpty()) {
-            log.warn("Refresh token was not found for user: {}", email);
+            log.warn("AuthServiceImpl: Refresh token was not found for user: {}", email);
             throw new ResourceNotFoundException("Refresh token or user not found");
         }
 
         RefreshToken storedToken = storedTokenOptional.get();
         if (storedToken.getExpiredAt().isBefore(LocalDateTime.now())) {
-            log.warn("Stored refresh token has expired for user: {}", email);
+            log.warn("AuthServiceImpl: Stored refresh token has expired for user: {}", email);
             throw invalidRefreshToken();
         }
 
         // Step 5: Find user by email and verify token ownership
         User user = userRepository.findByEmail(email);
         if (user == null) {
-            log.warn("Refresh token user was not found: {}", email);
+            log.warn("AuthServiceImpl: Refresh token user was not found: {}", email);
             throw new ResourceNotFoundException("Refresh token or user not found");
         }
 
         if (!storedToken.getUser().getUserId().equals(user.getUserId())) {
-            log.warn("Refresh token ownership mismatch for user: {}", email);
+            log.warn("AuthServiceImpl: Refresh token ownership mismatch for user: {}", email);
             throw invalidRefreshToken();
         }
 
@@ -105,7 +105,7 @@ public class AuthServiceImpl implements AuthService {
         refreshTokenRepository.save(newStoredToken);
 
         // Step 8: Return new token pair
-        log.info("Refresh token rotated successfully for user: {}", email);
+        log.info("AuthServiceImpl: Refresh token rotated successfully for user: {}", email);
         return refreshResponse(newAccessToken, newRefreshToken, expiresIn);
     }
 

@@ -16,12 +16,12 @@ public class SkillExtractionScheduler {
     // Run at 2 AM every day
     @Scheduled(cron = "0 0 2 * * ?")
     public void runSkillExtractionJob() {
-        log.info("CronJob Started: Beginning scheduled skill extraction at 2 AM.");
+        log.info("SkillExtractionScheduler: CronJob Started: Beginning scheduled skill extraction at 2 AM.");
         try {
             skillExtractionService.extractAndRebuildSkillTrends();
-            log.info("CronJob Finished: Skill extraction completed successfully.");
+            log.info("SkillExtractionScheduler: CronJob Finished: Skill extraction completed successfully.");
         } catch (Exception e) {
-            log.error("CronJob Failed: Error during skill extraction.", e);
+            log.error("SkillExtractionScheduler: CronJob Failed: Error during skill extraction.", e);
         }
     }
 }

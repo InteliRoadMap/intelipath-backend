@@ -33,6 +33,9 @@ public class RoadmapRecommendation {
     @Column(name = "recommendation_id")
     private UUID recommendationId;
 
+    @Column(name = "user_id")
+    private UUID userId;
+
     @Column(name = "current_career_id", nullable = false)
     private UUID currentCareerId;
 

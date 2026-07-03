@@ -20,9 +20,12 @@ public class StudentResponse {
     private LocalDate yob;
     private String bio;
     private String university;
+    private UUID universityId;
+    private String universityName;
     private Integer yearOfAdmission;
     private String major;
     private String githubProfile;
+    private String transcriptUrl;
     private String role;
     private UUID careerId;
     private String careerName;

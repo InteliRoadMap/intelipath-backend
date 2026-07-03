@@ -8,6 +8,26 @@
 
 services:
 
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: intelipath-postgres
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-intelipath}
+      POSTGRES_USER: ${POSTGRES_USER:-intelipath}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-intelipath_dev_password}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-intelipath} -d ${POSTGRES_DB:-intelipath}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 10s
+    restart: unless-stopped
+
   ai-service:
     build:
       context: ../intelipath-service
@@ -30,16 +50,26 @@ services:
     container_name: intelipath-backend
     ports:
       - "8080:8080"
+    volumes:
+      - ./data:/app/data:ro
 
     env_file:
       - .env
     environment:
+      DB_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-intelipath}
+      DB_USERNAME: ${POSTGRES_USER:-intelipath}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-intelipath_dev_password}
       AI_SERVICE_BASE_URL: http://ai-service:8000
       AI_SERVICE_URL: http://ai-service:8000/api/extract
       SCRAPER_API: http://ai-service:8000/api/v1/scraper/scrape/topcv/
       MCP_DOCUMENT_SERVICE_ENABLED: "true"
       MCP_DOCUMENT_SERVICE_URL: http://ai-service:8000
     depends_on:
+      postgres:
+        condition: service_healthy
       ai-service:
         condition: service_healthy
     restart: unless-stopped
+
+volumes:
+  postgres_data:

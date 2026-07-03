@@ -40,19 +40,19 @@ public class UserServiceImpl implements UserService {
     @Transactional
     @Override
     public UserResponse getCurrentUser() {
-        log.info("User Module: Current user info request received");
+        log.info("UserServiceImpl: Current user info request received");
 
         // Extract the authenticated user's email from the security context
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         if (email == null || email.isBlank()) {
-            log.warn("User Module: Cannot extract email from security context");
+            log.warn("UserServiceImpl: Cannot extract email from security context");
             throw new ResourceNotFoundException("Cannot extract email from security context");
         }
 
         // Retrieve the user entity from the database using the email
         User user = userRepository.findByEmail(email);
         if (user == null) {
-            log.warn("User Module: User not found: {}", email);
+            log.warn("UserServiceImpl: User not found: {}", email);
             throw new ResourceNotFoundException("User not found");
         }
 
@@ -69,11 +69,11 @@ public class UserServiceImpl implements UserService {
     @Transactional
     @Override
     public UserResponse getUserByEmail(UserRequest userRequest) {
-        log.info("User Module: User info request received for email: {}", userRequest.getEmail());
+        log.info("UserServiceImpl: User info request received for email: {}", userRequest.getEmail());
 
         User user = userRepository.findByEmail(userRequest.getEmail());
         if (user == null) {
-            log.warn("User Module: User not found: {}", userRequest.getEmail());
+            log.warn("UserServiceImpl: User not found: {}", userRequest.getEmail());
             throw new ResourceNotFoundException("User not found");
         }
 
@@ -90,7 +90,7 @@ public class UserServiceImpl implements UserService {
     @Transactional
     @Override
     public UserResponse setupUserProfile(SetupUserProfileRequest request) {
-        log.info("User Module: Setup user profile request received");
+        log.info("UserServiceImpl: Setup user profile request received");
 
         // Identify and fetch the current user based on the security context
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -126,7 +126,7 @@ public class UserServiceImpl implements UserService {
     @Transactional
     @Override
     public UserResponse updateAvatar(MultipartFile file) {
-        log.info("User Module: Update avatar request received");
+        log.info("UserServiceImpl: Update avatar request received");
 
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByEmail(email);

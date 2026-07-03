@@ -56,7 +56,7 @@ public class OAuth2UserServiceImpl extends DefaultOAuth2UserService {
     public OAuth2User loadUser(OAuth2UserRequest request) throws OAuth2AuthenticationException {
         // Retrieve the provider (e.g., github, google) from the OAuth2 client registration
         String provider = request.getClientRegistration().getRegistrationId();
-        log.info("Loading OAuth2 user from provider: {}", provider);
+        log.info("OAuth2UserServiceImpl: Loading OAuth2 user from provider: {}", provider);
 
         // Delegate to DefaultOAuth2UserService to fetch the basic user info
         OAuth2User oauthUser = super.loadUser(request);
@@ -73,7 +73,7 @@ public class OAuth2UserServiceImpl extends DefaultOAuth2UserService {
         // Link the OAuth account to the user record if not already linked
         linkOauthAccountIfNeeded(user, userInfo, provider);
 
-        log.info("OAuth2 login completed for email: {}, role: {}", user.getEmail(), user.getRole());
+        log.info("OAuth2UserServiceImpl: OAuth2 login completed for email: {}, role: {}", user.getEmail(), user.getRole());
 
         // Return a custom user principal holding the email and role for Spring Security
         return new CustomOAuth2User(oauthUser, user.getEmail(), user.getRole().name());
@@ -134,7 +134,7 @@ public class OAuth2UserServiceImpl extends DefaultOAuth2UserService {
                     .filter(email -> email != null && !email.isBlank())
                     .findFirst();
         } catch (Exception e) {
-            log.warn("Could not fetch GitHub primary email: {}", e.getMessage());
+            log.warn("OAuth2UserServiceImpl: Could not fetch GitHub primary email: {}", e.getMessage());
             return Optional.empty();
         }
     }
@@ -151,12 +151,12 @@ public class OAuth2UserServiceImpl extends DefaultOAuth2UserService {
 
         if (user == null) {
             // If the user doesn't exist, proceed to create a new one
-            log.info("No existing user found. Creating new OAuth2 user: {}", userInfo.getEmail());
+            log.info("OAuth2UserServiceImpl: No existing user found. Creating new OAuth2 user: {}", userInfo.getEmail());
             return createUser(userInfo);
         }
 
         // If the user exists, log the discovery and potentially update missing fields
-        log.info("Existing user found for OAuth2 login: {}", user.getEmail());
+        log.info("OAuth2UserServiceImpl: Existing user found for OAuth2 login: {}", user.getEmail());
         return updateUserIfNeeded(user, userInfo);
     }
 
@@ -177,7 +177,7 @@ public class OAuth2UserServiceImpl extends DefaultOAuth2UserService {
 
         // Save the new User entity to the database
         User savedUser = userRepository.save(user);
-        log.info("Created new OAuth2 user with id: {}, email: {}", savedUser.getUserId(), savedUser.getEmail());
+        log.info("OAuth2UserServiceImpl: Created new OAuth2 user with id: {}, email: {}", savedUser.getUserId(), savedUser.getEmail());
 
         // Automatically create a corresponding Student profile associated with the new User
         Student student = Student.builder()
@@ -207,12 +207,12 @@ public class OAuth2UserServiceImpl extends DefaultOAuth2UserService {
         }
 
         if (!changed) {
-            log.debug("No OAuth2 profile update needed for user: {}", user.getEmail());
+            log.debug("OAuth2UserServiceImpl: No OAuth2 profile update needed for user: {}", user.getEmail());
             return user;
         }
 
         User updatedUser = userRepository.save(user);
-        log.info("Updated OAuth2 profile fields for user: {}", updatedUser.getEmail());
+        log.info("OAuth2UserServiceImpl: Updated OAuth2 profile fields for user: {}", updatedUser.getEmail());
 
         return updatedUser;
     }
@@ -236,7 +236,7 @@ public class OAuth2UserServiceImpl extends DefaultOAuth2UserService {
 
         if (exists) {
             // Already linked, no action needed
-            log.debug("OAuth2 account already linked. provider: {}, providerId: {}", provider, userInfo.getProviderId());
+            log.debug("OAuth2UserServiceImpl: OAuth2 account already linked. provider: {}, providerId: {}", provider, userInfo.getProviderId());
             return;
         }
 
@@ -249,7 +249,7 @@ public class OAuth2UserServiceImpl extends DefaultOAuth2UserService {
 
         // Persist the mapping
         oauthAccountRepository.save(oauthAccount);
-        log.info("Linked OAuth2 account. user: {}, provider: {}, providerId: {}",
+        log.info("OAuth2UserServiceImpl: Linked OAuth2 account. user: {}, provider: {}, providerId: {}",
                 user.getEmail(), provider, userInfo.getProviderId());
     }
 
@@ -261,7 +261,7 @@ public class OAuth2UserServiceImpl extends DefaultOAuth2UserService {
      */
     private void validateEmail(OAuth2UserInfoInternal userInfo) {
         if (userInfo.getEmail() == null || userInfo.getEmail().isBlank()) {
-            log.warn("OAuth2 provider did not return an email");
+            log.warn("OAuth2UserServiceImpl: OAuth2 provider did not return an email");
             throw new OAuth2AuthenticationException("Email not found from OAuth2 provider");
         }
     }
@@ -277,13 +277,13 @@ public class OAuth2UserServiceImpl extends DefaultOAuth2UserService {
             String provider,
             Map<String, Object> attributes
     ) {
-        log.debug("Creating OAuth2 user info mapper for provider: {}", provider);
+        log.debug("OAuth2UserServiceImpl: Creating OAuth2 user info mapper for provider: {}", provider);
 
         return switch (provider.toLowerCase()) {
             case "google" -> new GoogleOAuth2UserInfo(attributes);
             case "github" -> new GitHubOauth2UserInfo(attributes);
             default -> {
-                log.warn("Unsupported OAuth2 provider: {}", provider);
+                log.warn("OAuth2UserServiceImpl: Unsupported OAuth2 provider: {}", provider);
                 throw new ResourceNotFoundException("Unknown provider: " + provider);
             }
         };

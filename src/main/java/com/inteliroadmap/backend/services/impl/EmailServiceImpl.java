@@ -51,7 +51,7 @@ public class EmailServiceImpl implements EmailService {
      */
     @Override
     public void sendFeedbackNotificationEmail(String email, String receiverName, String senderName, String content) {
-        log.info("Email Module: Preparing Feedback Notification email for {}", email);
+        log.info("EmailServiceImpl: Preparing Feedback Notification email for {}", email);
 
         try {
             MimeMessage message = mailSender.createMimeMessage();
@@ -65,10 +65,10 @@ public class EmailServiceImpl implements EmailService {
             helper.setText(htmlContent, true);
 
             mailSender.send(message);
-            log.info("Email Module: OTP email successfully sent to {}", email);
+            log.info("EmailServiceImpl: OTP email successfully sent to {}", email);
 
         } catch (jakarta.mail.MessagingException e) {
-            log.error("Email Module: Failed to send OTP email", e);
+            log.error("EmailServiceImpl: Failed to send OTP email", e);
             throw new RuntimeException("Email Module: Failed to send OTP email");
         }
     }

@@ -54,7 +54,7 @@ public class RecruitmentPostsController {
             )
     })
     public ResponseEntity<List<RecruitmentPostDto>> getRecruitmentPosts() {
-        log.info("Getting all recruitment posts");
+        log.info("RecruitmentPostsController: Getting all recruitment posts");
         return ResponseEntity.ok(scraperService.getRecruitmentPosts());
     }
 
@@ -81,7 +81,7 @@ public class RecruitmentPostsController {
             )
     })
     public ResponseEntity<CompanyResponse> getCompanyInfos(@PathVariable String companyId) {
-        log.info("Getting Company info for ID {}", companyId);
+        log.info("RecruitmentPostsController: Getting Company info for ID {}", companyId);
         return ResponseEntity.ok(scraperService.getCompanyInfos(companyId));
     }
 
@@ -108,7 +108,7 @@ public class RecruitmentPostsController {
             )
     })
     public ResponseEntity<RecruitmentResponse> getRecruitmentInfos(@PathVariable String recruitmentId) {
-        log.info("Getting Recruitment info for ID {}", recruitmentId);
+        log.info("RecruitmentPostsController: Getting Recruitment info for ID {}", recruitmentId);
         return ResponseEntity.ok(scraperService.getRecruitmentInfos(recruitmentId));
     }
 }

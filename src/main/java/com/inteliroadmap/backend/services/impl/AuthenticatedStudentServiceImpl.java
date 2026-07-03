@@ -40,7 +40,7 @@ public class AuthenticatedStudentServiceImpl implements AuthenticatedStudentServ
         
         // If no student profile exists, create a new default one with a generated portfolio slug
         if (student == null) {
-            log.info("Student profile not found. Creating a new one for user: {}", user.getEmail());
+            log.info("AuthenticatedStudentServiceImpl: Student profile not found. Creating a new one for user: {}", user.getEmail());
             student = studentRepository.save(Student.builder()
                     .userId(user.getUserId())
                     .portfolioSlug(SlugUtils.generateSlug(user.getFullName(), user.getUserId()))
@@ -62,7 +62,7 @@ public class AuthenticatedStudentServiceImpl implements AuthenticatedStudentServ
         
         // Throw an exception if the student profile is mandatory but missing
         if (student == null) {
-            log.error("[AuthenticatedStudentService] Student profile not found for user ID: {}", user.getUserId());
+            log.error("AuthenticatedStudentServiceImpl: Student profile not found for user ID: {}", user.getUserId());
             throw new ResourceNotFoundException("Student profile not found");
         }
         
@@ -87,7 +87,7 @@ public class AuthenticatedStudentServiceImpl implements AuthenticatedStudentServ
         // Attempt to fetch the user with a database lock to prevent concurrent modifications
         Optional<User> userOptional = userRepository.findByEmailForUpdate(email);
         if (userOptional.isEmpty()) {
-            log.error("[AuthenticatedStudentService] User not found from token: {}", email);
+            log.error("AuthenticatedStudentServiceImpl: User not found from token: {}", email);
             throw new ResourceNotFoundException("User not found from token");
         }
 
@@ -121,7 +121,7 @@ public class AuthenticatedStudentServiceImpl implements AuthenticatedStudentServ
         
         // Throw an exception if the user record doesn't exist
         if (user == null) {
-            log.error("[AuthenticatedStudentService] User not found from token: {}", email);
+            log.error("AuthenticatedStudentServiceImpl: User not found from token: {}", email);
             throw new ResourceNotFoundException("User not found from token");
         }
         return user;
@@ -140,7 +140,7 @@ public class AuthenticatedStudentServiceImpl implements AuthenticatedStudentServ
         
         // Validate that the authentication information is present and contains the email/username
         if (authentication == null || authentication.getName() == null || authentication.getName().isBlank()) {
-            log.error("[AuthenticatedStudentService] Cannot extract user from security context");
+            log.error("AuthenticatedStudentServiceImpl: Cannot extract user from security context");
             throw new ResourceNotFoundException("Cannot extract user from security context");
         }
         

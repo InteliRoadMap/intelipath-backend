@@ -58,14 +58,14 @@ public class PortfolioAiAnalyzer {
 
     public AiGithubSummary analyzeGithubProject(String repoName, String description,
                                                  String readmeContent, String extraContext) {
-        log.info("Analyzing GitHub project: {}", repoName);
+        log.info("PortfolioAiAnalyzer: Analyzing GitHub project: {}", repoName);
         try {
             return chatClient.prompt()
                     .user(String.format(ANALYZE_PROMPT, repoName, description, readmeContent, extraContext))
                     .call()
                     .entity(AiGithubSummary.class);
         } catch (Exception e) {
-            log.error("AI analysis failed for project: {}", repoName, e);
+            log.error("PortfolioAiAnalyzer: AI analysis failed for project: {}", repoName, e);
             return new AiGithubSummary("Dự án " + repoName + ": " + description, new HashMap<>());
         }
     }

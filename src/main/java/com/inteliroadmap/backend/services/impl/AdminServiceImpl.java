@@ -48,7 +48,7 @@ public class AdminServiceImpl implements AdminService {
     public AdminUserMetricResponse getUserMetrics(String authorizationHeader) {
         validateAdmin(authorizationHeader);
 
-        log.info("Admin Dashboard Module: Get user metric data");
+        log.info("AdminServiceImpl: Get user metric data");
 
         // Return user metrics with total count and a default growth percentage of 12%
         return adminMapper.toUserMetricResponse(userRepository.count(), 12);
@@ -65,7 +65,7 @@ public class AdminServiceImpl implements AdminService {
     public AdminCourseMetricResponse getCourseMetrics(String authorizationHeader) {
         validateAdmin(authorizationHeader);
 
-        log.info("Admin Dashboard Module: Get course metric data");
+        log.info("AdminServiceImpl: Get course metric data");
 
         // Retrieve total number of career roles as active courses
         long total = careerRoleRepository.count();
@@ -84,7 +84,7 @@ public class AdminServiceImpl implements AdminService {
     public AdminSystemHealthResponse getSystemHealth(String authorizationHeader) {
         validateAdmin(authorizationHeader);
 
-        log.info("Admin Dashboard Module: Get system health");
+        log.info("AdminServiceImpl: Get system health");
 
         // Return static system health status indicating 99.9% uptime and ONLINE status
         return adminMapper.toSystemHealthResponse(99.9, "ONLINE");
@@ -101,7 +101,7 @@ public class AdminServiceImpl implements AdminService {
     public List<AdminUserListItemResponse> getUsers(String authorizationHeader) {
         validateAdmin(authorizationHeader);
 
-        log.info("Admin Dashboard Module: Get users list");
+        log.info("AdminServiceImpl: Get users list");
 
         // Fetch all users from the database, map to list item responses, and collect to a list
         return userRepository.findAllUsers()
@@ -124,7 +124,7 @@ public class AdminServiceImpl implements AdminService {
 
         validateAdmin(authorizationHeader);
 
-        log.info("Admin Dashboard Module: Update user role. userId: {}, role: {}", userId, request.getRole());
+        log.info("AdminServiceImpl: Update user role. userId: {}, role: {}", userId, request.getRole());
 
         // Find the target user by ID and set their new role from the request
         User user = findUserById(userId);
@@ -132,7 +132,7 @@ public class AdminServiceImpl implements AdminService {
 
         // Save the updated user to the database
         User updatedUser = userRepository.save(user);
-        log.info("Admin Dashboard Module: User role updated successfully. email: {}, role: {}",
+        log.info("AdminServiceImpl: User role updated successfully. email: {}, role: {}",
                 updatedUser.getEmail(), updatedUser.getRole());
 
         // Return the updated user information mapped to a list item response
@@ -150,7 +150,7 @@ public class AdminServiceImpl implements AdminService {
     @Override
     public void deleteUser(String authorizationHeader, String userId) {validateAdmin(authorizationHeader);
 
-        log.info("Admin Dashboard Module: Delete user. userId: {}", userId);
+        log.info("AdminServiceImpl: Delete user. userId: {}", userId);
 
         // Extract the email of the admin performing the request to prevent self-deletion
         String currentEmail = jwtService.extractEmail(BearerTokenUtil.extractToken(authorizationHeader));
@@ -164,7 +164,7 @@ public class AdminServiceImpl implements AdminService {
         // Proceed to delete the user from the database
         userRepository.delete(user);
 
-        log.info("Admin Dashboard Module: User deleted successfully. email: {}", user.getEmail());
+        log.info("AdminServiceImpl: User deleted successfully. email: {}", user.getEmail());
     }
 
     /**
@@ -206,7 +206,7 @@ public class AdminServiceImpl implements AdminService {
 
         // Verify the token is valid and the user holds the ADMIN role
         if (!jwtService.isTokenValid(token) || !"ADMIN".equals(role)) {
-            log.warn("Admin Dashboard Module: Access denied. role: {}", role);
+            log.warn("AdminServiceImpl: Access denied. role: {}", role);
             throw new ResourceNotFoundException("Access denied");
         }
     }

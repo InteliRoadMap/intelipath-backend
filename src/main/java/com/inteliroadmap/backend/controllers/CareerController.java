@@ -61,7 +61,7 @@ public class CareerController {
             )
     })
     public ResponseEntity<List<CareerResponse>> getAllCareers() {
-        log.info("Fetching all career roles");
+        log.info("CareerController: Fetching all career roles");
         // Delegate to CareerService to retrieve all available careers
         return ResponseEntity.ok(careerService.getAllCareers());
     }
@@ -96,7 +96,7 @@ public class CareerController {
             )
     })
     public ResponseEntity<CareerResponse> getCareerRequirements(@PathVariable("career_id") UUID careerId) {
-        log.info("Fetching requirements for career role: {}", careerId);
+        log.info("CareerController: Fetching requirements for career role: {}", careerId);
         // Delegate to CareerService to fetch skill node requirements for the specified career
         return ResponseEntity.ok(careerService.getCareerRequirements(careerId));
     }

@@ -1,5 +1,6 @@
 package com.inteliroadmap.backend.services.impl;
 
+import com.inteliroadmap.backend.components.RoadmapProgressCalculator;
 import com.inteliroadmap.backend.domain.dto.request.UpdateProfileRequest;
 import com.inteliroadmap.backend.domain.dto.response.CounselorResponse;
 import com.inteliroadmap.backend.domain.dto.response.StudentInfoProjection;
@@ -51,6 +52,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class CounselorServiceImpl implements CounselorService {
 
     private final CounselorMapper counselorMapper;
+    private final RoadmapProgressCalculator roadmapProgressCalculator;
     private final CareerRoleRepository careerRoleRepository;
     private final FeedbackRepository feedbackRepository;
     private final SkillNodeRepository skillNodeRepository;
@@ -257,18 +259,10 @@ public class CounselorServiceImpl implements CounselorService {
         User st = userRepository.findByUserId(studentId);
         Student student = studentRepository.findByUserId(studentId);
 
-        // Calculate the student's progress ratio by comparing completed nodes vs total nodes
-        int nodesCompleted = studentProgressRepository
-                .findRoadmapTotalNodeCompletedByStudentIdAndCareerId(
-                        student.getUserId(),
-                        student.getCareerRole().getCareerId()
-                );
-
-        int totalRoadmapNode = skillNodeRepository
-                .findTotalNodeOfRoadmap(student.getCareerRole().getCareerId());
-
-        // Avoid division by zero if the roadmap is empty
-        int progress = (totalRoadmapNode == 0) ? 0 : (nodesCompleted * 100) / totalRoadmapNode;
+        // Weighted roadmap progress, shared formula with the student-facing views
+        int progress = roadmapProgressCalculator.calculateProgress(
+                skillNodeRepository.findByCareerRole_CareerId(student.getCareerRole().getCareerId()),
+                studentProgressRepository.findByStudent_UserId(student.getUserId()));
 
         // Fetch the list of skills the student has yet to acquire for their current career
         List<String> missingSkillNames = studentSkillRepository

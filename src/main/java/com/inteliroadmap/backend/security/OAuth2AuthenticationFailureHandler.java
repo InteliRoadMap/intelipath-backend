@@ -31,7 +31,7 @@ public class OAuth2AuthenticationFailureHandler extends SimpleUrlAuthenticationF
 
     @Override
     public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response, AuthenticationException exception) throws IOException, ServletException {
-        log.error("OAuth2 authentication failed", exception);
+        log.error("OAuth2AuthenticationFailureHandler: OAuth2 authentication failed", exception);
 
         String targetUrl = UriComponentsBuilder.fromUriString(authorizedRedirectUri)
                 .queryParam("error", exception.getLocalizedMessage())

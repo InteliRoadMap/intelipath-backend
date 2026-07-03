@@ -25,7 +25,7 @@ public class JobMarketTool implements Function<JobMarketTool.Request, JobMarketT
 
     @Override
     public Response apply(Request request) {
-        log.info("AI Called JobMarketTool to search for: {}", request.keyword());
+        log.info("JobMarketTool: AI Called JobMarketTool to search for: {}", request.keyword());
         List<Recruitment> recruitments = recruitmentRepository.findTop10ByTitleContainingIgnoreCase(request.keyword());
         
         if (recruitments.isEmpty()) {

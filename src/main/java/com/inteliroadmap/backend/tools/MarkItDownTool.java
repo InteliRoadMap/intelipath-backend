@@ -3,8 +3,6 @@ package com.inteliroadmap.backend.tools;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Description;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.ResourceAccessException;
@@ -23,9 +21,6 @@ public class MarkItDownTool implements Function<MarkItDownTool.Request, String> 
     @Value("${ai.service.url:http://localhost:8000/api/extract}")
     private String aiServiceUrl;
 
-    @Value("${ai-service.api-key:}")
-    private String aiServiceApiKey;
-
     private final RestTemplate restTemplate = new RestTemplate();
 
     public record Request(String fileUrl) {}
@@ -42,11 +37,7 @@ public class MarkItDownTool implements Function<MarkItDownTool.Request, String> 
             Map<String, String> requestBody = new HashMap<>();
             requestBody.put("url", request.fileUrl());
 
-            HttpHeaders headers = new HttpHeaders();
-            headers.set("X-API-Key", aiServiceApiKey);
-            HttpEntity<Map<String, String>> requestEntity = new HttpEntity<>(requestBody, headers);
-
-            ResponseEntity<Map> response = restTemplate.postForEntity(aiServiceUrl, requestEntity, Map.class);
+            ResponseEntity<Map> response = restTemplate.postForEntity(aiServiceUrl, requestBody, Map.class);
 
             if (response.getStatusCode().is2xxSuccessful() && response.getBody() != null) {
                 String markdown = (String) response.getBody().get("markdown");

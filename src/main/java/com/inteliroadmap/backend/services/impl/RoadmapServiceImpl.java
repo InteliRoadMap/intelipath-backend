@@ -1,5 +1,6 @@
 package com.inteliroadmap.backend.services.impl;
 
+import com.inteliroadmap.backend.components.RoadmapProgressCalculator;
 import com.inteliroadmap.backend.domain.dto.request.UpdateUserProgressRequest;
 import com.inteliroadmap.backend.domain.dto.request.UpdateNodeProgressRequest;
 import com.inteliroadmap.backend.domain.dto.response.RoadmapResponse;
@@ -51,6 +52,7 @@ import java.util.stream.Collectors;
 @Slf4j
 public class RoadmapServiceImpl implements RoadmapService {
 
+    private final RoadmapProgressCalculator roadmapProgressCalculator;
     private final UserRepository userRepository;
     private final StudentRepository studentRepository;
     private final CareerRoleRepository careerRoleRepository;
@@ -625,18 +627,7 @@ public class RoadmapServiceImpl implements RoadmapService {
      * @return the calculated progress percentage (0 to 100)
      */
     private int calculateProgress(List<SkillNode> nodes, Map<UUID, StudentProgress> progressByNodeId) {
-        if (nodes.isEmpty()) {
-            return 0;
-        }
-
-        long completedCount = nodes.stream()
-                .map(SkillNode::getNodeId)
-                .map(progressByNodeId::get)
-                .filter(Objects::nonNull)
-                .filter(progress -> RoadmapStepStatus.COMPLETED == progress.getStatus())
-                .count();
-
-        return (int) Math.round(((double) completedCount / nodes.size()) * 100);
+        return roadmapProgressCalculator.calculateProgress(nodes, progressByNodeId);
     }
 
 

@@ -44,7 +44,7 @@ public class GithubApiClient {
         } catch (HttpClientErrorException.NotFound e) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "GitHub repository not found or is private.");
         } catch (Exception e) {
-            log.error("Error fetching GitHub repo", e);
+            log.error("GithubApiClient: Error fetching GitHub repo", e);
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to connect to GitHub API.");
         }
 
@@ -59,7 +59,7 @@ public class GithubApiClient {
             
             return new GithubRepoMetadata(description, defaultBranch, stars, homepage);
         } catch (Exception e) {
-            log.error("Error parsing GitHub repo metadata", e);
+            log.error("GithubApiClient: Error parsing GitHub repo metadata", e);
             return new GithubRepoMetadata("", "main", 0, null);
         }
     }

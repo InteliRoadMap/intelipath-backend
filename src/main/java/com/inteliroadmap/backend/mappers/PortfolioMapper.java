@@ -2,7 +2,13 @@ package com.inteliroadmap.backend.mappers;
 
 import com.inteliroadmap.backend.domain.dto.request.PortfolioUpsertRequest;
 import com.inteliroadmap.backend.domain.dto.response.PortfolioResponse;
-import com.inteliroadmap.backend.domain.entity.*;
+import com.inteliroadmap.backend.domain.entity.PortfolioConfig;
+import com.inteliroadmap.backend.domain.entity.PortfolioProject;
+import com.inteliroadmap.backend.domain.entity.Skill;
+import com.inteliroadmap.backend.domain.entity.Student;
+import com.inteliroadmap.backend.domain.entity.StudentEducation;
+import com.inteliroadmap.backend.domain.entity.StudentSkill;
+import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.repositories.SkillRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
@@ -28,7 +34,7 @@ public class PortfolioMapper {
                 .bio(user.getBio())
                 .email(user.getEmail())
                 .portfolioSlug(student.getPortfolioSlug())
-                .university(student.getUniversity() != null ? student.getUniversity().getName() : null)
+                .university(resolveUniversityDisplayName(student))
                 .build();
 
         PortfolioResponse.PortfolioConfigResponse configResponse = null;
@@ -89,6 +95,13 @@ public class PortfolioMapper {
                 .projects(projectResponses)
                 .education(educationResponses)
                 .build();
+    }
+
+    private String resolveUniversityDisplayName(Student student) {
+        if (student.getUniversityName() != null && !student.getUniversityName().isBlank()) {
+            return student.getUniversityName();
+        }
+        return student.getUniversity() != null ? student.getUniversity().getName() : null;
     }
 
     public List<PortfolioProject> toPortfolioProjects(List<PortfolioUpsertRequest.PortfolioProjectRequest> projectRequests, User user) {

@@ -14,7 +14,8 @@ class HttpCookieOAuth2AuthorizationRequestRepositoryTest {
 
     @Test
     void storesAndLoadsAuthenticatedOAuthRequestFromCookie() {
-        HttpCookieOAuth2AuthorizationRequestRepository repository = new HttpCookieOAuth2AuthorizationRequestRepository();
+        HttpCookieOAuth2AuthorizationRequestRepository repository =
+                new HttpCookieOAuth2AuthorizationRequestRepository(new SecureOAuth2CookieCodec("test-only-oauth-cookie-secret"));
         OAuth2AuthorizationRequest authorizationRequest = OAuth2AuthorizationRequest.authorizationCode()
                 .authorizationUri("https://accounts.example.test/authorize")
                 .clientId("client-id")

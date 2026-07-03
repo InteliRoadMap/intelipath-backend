@@ -94,7 +94,7 @@ public class PdfToMarkdownServiceImpl implements PdfToMarkdownService {
      */
     @Override
     public String convertToMarkdown(MultipartFile file) throws IOException {
-        log.info("Starting PDF-to-Markdown conversion for file: {}, size: {} bytes",
+        log.info("PdfToMarkdownServiceImpl: Starting PDF-to-Markdown conversion for file: {}, size: {} bytes",
                 file.getOriginalFilename(), file.getSize());
 
         // Extract the file data into an InputStream and read it fully into a byte array
@@ -114,7 +114,7 @@ public class PdfToMarkdownServiceImpl implements PdfToMarkdownService {
      */
     @Override
     public String convertToMarkdown(String pdfUrl) throws IOException {
-        log.info("Starting PDF-to-Markdown conversion for URL: {}", pdfUrl);
+        log.info("PdfToMarkdownServiceImpl: Starting PDF-to-Markdown conversion for URL: {}", pdfUrl);
 
         try (InputStream inputStream = new URL(pdfUrl).openStream()) {
             byte[] pdfBytes = inputStream.readAllBytes();
@@ -132,7 +132,7 @@ public class PdfToMarkdownServiceImpl implements PdfToMarkdownService {
      */
     @Override
     public String convertToMarkdown(byte[] pdfBytes, String sourceName) throws IOException {
-        log.info("Starting PDF-to-Markdown conversion for: {}, size: {} bytes",
+        log.info("PdfToMarkdownServiceImpl: Starting PDF-to-Markdown conversion for: {}, size: {} bytes",
                 sourceName, pdfBytes.length);
         return processPages(pdfBytes, sourceName);
     }
@@ -149,11 +149,11 @@ public class PdfToMarkdownServiceImpl implements PdfToMarkdownService {
     private String processPages(byte[] pdfBytes, String sourceName) throws IOException {
         // Convert the PDF bytes into a list of PNG image byte arrays (one per page)
         List<byte[]> pageImages = renderPdfToImages(pdfBytes);
-        log.info("Rendered {} pages from PDF: {}", pageImages.size(), sourceName);
+        log.info("PdfToMarkdownServiceImpl: Rendered {} pages from PDF: {}", pageImages.size(), sourceName);
 
         // Handle edge case of an empty PDF
         if (pageImages.isEmpty()) {
-            log.warn("PDF has no pages: {}", sourceName);
+            log.warn("PdfToMarkdownServiceImpl: PDF has no pages: {}", sourceName);
             return "<!-- Document is empty -->";
         }
 
@@ -162,7 +162,7 @@ public class PdfToMarkdownServiceImpl implements PdfToMarkdownService {
         // Iterate through each rendered page image
         for (int i = 0; i < pageImages.size(); i++) {
             int pageNumber = i + 1;
-            log.debug("Processing page {}/{} of {}", pageNumber, pageImages.size(), sourceName);
+            log.debug("PdfToMarkdownServiceImpl: Processing page {}/{} of {}", pageNumber, pageImages.size(), sourceName);
 
             try {
                 // Send the image to the AI vision model to extract its markdown content
@@ -177,7 +177,7 @@ public class PdfToMarkdownServiceImpl implements PdfToMarkdownService {
 
             } catch (Exception e) {
                 // In case of a processing failure, log the error and embed a failure note in the markdown
-                log.error("Failed to convert page {} of {}: {}", pageNumber, sourceName, e.getMessage());
+                log.error("PdfToMarkdownServiceImpl: Failed to convert page {} of {}: {}", pageNumber, sourceName, e.getMessage());
                 fullMarkdown.append("\n\n<!-- page: ").append(pageNumber)
                         .append(" failed: ").append(e.getMessage()).append(" -->\n\n");
             }
@@ -185,7 +185,7 @@ public class PdfToMarkdownServiceImpl implements PdfToMarkdownService {
 
         // Return the accumulated and trimmed markdown string
         String result = fullMarkdown.toString().trim();
-        log.info("PDF-to-Markdown conversion completed for {}. Output length: {} chars", sourceName, result.length());
+        log.info("PdfToMarkdownServiceImpl: PDF-to-Markdown conversion completed for {}. Output length: {} chars", sourceName, result.length());
         return result;
     }
 
@@ -228,7 +228,7 @@ public class PdfToMarkdownServiceImpl implements PdfToMarkdownService {
      * @return the Markdown representation of the page
      */
     private String convertPageToMarkdown(byte[] imageBytes, int pageNumber) {
-        log.debug("Sending page {} image ({} bytes) to Vision AI", pageNumber, imageBytes.length);
+        log.debug("PdfToMarkdownServiceImpl: Sending page {} image ({} bytes) to Vision AI", pageNumber, imageBytes.length);
 
         // Wrap byte[] thành Resource để Spring AI Media có thể đọc
         // Wrap the raw image bytes into a Spring Resource required by the AI Media wrapper

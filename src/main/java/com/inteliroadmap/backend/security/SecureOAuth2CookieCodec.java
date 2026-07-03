@@ -88,7 +88,7 @@ public class SecureOAuth2CookieCodec {
                     ? Optional.of(expectedType.cast(decoded))
                     : Optional.empty();
         } catch (Exception exception) {
-            log.warn("Ignoring invalid OAuth authorization cookie: {}", exception.getClass().getSimpleName());
+            log.warn("SecureOAuth2CookieCodec: Ignoring invalid OAuth authorization cookie: {}", exception.getClass().getSimpleName());
             return Optional.empty();
         }
     }

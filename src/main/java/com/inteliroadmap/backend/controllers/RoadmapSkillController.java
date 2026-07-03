@@ -57,7 +57,7 @@ public class RoadmapSkillController {
             )
     })
     public ResponseEntity<SkillResponse> compareSkills() {
-        log.info("Roadmap Skills API: Compare skills request received");
+        log.info("RoadmapSkillController: Compare skills request received");
         return ResponseEntity.ok(studentService.compareCurrentStudentSkills());
     }
 }
