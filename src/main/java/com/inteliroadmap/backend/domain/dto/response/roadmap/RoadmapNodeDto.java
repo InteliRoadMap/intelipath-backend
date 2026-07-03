@@ -15,7 +15,12 @@ public class RoadmapNodeDto {
     private UUID nodeId;
     private String nodeName;
     private String parentNode;
+    private String previousNode;
     private Integer nodeLevel;
+    private String stage;
+    private String completionPolicy;
+    private Integer weight;
+    private Integer requiredProficiency;
     private String description;
     private Object resource;
     private String status;

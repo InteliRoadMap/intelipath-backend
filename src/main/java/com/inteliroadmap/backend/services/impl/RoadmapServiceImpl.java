@@ -35,6 +35,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -585,38 +587,127 @@ public class RoadmapServiceImpl implements RoadmapService {
      * @param progressByNodeId the mapped student progress by node ID
      * @return a map of node IDs to their frontend status string
      */
+    private static final String NEVER_COMPLETE_POLICY = "NEVER_COMPLETE";
+
     private Map<UUID, String> buildFrontendStatusMap(
             List<SkillNode> nodes,
             Map<UUID, StudentProgress> progressByNodeId
     ) {
         Map<UUID, String> statusByNodeId = new HashMap<>();
+        Set<String> passedStages = findPassedStages(nodes, progressByNodeId);
 
-        for (SkillNode node : nodes) {
+        // Parents/previous nodes must be classified before their dependants,
+        // regardless of the level/name order the nodes were fetched in.
+        for (SkillNode node : orderDependenciesFirst(nodes)) {
             StudentProgress progress = progressByNodeId.get(node.getNodeId());
-            if (progress != null) {
-                if (RoadmapStepStatus.COMPLETED == progress.getStatus()) {
-                    statusByNodeId.put(node.getNodeId(), FRONTEND_COMPLETED_STATUS);
-                    continue;
-                }
-                if (RoadmapStepStatus.IN_PROGRESS == progress.getStatus()) {
-                    statusByNodeId.put(node.getNodeId(), FRONTEND_IN_PROGRESS_STATUS);
-                    continue;
-                }
+            if (progress != null && RoadmapStepStatus.COMPLETED == progress.getStatus()) {
+                statusByNodeId.put(node.getNodeId(), FRONTEND_COMPLETED_STATUS);
+                continue;
+            }
+            if (progress != null && RoadmapStepStatus.IN_PROGRESS == progress.getStatus()) {
+                statusByNodeId.put(node.getNodeId(), FRONTEND_IN_PROGRESS_STATUS);
+                continue;
             }
 
-            if (node.getParentNode() == null) {
-                statusByNodeId.put(node.getNodeId(), FRONTEND_CURRENT_STATUS);
-            } else {
-                String parentStatus = statusByNodeId.get(node.getParentNode());
-                if (FRONTEND_COMPLETED_STATUS.equals(parentStatus)) {
-                    statusByNodeId.put(node.getNodeId(), FRONTEND_CURRENT_STATUS);
-                } else {
-                    statusByNodeId.put(node.getNodeId(), FRONTEND_LOCKED_STATUS);
-                }
-            }
+            boolean locked = isStageLocked(node, passedStages)
+                    || isGateLocked(node.getParentNode(), statusByNodeId)
+                    || isGateLocked(node.getPreviousNode(), statusByNodeId);
+            statusByNodeId.put(node.getNodeId(), locked ? FRONTEND_LOCKED_STATUS : FRONTEND_CURRENT_STATUS);
         }
 
         return statusByNodeId;
+    }
+
+    /**
+     * A dependant is locked until its gate node is COMPLETED — except when the
+     * gate is a NEVER_COMPLETE group header, which can never be completed:
+     * there the dependant only stays locked while the header itself is locked.
+     */
+    private boolean isGateLocked(SkillNode gate, Map<UUID, String> statusByNodeId) {
+        if (gate == null) {
+            return false;
+        }
+        String gateStatus = statusByNodeId.get(gate.getNodeId());
+        if (gateStatus == null) {
+            return true;
+        }
+        if (NEVER_COMPLETE_POLICY.equalsIgnoreCase(gate.getCompletionPolicy())) {
+            return FRONTEND_LOCKED_STATUS.equals(gateStatus);
+        }
+        return !FRONTEND_COMPLETED_STATUS.equals(gateStatus);
+    }
+
+    /**
+     * A node whose NodeType requires unlock keys stays locked until every stage
+     * named in stageUnlockKey has been passed (all of that stage's completable
+     * nodes are COMPLETED).
+     */
+    private boolean isStageLocked(SkillNode node, Set<String> passedStages) {
+        if (node.getType() == null || !Boolean.TRUE.equals(node.getType().getUnlockKeyRequired())) {
+            return false;
+        }
+        List<String> requiredStages = node.getType().getStageUnlockKey();
+        if (requiredStages == null) {
+            return false;
+        }
+        for (String stage : requiredStages) {
+            if (stage != null && !passedStages.contains(stage.trim().toUpperCase())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Stages where every completable (non-group) node is COMPLETED. */
+    private Set<String> findPassedStages(List<SkillNode> nodes, Map<UUID, StudentProgress> progressByNodeId) {
+        Map<String, Boolean> stageCompleted = new HashMap<>();
+        for (SkillNode node : nodes) {
+            if (node.getType() == null || node.getType().getStage() == null) {
+                continue;
+            }
+            String stage = node.getType().getStage().name();
+            if (NEVER_COMPLETE_POLICY.equalsIgnoreCase(node.getCompletionPolicy())) {
+                stageCompleted.putIfAbsent(stage, true);
+                continue;
+            }
+            StudentProgress progress = progressByNodeId.get(node.getNodeId());
+            boolean completed = progress != null && RoadmapStepStatus.COMPLETED == progress.getStatus();
+            stageCompleted.merge(stage, completed, Boolean::logicalAnd);
+        }
+
+        Set<String> passed = new HashSet<>();
+        stageCompleted.forEach((stage, completed) -> {
+            if (Boolean.TRUE.equals(completed)) {
+                passed.add(stage);
+            }
+        });
+        return passed;
+    }
+
+    /** Kahn-style ordering over parent/previous references; tolerates cycles by appending leftovers. */
+    private List<SkillNode> orderDependenciesFirst(List<SkillNode> nodes) {
+        Set<UUID> emitted = new HashSet<>();
+        List<SkillNode> ordered = new ArrayList<>(nodes.size());
+        List<SkillNode> remaining = new ArrayList<>(nodes);
+
+        boolean progressMade = true;
+        while (!remaining.isEmpty() && progressMade) {
+            progressMade = false;
+            Iterator<SkillNode> iterator = remaining.iterator();
+            while (iterator.hasNext()) {
+                SkillNode node = iterator.next();
+                boolean parentReady = node.getParentNode() == null || emitted.contains(node.getParentNode().getNodeId());
+                boolean previousReady = node.getPreviousNode() == null || emitted.contains(node.getPreviousNode().getNodeId());
+                if (parentReady && previousReady) {
+                    ordered.add(node);
+                    emitted.add(node.getNodeId());
+                    iterator.remove();
+                    progressMade = true;
+                }
+            }
+        }
+        ordered.addAll(remaining);
+        return ordered;
     }
 
     /**
@@ -640,7 +731,13 @@ public class RoadmapServiceImpl implements RoadmapService {
                         .nodeId(node.getNodeId())
                         .nodeName(node.getNodeName())
                         .parentNode(node.getParentNode() != null ? node.getParentNode().getNodeId().toString() : null)
+                        .previousNode(node.getPreviousNode() != null ? node.getPreviousNode().getNodeId().toString() : null)
                         .nodeLevel(node.getNodeLevel())
+                        .stage(node.getType() != null && node.getType().getStage() != null
+                                ? node.getType().getStage().name() : null)
+                        .completionPolicy(node.getCompletionPolicy())
+                        .weight(node.getType() != null ? node.getType().getWeight() : null)
+                        .requiredProficiency(node.getRequiredProficiency())
                         .description(node.getDescription())
                         .resource(node.getResource())
                         .status(statusByNodeId.getOrDefault(node.getNodeId(), FRONTEND_LOCKED_STATUS))

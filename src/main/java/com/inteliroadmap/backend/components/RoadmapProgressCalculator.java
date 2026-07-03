@@ -22,6 +22,7 @@ import java.util.UUID;
 public class RoadmapProgressCalculator {
 
     private static final int DEFAULT_NODE_WEIGHT = 1;
+    private static final String NEVER_COMPLETE_POLICY = "NEVER_COMPLETE";
 
     public int calculateProgress(List<SkillNode> nodes, List<StudentProgress> progresses) {
         return calculateProgress(nodes, mapProgressByNodeId(progresses));
@@ -35,6 +36,11 @@ public class RoadmapProgressCalculator {
         long totalWeight = 0;
         long completedWeight = 0;
         for (SkillNode node : nodes) {
+            // NEVER_COMPLETE nodes are group headers that can never be completed;
+            // counting them would cap progress permanently below 100%.
+            if (NEVER_COMPLETE_POLICY.equalsIgnoreCase(node.getCompletionPolicy())) {
+                continue;
+            }
             int weight = resolveWeight(node);
             totalWeight += weight;
             if (isCompleted(progressByNodeId.get(node.getNodeId()))) {

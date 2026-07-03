@@ -66,6 +66,12 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
     private static final BigDecimal MIN_EVIDENCE_CONFIDENCE = new BigDecimal("0.70");
     private static final BigDecimal PROFILE_SKILL_CONFIDENCE = new BigDecimal("0.80");
 
+    /**
+     * Only EVIDENCE_ALLOWED nodes may be auto-suggested. NEVER_COMPLETE nodes are
+     * group headers, and MANUAL_ONLY nodes must be ticked by the student directly.
+     */
+    private static final String EVIDENCE_ALLOWED_POLICY = "EVIDENCE_ALLOWED";
+
     private final AuthenticatedStudentService authenticatedStudentService;
     private final RoadmapRecommendationRepository recommendationRepository;
     private final RoadmapRecommendationItemRepository recommendationItemRepository;
@@ -224,12 +230,13 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
             }
         }
 
-        // Source 2: AI/portfolio/transcript evidence with sufficient confidence.
+        // Source 2: AI/portfolio/transcript evidence. Per-node proficiency
+        // thresholds are enforced in offerCandidate.
         List<StudentSkillEvidence> evidences = evidenceRepository.findByUserIdAndStatusIn(
                 student.getUserId(), List.of(EvidenceStatus.PENDING, EvidenceStatus.ACCEPTED));
         for (StudentSkillEvidence evidence : evidences) {
             BigDecimal confidence = evidence.getConfidence();
-            if (confidence == null || confidence.compareTo(MIN_EVIDENCE_CONFIDENCE) < 0) {
+            if (confidence == null) {
                 continue;
             }
             String reason = buildEvidenceReason(evidence);
@@ -252,6 +259,12 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
         if (excludedNodeIds.contains(node.getNodeId())) {
             return;
         }
+        if (!EVIDENCE_ALLOWED_POLICY.equalsIgnoreCase(node.getCompletionPolicy())) {
+            return;
+        }
+        if (!meetsNodeProficiency(node, confidence)) {
+            return;
+        }
 
         NodeCandidate existing = candidates.get(node.getNodeId());
         if (existing == null) {
@@ -270,6 +283,20 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
             candidates.put(node.getNodeId(),
                     new NodeCandidate(node, confidence, reason, existing.evidenceIds()));
         }
+    }
+
+    /**
+     * The node's requiredProficiency (0-100) is the confidence bar for
+     * suggesting it; nodes without one fall back to the default threshold.
+     */
+    private boolean meetsNodeProficiency(SkillNode node, BigDecimal confidence) {
+        if (confidence == null) {
+            return false;
+        }
+        BigDecimal threshold = node.getRequiredProficiency() != null && node.getRequiredProficiency() > 0
+                ? BigDecimal.valueOf(node.getRequiredProficiency()).movePointLeft(2)
+                : MIN_EVIDENCE_CONFIDENCE;
+        return confidence.compareTo(threshold) >= 0;
     }
 
     private String buildEvidenceReason(StudentSkillEvidence evidence) {
