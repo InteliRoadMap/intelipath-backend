@@ -10,6 +10,7 @@ import com.inteliroadmap.backend.domain.dto.response.roadmap.StudentRoadmapRespo
 import com.inteliroadmap.backend.domain.entity.CareerRequiredSkill;
 import com.inteliroadmap.backend.domain.entity.CareerRole;
 import com.inteliroadmap.backend.domain.entity.Skill;
+import com.inteliroadmap.backend.domain.entity.RoadmapNodeLayout;
 import com.inteliroadmap.backend.domain.entity.SkillNode;
 import com.inteliroadmap.backend.domain.entity.Student;
 import com.inteliroadmap.backend.domain.entity.StudentProgress;
@@ -18,6 +19,7 @@ import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
 import com.inteliroadmap.backend.repositories.CareerRequiredSkillRepository;
 import com.inteliroadmap.backend.repositories.CareerRoleRepository;
+import com.inteliroadmap.backend.repositories.RoadmapNodeLayoutRepository;
 import com.inteliroadmap.backend.repositories.SkillNodeRepository;
 import com.inteliroadmap.backend.repositories.SkillRepository;
 import com.inteliroadmap.backend.repositories.StudentProgressRepository;
@@ -55,6 +57,7 @@ import java.util.stream.Collectors;
 public class RoadmapServiceImpl implements RoadmapService {
 
     private final RoadmapProgressCalculator roadmapProgressCalculator;
+    private final RoadmapNodeLayoutRepository roadmapNodeLayoutRepository;
     private final UserRepository userRepository;
     private final StudentRepository studentRepository;
     private final CareerRoleRepository careerRoleRepository;
@@ -726,22 +729,36 @@ public class RoadmapServiceImpl implements RoadmapService {
             List<SkillNode> nodes,
             Map<UUID, String> statusByNodeId
     ) {
+        // Presentation-only placement, joined in from the layout table.
+        Map<UUID, RoadmapNodeLayout> layoutsByNodeId = new HashMap<>();
+        for (RoadmapNodeLayout layout : roadmapNodeLayoutRepository
+                .findByNodeIdIn(nodes.stream().map(SkillNode::getNodeId).toList())) {
+            layoutsByNodeId.put(layout.getNodeId(), layout);
+        }
+
         return nodes.stream()
-                .map(node -> RoadmapNodeDto.builder()
-                        .nodeId(node.getNodeId())
-                        .nodeName(node.getNodeName())
-                        .parentNode(node.getParentNode() != null ? node.getParentNode().getNodeId().toString() : null)
-                        .previousNode(node.getPreviousNode() != null ? node.getPreviousNode().getNodeId().toString() : null)
-                        .nodeLevel(node.getNodeLevel())
-                        .stage(node.getType() != null && node.getType().getStage() != null
-                                ? node.getType().getStage().name() : null)
-                        .completionPolicy(node.getCompletionPolicy())
-                        .weight(node.getType() != null ? node.getType().getWeight() : null)
-                        .requiredProficiency(node.getRequiredProficiency())
-                        .description(node.getDescription())
-                        .resource(node.getResource())
-                        .status(statusByNodeId.getOrDefault(node.getNodeId(), FRONTEND_LOCKED_STATUS))
-                        .build())
+                .map(node -> {
+                    RoadmapNodeLayout layout = layoutsByNodeId.get(node.getNodeId());
+                    return RoadmapNodeDto.builder()
+                            .nodeId(node.getNodeId())
+                            .nodeName(node.getNodeName())
+                            .parentNode(node.getParentNode() != null ? node.getParentNode().getNodeId().toString() : null)
+                            .previousNode(node.getPreviousNode() != null ? node.getPreviousNode().getNodeId().toString() : null)
+                            .nodeLevel(node.getNodeLevel())
+                            .stage(node.getType() != null && node.getType().getStage() != null
+                                    ? node.getType().getStage().name() : null)
+                            .completionPolicy(node.getCompletionPolicy())
+                            .weight(node.getType() != null ? node.getType().getWeight() : null)
+                            .requiredProficiency(node.getRequiredProficiency())
+                            .positionX(layout != null ? layout.getPositionX() : null)
+                            .positionY(layout != null ? layout.getPositionY() : null)
+                            .lane(layout != null ? layout.getLane() : null)
+                            .displayOrder(layout != null ? layout.getDisplayOrder() : null)
+                            .description(node.getDescription())
+                            .resource(node.getResource())
+                            .status(statusByNodeId.getOrDefault(node.getNodeId(), FRONTEND_LOCKED_STATUS))
+                            .build();
+                })
                 .toList();
     }
 

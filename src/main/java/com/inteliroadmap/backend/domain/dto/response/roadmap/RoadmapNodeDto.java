@@ -21,6 +21,12 @@ public class RoadmapNodeDto {
     private String completionPolicy;
     private Integer weight;
     private Integer requiredProficiency;
+    // Layout metadata (presentation only, sourced from roadmap_node_layouts).
+    private Double positionX;
+    private Double positionY;
+    private String lane;
+    private Integer displayOrder;
+    private Integer layoutVersion;
     private String description;
     private Object resource;
     private String status;

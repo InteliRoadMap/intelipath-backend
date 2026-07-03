@@ -146,6 +146,31 @@ CREATE TABLE IF NOT EXISTS skill_nodes (
         FOREIGN KEY (parent_node) REFERENCES skill_nodes (node_id) ON DELETE SET NULL
 );
 
+-- ============================================================
+-- Roadmap layout (presentation only)
+-- ============================================================
+-- Purely visual placement of a node on the roadmap canvas, edited by mentors.
+-- Kept separate from skill_nodes so layout never influences unlock/progress
+-- logic; the dynamic roadmap is still computed from parent/previous/
+-- prerequisite/stage/student_progress. One row per node.
+
+CREATE TABLE IF NOT EXISTS roadmap_node_layouts (
+    layout_id      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    node_id        UUID NOT NULL,
+    position_x     DOUBLE PRECISION,
+    position_y     DOUBLE PRECISION,
+    lane           VARCHAR(50),
+    display_order  INT,
+    layout_version INT NOT NULL DEFAULT 1,
+    edited_by      UUID,
+    updated_at     TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_roadmap_node_layout UNIQUE (node_id),
+    CONSTRAINT fk_rnl_node
+        FOREIGN KEY (node_id) REFERENCES skill_nodes (node_id) ON DELETE CASCADE,
+    CONSTRAINT fk_rnl_edited_by
+        FOREIGN KEY (edited_by) REFERENCES users (user_id) ON DELETE SET NULL
+);
+
 CREATE TABLE IF NOT EXISTS student_skills (
     student_skill_id   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id            UUID NOT NULL,
@@ -448,6 +473,7 @@ CREATE INDEX IF NOT EXISTS idx_skill_nodes_career_id             ON skill_nodes 
 CREATE INDEX IF NOT EXISTS idx_skill_nodes_skill_id              ON skill_nodes (skill_id);
 CREATE INDEX IF NOT EXISTS idx_skill_nodes_type_id               ON skill_nodes (type_id);
 CREATE INDEX IF NOT EXISTS idx_skill_nodes_previous_node         ON skill_nodes (previous_node);
+CREATE INDEX IF NOT EXISTS idx_roadmap_node_layouts_node_id       ON roadmap_node_layouts (node_id);
 CREATE INDEX IF NOT EXISTS idx_skill_nodes_parent_node           ON skill_nodes (parent_node);
 CREATE INDEX IF NOT EXISTS idx_student_skills_user_id            ON student_skills (user_id);
 CREATE INDEX IF NOT EXISTS idx_student_skills_skill_id           ON student_skills (skill_id);
