@@ -19,7 +19,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Controller responsible for handling student-related API endpoints.
@@ -65,7 +72,7 @@ public class StudentController {
             )
     })
     public ResponseEntity<StudentResponse> getStudentProfile() {
-        log.info("Student profile retrieval request received");
+        log.info("StudentController: Student profile retrieval request received");
         return ResponseEntity.ok(studentService.getStudentProfile());
     }
 
@@ -113,7 +120,7 @@ public class StudentController {
             )
             @RequestBody @Valid SetupStudentProfileRequest setupStudentProfileRequest
         ) {
-        log.info("Student profile setup request received");
+        log.info("StudentController: Student profile setup request received");
         return ResponseEntity.ok(studentService.setupStudentProfile(setupStudentProfileRequest));
     }
 
@@ -139,7 +146,7 @@ public class StudentController {
     public ResponseEntity<StudentResponse> uploadTranscript(
             @org.springframework.web.bind.annotation.RequestParam("file") org.springframework.web.multipart.MultipartFile file
     ) {
-        log.info("Student transcript upload request received");
+        log.info("StudentController: Student transcript upload request received");
         return ResponseEntity.ok(studentService.uploadTranscript(file));
     }
 
@@ -183,7 +190,7 @@ public class StudentController {
             )
             @RequestBody @Valid TargetCareerRequest request
     ) {
-        log.warn("DEPRECATED API CALLED: PUT /target-career. Please migrate to PATCH /profile.");
+        log.warn("StudentController: DEPRECATED API CALLED: PUT /target-career. Please migrate to PATCH /profile.");
         return ResponseEntity.ok(studentService.updateTargetCareer(request.getCareerId()));
     }
 
@@ -217,7 +224,7 @@ public class StudentController {
             )
     })
     public ResponseEntity<SkillResponse> getStudentSkills() {
-        log.info("Fetching selected and available skills for the authenticated student");
+        log.info("StudentController: Fetching selected and available skills for the authenticated student");
         return ResponseEntity.ok(skillService.getStudentSkills());
     }
 
@@ -247,7 +254,7 @@ public class StudentController {
             )
     })
     public ResponseEntity<SkillResponse> searchSkills(@RequestParam String keyword) {
-        log.info("Searching skills by name: {}", keyword);
+        log.info("StudentController: Searching skills by name: {}", keyword);
 
         return ResponseEntity.ok(skillService.searchSkills(keyword));
     }
@@ -296,7 +303,7 @@ public class StudentController {
             )
             @RequestBody @Valid ImportSkillsRequest importSkillsRequest
     ) {
-        log.info("Importing selected skills for authenticated student");
+        log.info("StudentController: Importing selected skills for authenticated student");
         return ResponseEntity.ok(skillService.importStudentSkills(importSkillsRequest));
     }
 }

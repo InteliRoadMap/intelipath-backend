@@ -2,7 +2,13 @@ package com.inteliroadmap.backend.controllers;
 
 import com.inteliroadmap.backend.domain.dto.request.CreateFeedbackRequest;
 import com.inteliroadmap.backend.domain.dto.response.MentorResponse;
-import com.inteliroadmap.backend.domain.dto.response.mentor.*;
+import com.inteliroadmap.backend.domain.dto.response.mentor.MentorCareerDistributionResponse;
+import com.inteliroadmap.backend.domain.dto.response.mentor.MentorDashboardMetrics;
+import com.inteliroadmap.backend.domain.dto.response.mentor.MentorFeedbackHistoryDto;
+import com.inteliroadmap.backend.domain.dto.response.mentor.MentorPendingReviewResponse;
+import com.inteliroadmap.backend.domain.dto.response.mentor.MentorProfileResponse;
+import com.inteliroadmap.backend.domain.dto.response.mentor.MentorProgressReportDto;
+import com.inteliroadmap.backend.domain.dto.response.mentor.MentorStudentDto;
 import com.inteliroadmap.backend.services.MentorService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -15,7 +21,13 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/mentor")
@@ -31,7 +43,7 @@ public class MentorController {
     @GetMapping("/dashboard/metrics")
     @Operation(summary = "Get Mentor Metrics", description = "Get rating, response time, mentees, pending reviews, etc.")
     public ResponseEntity<MentorDashboardMetrics> getMetrics() {
-        log.info("Mentor metrics request received");
+        log.info("MentorController: Mentor metrics request received");
         return ResponseEntity.ok(mentorService.getDashboardMetrics());
     }
 
@@ -89,7 +101,7 @@ public class MentorController {
     @PostMapping("/feedback/submit")
     @Operation(summary = "Submit Feedback", description = "Mentor submits feedback for a student's portfolio")
     public ResponseEntity<MentorResponse> submitFeedback(@RequestBody @Valid CreateFeedbackRequest request) {
-        log.info("Mentor submit feedback request received");
+        log.info("MentorController: Mentor submit feedback request received");
         return ResponseEntity.ok(mentorService.submitFeedback(request));
     }
 

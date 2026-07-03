@@ -11,7 +11,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/public-portfolio")
@@ -30,7 +33,7 @@ public class PublicPortfolioController {
             @ApiResponse(responseCode = "404", description = "Portfolio or User not found")
     })
     public ResponseEntity<PortfolioResponse> getPortfolioBySlug(@PathVariable String slug) {
-        log.info("Request received: Get Public Portfolio for slug '{}'", slug);
+        log.info("PublicPortfolioController: Request received: Get Public Portfolio for slug '{}'", slug);
         return ResponseEntity.ok(portfolioService.getPortfolioBySlug(slug));
     }
 
@@ -42,7 +45,7 @@ public class PublicPortfolioController {
             @ApiResponse(responseCode = "404", description = "Portfolio or User not found")
     })
     public ResponseEntity<PortfolioResponse> getPortfolioByStudentId(@PathVariable java.util.UUID studentId) {
-        log.info("Request received: Get Public Portfolio for studentId '{}'", studentId);
+        log.info("PublicPortfolioController: Request received: Get Public Portfolio for studentId '{}'", studentId);
         return ResponseEntity.ok(portfolioService.getPortfolioByStudentId(studentId));
     }
 }

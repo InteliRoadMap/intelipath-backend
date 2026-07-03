@@ -3,11 +3,18 @@ package com.inteliroadmap.backend.services.impl;
 import com.inteliroadmap.backend.domain.dto.request.CompareStRmSkillRequest;
 import com.inteliroadmap.backend.domain.dto.request.ImportSkillsRequest;
 import com.inteliroadmap.backend.domain.dto.response.SkillResponse;
-import com.inteliroadmap.backend.domain.entity.*;
+import com.inteliroadmap.backend.domain.entity.CareerRequiredSkill;
+import com.inteliroadmap.backend.domain.entity.CareerRole;
+import com.inteliroadmap.backend.domain.entity.Skill;
+import com.inteliroadmap.backend.domain.entity.Student;
+import com.inteliroadmap.backend.domain.entity.StudentSkill;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.services.AuthenticatedStudentService;
 import com.inteliroadmap.backend.mappers.SkillMapper;
-import com.inteliroadmap.backend.repositories.*;
+import com.inteliroadmap.backend.repositories.CareerRequiredSkillRepository;
+import com.inteliroadmap.backend.repositories.CareerRoleRepository;
+import com.inteliroadmap.backend.repositories.SkillRepository;
+import com.inteliroadmap.backend.repositories.StudentSkillRepository;
 import com.inteliroadmap.backend.services.SkillService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -45,7 +52,7 @@ public class SkillServiceImpl implements SkillService {
     @Transactional
     @Override
     public SkillResponse getStudentSkills() {
-        log.info("Student skill retrieval request received");
+        log.info("SkillServiceImpl: Student skill retrieval request received");
 
         // Step 1: Get or create the authenticated student
         Student student = AuthenticatedStudentService.getOrCreateStudent();
@@ -87,7 +94,7 @@ public class SkillServiceImpl implements SkillService {
     @Transactional
     @Override
     public SkillResponse searchSkills(String search) {
-        log.info("Skill search request received. search: {}", search);
+        log.info("SkillServiceImpl: Skill search request received. search: {}", search);
 
         // Step 1: Search only by skill name without case sensitivity
         List<Skill> skills = skillRepository.findBySkillNameContainingIgnoreCase(search);
@@ -108,7 +115,7 @@ public class SkillServiceImpl implements SkillService {
     @Transactional
     @Override
     public SkillResponse importStudentSkills(ImportSkillsRequest request) {
-        log.info("Student skill selection request received");
+        log.info("SkillServiceImpl: Student skill selection request received");
 
         // Step 1: Get the authenticated student and lock profile data for update
         Student student = AuthenticatedStudentService.getOrCreateStudentForUpdate();
@@ -128,7 +135,7 @@ public class SkillServiceImpl implements SkillService {
         Set<UUID> missingSkillIds = new LinkedHashSet<>(requestedSkillIds);
         missingSkillIds.removeAll(foundSkillIds);
         if (!missingSkillIds.isEmpty()) {
-            log.warn("Requested skills were not found: {}", missingSkillIds);
+            log.warn("SkillServiceImpl: Requested skills were not found: {}", missingSkillIds);
             throw new ResourceNotFoundException("Skills not found: " + missingSkillIds);
         }
 
@@ -159,7 +166,7 @@ public class SkillServiceImpl implements SkillService {
 
         // Step 8: Return the complete selected skill list after the update
         List<StudentSkill> studentSkills = studentSkillRepository.findByStudent_UserId(student.getUserId());
-        log.info("Student skill selection completed. selectedSkillCount: {}", studentSkills.size());
+        log.info("SkillServiceImpl: Student skill selection completed. selectedSkillCount: {}", studentSkills.size());
 
         return SkillResponse.builder()
                 .selectedSkills(skillMapper.toSelectedSkillResponses(studentSkills))
@@ -176,7 +183,7 @@ public class SkillServiceImpl implements SkillService {
     @Transactional
     @Override
     public SkillResponse compareWithStudentSkills(CompareStRmSkillRequest request) {
-        log.info("Student skill comparison request received. careerId: {}", request.getCareerId());
+        log.info("SkillServiceImpl: Student skill comparison request received. careerId: {}", request.getCareerId());
 
         // Step 1: Get or create the authenticated student
         Student student = AuthenticatedStudentService.getOrCreateStudent();
@@ -184,7 +191,7 @@ public class SkillServiceImpl implements SkillService {
         // Step 2: Verify that the requested career exists
         Optional<CareerRole> careerOptional = careerRoleRepository.findById(request.getCareerId());
         if (careerOptional.isEmpty()) {
-            log.warn("Career role was not found: {}", request.getCareerId());
+            log.warn("SkillServiceImpl: Career role was not found: {}", request.getCareerId());
             throw new ResourceNotFoundException("Career not found");
         }
 

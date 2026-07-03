@@ -1,10 +1,14 @@
 package com.inteliroadmap.backend.services;
 
-import com.inteliroadmap.backend.domain.dto.response.student.*;
-import com.inteliroadmap.backend.domain.entity.*;
+import com.inteliroadmap.backend.domain.dto.response.student.AiHistoryItemResponse;
+import com.inteliroadmap.backend.domain.dto.response.student.DashboardRoadmapProgressResponse;
+import com.inteliroadmap.backend.domain.dto.response.student.MarketDemandResponse;
+import com.inteliroadmap.backend.domain.dto.response.student.MentorFeedbackItemResponse;
+import com.inteliroadmap.backend.domain.dto.response.student.RecommendationItemResponse;
+import com.inteliroadmap.backend.domain.dto.response.student.SkillGapItemResponse;
+import com.inteliroadmap.backend.domain.entity.Student;
 import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
 import com.inteliroadmap.backend.mappers.StudentDashboardMapper;
-import com.inteliroadmap.backend.repositories.*;
 import com.inteliroadmap.backend.services.AuthenticatedStudentService;
 import com.inteliroadmap.backend.services.StudentDashboardService;
 import com.inteliroadmap.backend.services.StudentService;
@@ -13,7 +17,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import java.time.LocalDate;
-import java.util.*;
+import java.util.List;
 
 public interface StudentDashboardService {
 

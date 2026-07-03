@@ -1,7 +1,19 @@
 package com.inteliroadmap.backend.mappers;
 
-import com.inteliroadmap.backend.domain.dto.response.student.*;
-import com.inteliroadmap.backend.domain.entity.*;
+import com.inteliroadmap.backend.domain.dto.response.student.AiHistoryItemResponse;
+import com.inteliroadmap.backend.domain.dto.response.student.DashboardRoadmapProgressResponse;
+import com.inteliroadmap.backend.domain.dto.response.student.MarketDemandResponse;
+import com.inteliroadmap.backend.domain.dto.response.student.MentorFeedbackItemResponse;
+import com.inteliroadmap.backend.domain.dto.response.student.RecommendationItemResponse;
+import com.inteliroadmap.backend.domain.dto.response.student.RoadmapStepResponse;
+import com.inteliroadmap.backend.domain.dto.response.student.SkillGapItemResponse;
+import com.inteliroadmap.backend.domain.entity.CareerRequiredSkill;
+import com.inteliroadmap.backend.domain.entity.CareerRole;
+import com.inteliroadmap.backend.domain.entity.ChatMessage;
+import com.inteliroadmap.backend.domain.entity.ChatSession;
+import com.inteliroadmap.backend.domain.entity.Feedback;
+import com.inteliroadmap.backend.domain.entity.Skill;
+import com.inteliroadmap.backend.domain.entity.SkillNode;
 import com.inteliroadmap.backend.domain.enums.ImportanceLevel;
 import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
 import com.inteliroadmap.backend.repositories.SkillRepository;

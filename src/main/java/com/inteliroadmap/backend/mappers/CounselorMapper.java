@@ -3,7 +3,9 @@ package com.inteliroadmap.backend.mappers;
 import com.inteliroadmap.backend.domain.dto.response.CounselorResponse;
 import com.inteliroadmap.backend.domain.dto.response.FeedbackResponse;
 import com.inteliroadmap.backend.domain.dto.response.UpdateProfileResponse;
-import com.inteliroadmap.backend.domain.entity.*;
+import com.inteliroadmap.backend.domain.entity.AcademicCounselor;
+import com.inteliroadmap.backend.domain.entity.Feedback;
+import com.inteliroadmap.backend.domain.entity.User;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;

@@ -16,7 +16,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Controller - User API Endpoints
@@ -63,7 +69,7 @@ public class UserController {
             )
     })
     public ResponseEntity<UserResponse> getCurrentUser() {
-        log.info("Current user info request received");
+        log.info("UserController: Current user info request received");
         return ResponseEntity.ok(userService.getCurrentUser());
     }
 
@@ -108,7 +114,7 @@ public class UserController {
             )
             @RequestBody @Valid UserRequest userRequest
     ) {
-        log.info("User info request received for email: {}", userRequest.getEmail());
+        log.info("UserController: User info request received for email: {}", userRequest.getEmail());
         return ResponseEntity.ok(userService.getUserByEmail(userRequest));
     }
 
@@ -150,7 +156,7 @@ public class UserController {
             )
             @RequestBody @Valid SetupUserProfileRequest request
     ) {
-        log.info("User profile setup request received");
+        log.info("UserController: User profile setup request received");
         return ResponseEntity.ok(userService.setupUserProfile(request));
     }
 

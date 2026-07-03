@@ -6,9 +6,23 @@ import com.inteliroadmap.backend.domain.dto.response.RoadmapResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapNodeDto;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.SkillGapResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.StudentRoadmapResponse;
-import com.inteliroadmap.backend.domain.entity.*;
+import com.inteliroadmap.backend.domain.entity.CareerRequiredSkill;
+import com.inteliroadmap.backend.domain.entity.CareerRole;
+import com.inteliroadmap.backend.domain.entity.Skill;
+import com.inteliroadmap.backend.domain.entity.SkillNode;
+import com.inteliroadmap.backend.domain.entity.Student;
+import com.inteliroadmap.backend.domain.entity.StudentProgress;
+import com.inteliroadmap.backend.domain.entity.StudentSkill;
+import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
-import com.inteliroadmap.backend.repositories.*;
+import com.inteliroadmap.backend.repositories.CareerRequiredSkillRepository;
+import com.inteliroadmap.backend.repositories.CareerRoleRepository;
+import com.inteliroadmap.backend.repositories.SkillNodeRepository;
+import com.inteliroadmap.backend.repositories.SkillRepository;
+import com.inteliroadmap.backend.repositories.StudentProgressRepository;
+import com.inteliroadmap.backend.repositories.StudentRepository;
+import com.inteliroadmap.backend.repositories.StudentSkillRepository;
+import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.security.JwtService;
 import com.inteliroadmap.backend.services.RoadmapService;
@@ -75,7 +89,7 @@ public class RoadmapServiceImpl implements RoadmapService {
     @Transactional(readOnly = true)
     @Override
     public RoadmapResponse getRoadmap(UUID careerId) {
-        log.info("Roadmap Module: Fetching roadmap for career ID: {}", careerId);
+        log.info("RoadmapServiceImpl: Fetching roadmap for career ID: {}", careerId);
 
         Student student = getAuthenticatedStudent();
         Optional<CareerRole> careerRoleOptional = careerRoleRepository.findById(careerId);
@@ -107,7 +121,7 @@ public class RoadmapServiceImpl implements RoadmapService {
     @Transactional(readOnly = true)
     @Override
     public StudentRoadmapResponse getStudentRoadmap() {
-        log.info("Roadmap Module: Fetching authenticated student roadmap");
+        log.info("RoadmapServiceImpl: Fetching authenticated student roadmap");
 
         // Fetch authenticated student
         Student student = getAuthenticatedStudent();
@@ -162,7 +176,7 @@ public class RoadmapServiceImpl implements RoadmapService {
     @Transactional(readOnly = true)
     @Override
     public RoadmapResponse getRoadmapProgress(UUID careerId) {
-        log.info("Roadmap Module: Calculating total progress for career ID: {}", careerId);
+        log.info("RoadmapServiceImpl: Calculating total progress for career ID: {}", careerId);
 
         Student student = getAuthenticatedStudent();
 
@@ -194,7 +208,7 @@ public class RoadmapServiceImpl implements RoadmapService {
      */
     @Override
     public RoadmapResponse getNode(UUID nodeId) {
-        log.info("Roadmap Module: Fetching Node information");
+        log.info("RoadmapServiceImpl: Fetching Node information");
 
         Optional<SkillNode> nodeOptional = skillNodeRepository.findById(nodeId);
         if (nodeOptional.isEmpty()) {
@@ -218,7 +232,7 @@ public class RoadmapServiceImpl implements RoadmapService {
     @Transactional
     @Override
     public RoadmapResponse updateNodeProgress(UpdateUserProgressRequest request) {
-        log.info("Roadmap Module: Updating Node progress");
+        log.info("RoadmapServiceImpl: Updating Node progress");
 
         // Identify the current student
         Student student = getAuthenticatedStudent();
@@ -445,7 +459,7 @@ public class RoadmapServiceImpl implements RoadmapService {
                                     .skill(skill)
                                     .build();
                             studentSkillRepository.save(newSkill);
-                            log.info("Auto-synced skill {} to student {} after all required nodes were completed", skill.getSkillName(), student.getUserId());
+                            log.info("RoadmapServiceImpl: Auto-synced skill {} to student {} after all required nodes were completed", skill.getSkillName(), student.getUserId());
                         }
                     }
                 }

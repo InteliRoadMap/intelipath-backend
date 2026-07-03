@@ -15,7 +15,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.server.ResponseStatusException;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.CookieValue;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Controller - Authentication API Endpoints
@@ -65,7 +68,7 @@ public class AuthController {
             @CookieValue(name = AuthenticationCookieService.REFRESH_TOKEN_COOKIE_NAME, required = false) String refreshToken,
             HttpServletResponse servletResponse
     ) {
-        log.info("Refresh token request received");
+        log.info("AuthController: Refresh token request received");
         if (refreshToken == null || refreshToken.isBlank()) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token is missing");
         }
@@ -84,7 +87,7 @@ public class AuthController {
             @CookieValue(name = AuthenticationCookieService.REFRESH_TOKEN_COOKIE_NAME, required = false) String refreshToken,
             HttpServletResponse servletResponse
     ) {
-        log.info("Logout request received");
+        log.info("AuthController: Logout request received");
         authService.logout(refreshToken);
         authenticationCookieService.clearRefreshTokenCookie(servletResponse);
         return ResponseEntity.ok("Logged out successfully");

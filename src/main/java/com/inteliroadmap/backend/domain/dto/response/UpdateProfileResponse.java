@@ -1,6 +1,9 @@
 package com.inteliroadmap.backend.domain.dto.response;
 
-import com.inteliroadmap.backend.domain.entity.*;
+import com.inteliroadmap.backend.domain.entity.AcademicCounselor;
+import com.inteliroadmap.backend.domain.entity.IndustryMentor;
+import com.inteliroadmap.backend.domain.entity.Student;
+import com.inteliroadmap.backend.domain.entity.User;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;

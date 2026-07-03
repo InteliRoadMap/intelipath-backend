@@ -1,10 +1,34 @@
 package com.inteliroadmap.backend.services.impl;
 
-import com.inteliroadmap.backend.domain.dto.response.student.*;
-import com.inteliroadmap.backend.domain.entity.*;
+import com.inteliroadmap.backend.domain.dto.response.student.AiHistoryItemResponse;
+import com.inteliroadmap.backend.domain.dto.response.student.DashboardRoadmapProgressResponse;
+import com.inteliroadmap.backend.domain.dto.response.student.MarketDemandResponse;
+import com.inteliroadmap.backend.domain.dto.response.student.MentorFeedbackItemResponse;
+import com.inteliroadmap.backend.domain.dto.response.student.RecommendationItemResponse;
+import com.inteliroadmap.backend.domain.dto.response.student.RoadmapStepResponse;
+import com.inteliroadmap.backend.domain.dto.response.student.SkillGapItemResponse;
+import com.inteliroadmap.backend.domain.entity.CareerRequiredSkill;
+import com.inteliroadmap.backend.domain.entity.CareerRole;
+import com.inteliroadmap.backend.domain.entity.ChatMessage;
+import com.inteliroadmap.backend.domain.entity.ChatSession;
+import com.inteliroadmap.backend.domain.entity.Feedback;
+import com.inteliroadmap.backend.domain.entity.SkillNode;
+import com.inteliroadmap.backend.domain.entity.SkillTrend;
+import com.inteliroadmap.backend.domain.entity.Student;
+import com.inteliroadmap.backend.domain.entity.StudentProgress;
+import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
 import com.inteliroadmap.backend.mappers.StudentDashboardMapper;
-import com.inteliroadmap.backend.repositories.*;
+import com.inteliroadmap.backend.repositories.CareerRequiredSkillRepository;
+import com.inteliroadmap.backend.repositories.CareerRoleRepository;
+import com.inteliroadmap.backend.repositories.ChatMessageRepository;
+import com.inteliroadmap.backend.repositories.ChatSessionRepository;
+import com.inteliroadmap.backend.repositories.FeedbackRepository;
+import com.inteliroadmap.backend.repositories.SkillNodeRepository;
+import com.inteliroadmap.backend.repositories.SkillRepository;
+import com.inteliroadmap.backend.repositories.SkillTrendRepository;
+import com.inteliroadmap.backend.repositories.StudentProgressRepository;
+import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.services.AuthenticatedStudentService;
 import com.inteliroadmap.backend.services.StudentDashboardService;
 import com.inteliroadmap.backend.services.StudentService;
@@ -14,7 +38,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.TreeMap;
+import java.util.UUID;
 
 /**
  * Implementation of the {@link StudentDashboardService}.
@@ -49,7 +80,7 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
     @Transactional
     @Override
     public DashboardRoadmapProgressResponse getRoadmapProgress() {
-        log.info("Student Dashboard Module: Fetching roadmap progress");
+        log.info("StudentDashboardServiceImpl: Fetching roadmap progress");
 
         // Fetch current authenticated student and check if they have selected a career
         Student student = getCurrentStudent();
@@ -106,7 +137,7 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
     @Transactional
     @Override
     public List<SkillGapItemResponse> getSkillGaps() {
-        log.info("Student Dashboard Module: Fetching skill gaps");
+        log.info("StudentDashboardServiceImpl: Fetching skill gaps");
 
         Student student = getCurrentStudent();
         return getSkillGaps(student);
@@ -138,7 +169,7 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
     @Transactional
     @Override
     public List<MentorFeedbackItemResponse> getMentorFeedback() {
-        log.info("Student Dashboard Module: Fetching mentor feedback");
+        log.info("StudentDashboardServiceImpl: Fetching mentor feedback");
 
         User user = getCurrentUser();
         List<Feedback> feedbackList = feedbackRepository
@@ -157,7 +188,7 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
     @Transactional
     @Override
     public List<AiHistoryItemResponse> getAiHistory() {
-        log.info("Student Dashboard Module: Fetching AI chat history");
+        log.info("StudentDashboardServiceImpl: Fetching AI chat history");
 
         User user = getCurrentUser();
         List<ChatSession> sessions = chatSessionRepository
@@ -188,7 +219,7 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
     @Transactional
     @Override
     public MarketDemandResponse getMarketDemand() {
-        log.info("Student Dashboard Module: Fetching market demand");
+        log.info("StudentDashboardServiceImpl: Fetching market demand");
 
         Student student = getCurrentStudent();
         if (student == null || student.getCareerRole().getCareerId() == null) {
@@ -239,7 +270,7 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
     @Transactional
     @Override
     public List<RecommendationItemResponse> getRecommendations() {
-        log.info("Student Dashboard Module: Fetching recommendations");
+        log.info("StudentDashboardServiceImpl: Fetching recommendations");
 
         Student student = getCurrentStudent();
         if (student == null || student.getCareerRole().getCareerId() == null) {

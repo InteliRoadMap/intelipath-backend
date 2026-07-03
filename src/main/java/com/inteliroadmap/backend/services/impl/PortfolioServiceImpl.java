@@ -3,12 +3,24 @@ package com.inteliroadmap.backend.services.impl;
 import com.inteliroadmap.backend.domain.dto.request.PortfolioUpsertRequest;
 import com.inteliroadmap.backend.domain.dto.request.RequestReviewRequest;
 import com.inteliroadmap.backend.domain.dto.response.PortfolioResponse;
-import com.inteliroadmap.backend.domain.entity.*;
+import com.inteliroadmap.backend.domain.entity.PortfolioConfig;
+import com.inteliroadmap.backend.domain.entity.PortfolioProject;
+import com.inteliroadmap.backend.domain.entity.PortfolioReviewRequest;
+import com.inteliroadmap.backend.domain.entity.Student;
+import com.inteliroadmap.backend.domain.entity.StudentEducation;
+import com.inteliroadmap.backend.domain.entity.StudentSkill;
+import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.domain.enums.ReviewStatus;
 import com.inteliroadmap.backend.domain.enums.UserRole;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.services.AuthenticatedStudentService;
-import com.inteliroadmap.backend.repositories.*;
+import com.inteliroadmap.backend.repositories.PortfolioConfigRepository;
+import com.inteliroadmap.backend.repositories.PortfolioProjectRepository;
+import com.inteliroadmap.backend.repositories.PortfolioReviewRequestRepository;
+import com.inteliroadmap.backend.repositories.StudentEducationRepository;
+import com.inteliroadmap.backend.repositories.StudentRepository;
+import com.inteliroadmap.backend.repositories.StudentSkillRepository;
+import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.mappers.PortfolioMapper;
 import com.inteliroadmap.backend.services.PortfolioService;
 import lombok.RequiredArgsConstructor;
@@ -53,7 +65,7 @@ public class PortfolioServiceImpl implements PortfolioService {
         // Fetch the associated user entity using the student's user ID
         Optional<User> userOpt = userRepository.findById(student.getUserId());
         if (userOpt.isEmpty()) {
-            log.error("[PortfolioService] User not found for ID: {}", student.getUserId());
+            log.error("PortfolioServiceImpl: User not found for ID: {}", student.getUserId());
             throw new ResourceNotFoundException("User not found");
         }
         User user = userOpt.get();
@@ -80,14 +92,14 @@ public class PortfolioServiceImpl implements PortfolioService {
     public PortfolioResponse getPortfolioBySlug(String slug) {
         Optional<Student> studentOpt = studentRepository.findByPortfolioSlug(slug);
         if (studentOpt.isEmpty()) {
-            log.error("[PortfolioService] Portfolio not found for slug: {}", slug);
+            log.error("PortfolioServiceImpl: Portfolio not found for slug: {}", slug);
             throw new ResourceNotFoundException("Portfolio not found for slug: " + slug);
         }
         Student student = studentOpt.get();
 
         Optional<User> userOpt = userRepository.findById(student.getUserId());
         if (userOpt.isEmpty()) {
-            log.error("[PortfolioService] User not found for ID: {}", student.getUserId());
+            log.error("PortfolioServiceImpl: User not found for ID: {}", student.getUserId());
             throw new ResourceNotFoundException("User not found");
         }
         User user = userOpt.get();
@@ -131,7 +143,7 @@ public class PortfolioServiceImpl implements PortfolioService {
         // Fetch the corresponding user entity
         Optional<User> userOpt = userRepository.findById(student.getUserId());
         if (userOpt.isEmpty()) {
-            log.error("[PortfolioService] User not found for ID: {}", student.getUserId());
+            log.error("PortfolioServiceImpl: User not found for ID: {}", student.getUserId());
             throw new ResourceNotFoundException("User not found");
         }
         User user = userOpt.get();

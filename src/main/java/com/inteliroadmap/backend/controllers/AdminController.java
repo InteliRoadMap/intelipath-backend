@@ -20,7 +20,15 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
@@ -53,12 +61,12 @@ public class AdminController {
     @PostMapping("/trigger-skill-extraction")
     @Operation(summary = "Trigger Skill Extraction", description = "Manually triggers the background AI skill extraction job.")
     public ResponseEntity<String> triggerSkillExtraction() {
-        log.info("Admin Dashboard Controller: Manual trigger for skill extraction received");
+        log.info("AdminController: Manual trigger for skill extraction received");
         try {
             skillExtractionService.extractAndRebuildSkillTrends();
             return ResponseEntity.ok("Skill extraction via AI Service completed successfully.");
         } catch (Exception e) {
-            log.error("Error extracting skills", e);
+            log.error("AdminController: Error extracting skills", e);
             return ResponseEntity.internalServerError().body("Error during extraction: " + e.getMessage());
         }
     }
@@ -69,12 +77,12 @@ public class AdminController {
     @PostMapping("/trigger-job-scraper")
     @Operation(summary = "Trigger Job Scraper", description = "Manually triggers the Python AI scraper job to fetch new recruitments.")
     public ResponseEntity<String> triggerJobScraper() {
-        log.info("Admin Dashboard Controller: Manual trigger for job scraper received");
+        log.info("AdminController: Manual trigger for job scraper received");
         try {
             jobScrapingScheduler.fetchJobsFromPython();
             return ResponseEntity.ok("Job Scraper via AI Service completed successfully.");
         } catch (Exception e) {
-            log.error("Error triggering job scraper", e);
+            log.error("AdminController: Error triggering job scraper", e);
             return ResponseEntity.internalServerError().body("Error during trigger: " + e.getMessage());
         }
     }
@@ -111,7 +119,7 @@ public class AdminController {
     public ResponseEntity<AdminUserMetricResponse> getUserMetric(
             @RequestHeader("Authorization") String authorizationHeader
     ) {
-        log.info("Admin Dashboard Controller: User metric request received");
+        log.info("AdminController: User metric request received");
         return ResponseEntity.ok(
                 adminService.getUserMetrics(authorizationHeader)
         );
@@ -149,7 +157,7 @@ public class AdminController {
     public ResponseEntity<AdminCourseMetricResponse> getCourseMetric(
             @RequestHeader("Authorization") String authorizationHeader
     ) {
-        log.info("Admin Dashboard Controller: Course metric request received");
+        log.info("AdminController: Course metric request received");
         return ResponseEntity.ok(
                 adminService.getCourseMetrics(authorizationHeader)
         );
@@ -187,7 +195,7 @@ public class AdminController {
     public ResponseEntity<AdminSystemHealthResponse> getSystemHealth(
             @RequestHeader("Authorization") String authorizationHeader
     ) {
-        log.info("Admin Dashboard Controller: System health request received");
+        log.info("AdminController: System health request received");
         return ResponseEntity.ok(
                 adminService.getSystemHealth(authorizationHeader)
         );
@@ -225,7 +233,7 @@ public class AdminController {
     public ResponseEntity<List<AdminUserListItemResponse>> getUsers(
             @RequestHeader("Authorization") String authorizationHeader
     ) {
-        log.info("Admin Dashboard Controller: Users list request received");
+        log.info("AdminController: Users list request received");
         return ResponseEntity.ok(
                 adminService.getUsers(authorizationHeader)
         );
@@ -283,7 +291,7 @@ public class AdminController {
             )
             @RequestBody @Valid UpdateUserRoleRequest request
     ) {
-        log.info("Admin Dashboard Controller: Update user role request received. userId: {}", userId);
+        log.info("AdminController: Update user role request received. userId: {}", userId);
         return ResponseEntity.ok(
                 adminService.updateUserRole(authorizationHeader, userId, request)
         );
@@ -327,7 +335,7 @@ public class AdminController {
             @RequestHeader("Authorization") String authorizationHeader,
             @PathVariable String userId
     ) {
-        log.info("Admin Dashboard Controller: Delete user request received. userId: {}", userId);
+        log.info("AdminController: Delete user request received. userId: {}", userId);
         adminService.deleteUser(authorizationHeader, userId);
         return ResponseEntity.noContent().build();
     }

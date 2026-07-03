@@ -16,7 +16,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/api/v1/student/portfolio")
@@ -38,7 +43,7 @@ public class PortfolioController {
             @ApiResponse(responseCode = "404", description = "User not found")
     })
     public ResponseEntity<PortfolioResponse> getPortfolio() {
-        log.info("Request received: Get Student Portfolio");
+        log.info("PortfolioController: Request received: Get Student Portfolio");
         return ResponseEntity.ok(portfolioService.getPortfolio());
     }
 
@@ -52,7 +57,7 @@ public class PortfolioController {
     })
     public ResponseEntity<PortfolioResponse> upsertPortfolio(
             @RequestBody @Valid PortfolioUpsertRequest request) {
-        log.info("Request received: Upsert Student Portfolio");
+        log.info("PortfolioController: Request received: Upsert Student Portfolio");
         return ResponseEntity.ok(portfolioService.upsertPortfolio(request));
     }
 
@@ -65,7 +70,7 @@ public class PortfolioController {
     })
     public ResponseEntity<java.util.Map<String, Object>> requestReview(
             @RequestBody @Valid com.inteliroadmap.backend.domain.dto.request.RequestReviewRequest request) {
-        log.info("Request received: Request Portfolio Review to {}", request.getEmail());
+        log.info("PortfolioController: Request received: Request Portfolio Review to {}", request.getEmail());
         portfolioService.requestReview(request);
         return ResponseEntity.ok(java.util.Map.of(
                 "success", true,

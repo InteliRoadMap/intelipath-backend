@@ -15,7 +15,9 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Map;
 
 /**
  * Implementation of the {@link ScraperService} interface.
@@ -38,7 +40,7 @@ public class ScraperServiceImpl implements ScraperService {
      */
     @Override
     public List<RecruitmentPostDto> getRecruitmentPosts() {
-        log.info("ScraperService: Retrieving Recruitment Posts...");
+        log.info("ScraperServiceImpl: Retrieving Recruitment Posts...");
         // Fetch all recruitment posts from the database
         List<RecruitmentPost> posts = recruitmentPostRepository.findAll();
         if(posts.isEmpty()) {
@@ -90,7 +92,7 @@ public class ScraperServiceImpl implements ScraperService {
             postDtos.add(dto);
         }
 
-        log.info("ScraperService: Recruitment Posts Retrieved");
+        log.info("ScraperServiceImpl: Recruitment Posts Retrieved");
         return postDtos;
     }
 
@@ -103,13 +105,13 @@ public class ScraperServiceImpl implements ScraperService {
      */
     @Override
     public CompanyResponse getCompanyInfos(String companyId) {
-        log.info("ScraperService: Retrieving Company Infos...");
+        log.info("ScraperServiceImpl: Retrieving Company Infos...");
         Company company = companyRepository.findByTopCvCompanyId(companyId);
         if (company == null) {
             throw new ResourceNotFoundException("Company not found");
         }
 
-        log.info("ScraperService: Company Infos Retrieved");
+        log.info("ScraperServiceImpl: Company Infos Retrieved");
         return CompanyResponse.builder()
                 .companyId(company.getTopCvCompanyId())
                 .companyLink(company.getCompanyLink())
@@ -130,13 +132,13 @@ public class ScraperServiceImpl implements ScraperService {
      */
     @Override
     public RecruitmentResponse getRecruitmentInfos(String recruitmentId) {
-        log.info("ScraperService: Retrieving Recruitment Infos...");
+        log.info("ScraperServiceImpl: Retrieving Recruitment Infos...");
         Recruitment recruitment = recruitmentRepository.findByTopCvRecruitmentId(recruitmentId);
         if (recruitment == null) {
             throw new ResourceNotFoundException("Recruitment not found");
         }
 
-        log.info("ScraperService: Recruitment Infos Retrieved");
+        log.info("ScraperServiceImpl: Recruitment Infos Retrieved");
         return RecruitmentResponse.builder()
                 .topCvRecruitmentId(recruitment.getTopCvRecruitmentId())
                 .recruitmentLink(recruitment.getRecruitmentLink())

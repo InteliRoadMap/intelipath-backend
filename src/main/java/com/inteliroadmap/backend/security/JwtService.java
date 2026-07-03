@@ -1,7 +1,10 @@
 package com.inteliroadmap.backend.security;
 
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
-import io.jsonwebtoken.*;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -33,7 +36,7 @@ public class JwtService {
      * @return JWT access token
      */
     public String generateAccessToken(String email, String role) {
-        log.debug("Generating access token for: {}", email);
+        log.debug("JwtService: Generating access token for: {}", email);
 
         try {
             return Jwts.builder()
@@ -44,7 +47,7 @@ public class JwtService {
                     .signWith(getSigningKey())
                     .compact();
         } catch (Exception e) {
-            log.error("Error generating access token: {}", e.getMessage());
+            log.error("JwtService: Error generating access token: {}", e.getMessage());
             throw new RuntimeException("Failed to generate access token", e);
         }
     }
@@ -56,7 +59,7 @@ public class JwtService {
      */
     public String generateRefreshToken(String email) {
 
-        log.debug("Generating refresh token for: {}", email);
+        log.debug("JwtService: Generating refresh token for: {}", email);
         try {
             return Jwts.builder()
                     .subject(email)
@@ -65,7 +68,7 @@ public class JwtService {
                     .signWith(getSigningKey())
                     .compact();
         } catch (Exception e) {
-            log.error("Error generating refresh token: {}", e.getMessage());
+            log.error("JwtService: Error generating refresh token: {}", e.getMessage());
             throw new RuntimeException("Failed to generate refresh token", e);
         }
     }
@@ -81,10 +84,10 @@ public class JwtService {
             getClaims(token);
             return true;
         } catch (ExpiredJwtException e) {
-            log.warn("Token expired");
+            log.warn("JwtService: Token expired");
             return false;
         } catch (JwtException e) {
-            log.warn("Token invalid");
+            log.warn("JwtService: Token invalid");
             return false;
         }
     }
@@ -99,7 +102,7 @@ public class JwtService {
         try {
             return getClaims(token).getSubject();
         } catch (Exception e) {
-            log.warn("Cannot extract email");
+            log.warn("JwtService: Cannot extract email");
             return null;
         }
     }
@@ -114,7 +117,7 @@ public class JwtService {
         try {
             return getClaims(token).get("role", String.class);
         } catch (Exception e) {
-            log.warn("Cannot extract role");
+            log.warn("JwtService: Cannot extract role");
             return null;
         }
     }

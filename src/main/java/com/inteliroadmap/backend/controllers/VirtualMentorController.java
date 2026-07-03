@@ -17,7 +17,16 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 import reactor.core.publisher.Flux;
 
@@ -45,7 +54,7 @@ public class VirtualMentorController {
     public ResponseEntity<VirtualMentorSessionResponse> createSession(
             @RequestHeader("Authorization") String authorizationHeader,
             @RequestBody(required = false) VirtualMentorSessionRequest request) {
-        log.info("Creating new AI chat session");
+        log.info("VirtualMentorController: Creating new AI chat session");
         String sessionName = (request != null && request.getSessionName() != null) ? request.getSessionName() : "New Chat";
         ChatSession session = virtualMentorService.createSession(authorizationHeader, sessionName);
         return ResponseEntity.status(HttpStatus.CREATED).body(mapToSessionResponse(session));
@@ -55,7 +64,7 @@ public class VirtualMentorController {
     @Operation(summary = "Get all chat sessions for the authenticated user")
     public ResponseEntity<List<VirtualMentorSessionResponse>> getSessions(
             @RequestHeader("Authorization") String authorizationHeader) {
-        log.info("Fetching chat sessions for user");
+        log.info("VirtualMentorController: Fetching chat sessions for user");
         List<ChatSession> sessions = virtualMentorService.getUserSessions(authorizationHeader);
         List<VirtualMentorSessionResponse> response = sessions.stream()
                 .map(this::mapToSessionResponse)
@@ -69,7 +78,7 @@ public class VirtualMentorController {
             @RequestHeader("Authorization") String authorizationHeader,
             @PathVariable UUID sessionId,
             @RequestBody @Valid com.inteliroadmap.backend.domain.dto.request.VirtualMentorRenameSessionRequest request) {
-        log.info("Renaming chat session: {}", sessionId);
+        log.info("VirtualMentorController: Renaming chat session: {}", sessionId);
         ChatSession updatedSession = virtualMentorService.renameSession(authorizationHeader, sessionId, request.getSessionName());
         return ResponseEntity.ok(mapToSessionResponse(updatedSession));
     }
@@ -79,7 +88,7 @@ public class VirtualMentorController {
     public ResponseEntity<Void> deleteSession(
             @RequestHeader("Authorization") String authorizationHeader,
             @PathVariable UUID sessionId) {
-        log.info("Deleting chat session: {}", sessionId);
+        log.info("VirtualMentorController: Deleting chat session: {}", sessionId);
         virtualMentorService.deleteSession(authorizationHeader, sessionId);
         return ResponseEntity.noContent().build();
     }
@@ -89,7 +98,7 @@ public class VirtualMentorController {
     public ResponseEntity<List<VirtualMentorMessageResponse>> getSessionMessages(
             @RequestHeader("Authorization") String authorizationHeader,
             @PathVariable UUID sessionId) {
-        log.info("Getting messages for session: {}", sessionId);
+        log.info("VirtualMentorController: Getting messages for session: {}", sessionId);
         List<ChatMessage> messages = virtualMentorService.getSessionMessages(authorizationHeader, sessionId);
         return ResponseEntity.ok(messages.stream()
                 .map(this::mapToMessageResponse)
@@ -102,7 +111,7 @@ public class VirtualMentorController {
             @RequestHeader("Authorization") String authorizationHeader,
             @PathVariable UUID sessionId,
             @Valid @RequestBody VirtualMentorChatRequest request) {
-        log.info("Streaming chat for session: {}", sessionId);
+        log.info("VirtualMentorController: Streaming chat for session: {}", sessionId);
         return virtualMentorService.streamChat(authorizationHeader, sessionId, request);
     }
 
@@ -111,7 +120,7 @@ public class VirtualMentorController {
                description = "Uploads the file to Supabase Storage and returns the public URL. Send that URL in chat when full-document extraction is needed.")
     public ResponseEntity<Map<String, String>> uploadChatFile(
             @RequestParam("file") MultipartFile file) {
-        log.info("Uploading chat file: {}", file.getOriginalFilename());
+        log.info("VirtualMentorController: Uploading chat file: {}", file.getOriginalFilename());
         String fileUrl = supabaseStorageService.uploadChatFile(file);
         return ResponseEntity.ok(Map.of("url", fileUrl));
     }
@@ -122,11 +131,11 @@ public class VirtualMentorController {
     public ResponseEntity<Map<String, String>> ingestKnowledge(
             @RequestParam("file") MultipartFile file) {
         try {
-            log.info("Ingesting knowledge file: {}", file.getOriginalFilename());
+            log.info("VirtualMentorController: Ingesting knowledge file: {}", file.getOriginalFilename());
             documentIngestionService.ingestPdfDocument(file);
             return ResponseEntity.ok(Map.of("message", "Successfully ingested document into Vector Database."));
         } catch (Exception e) {
-            log.error("Failed to ingest document", e);
+            log.error("VirtualMentorController: Failed to ingest document", e);
             return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
         }
     }
