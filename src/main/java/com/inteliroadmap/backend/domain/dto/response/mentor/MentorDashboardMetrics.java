@@ -10,7 +10,6 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 @Builder
 public class MentorDashboardMetrics {
-    private String rating;
     private String responseTime;
     private long mentees;
     private long pendingReviews;

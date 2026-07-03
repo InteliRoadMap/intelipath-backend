@@ -41,7 +41,7 @@ public class MentorController {
     private final MentorService mentorService;
 
     @GetMapping("/dashboard/metrics")
-    @Operation(summary = "Get Mentor Metrics", description = "Get rating, response time, mentees, pending reviews, etc.")
+    @Operation(summary = "Get Mentor Metrics", description = "Get response time, mentees, pending reviews, etc.")
     public ResponseEntity<MentorDashboardMetrics> getMetrics() {
         log.info("MentorController: Mentor metrics request received");
         return ResponseEntity.ok(mentorService.getDashboardMetrics());

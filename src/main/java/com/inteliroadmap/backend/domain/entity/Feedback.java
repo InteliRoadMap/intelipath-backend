@@ -56,10 +56,6 @@ public class Feedback {
     private FeedbackType type;
 
     // New
-    @Column(name = "rating")
-    private Integer rating;
-
-    // New
     @Column(name = "status")
     @Enumerated(EnumType.STRING)
     private FeedbackStatus status;

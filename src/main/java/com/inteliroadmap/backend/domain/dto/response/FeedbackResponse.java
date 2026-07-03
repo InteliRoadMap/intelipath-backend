@@ -20,7 +20,6 @@ public class FeedbackResponse {
     private String senderName;
     private String content;
     private FeedbackType type;
-    private Integer rating;
     private com.inteliroadmap.backend.domain.enums.FeedbackStatus status;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

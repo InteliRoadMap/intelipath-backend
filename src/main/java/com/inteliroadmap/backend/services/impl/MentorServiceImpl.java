@@ -82,9 +82,6 @@ public class MentorServiceImpl implements MentorService {
         log.info("MentorServiceImpl: Get mentor dashboard metrics request received");
         User mentor = getAuthenticatedMentor();
 
-        Double avgRating = feedbackRepository.getAverageRatingBySenderId(mentor.getUserId());
-        double rating = avgRating != null ? Math.round(avgRating * 10.0) / 10.0 : 0.0;
-
         Double avgTimeSec = reviewRequestRepository.getAverageResponseTimeInSecondsByMentorId(mentor.getUserId());
         String responseTime = formatResponseTime(avgTimeSec);
 
@@ -96,7 +93,6 @@ public class MentorServiceImpl implements MentorService {
         long menteesCount = reviewRequestRepository.countDistinctStudentsByMentorId(mentor.getUserId());
 
         return MentorDashboardMetrics.builder()
-                .rating(rating + "/5.0")
                 .responseTime(responseTime)
                 .mentees(menteesCount)
                 .pendingReviews(pendingReviews)

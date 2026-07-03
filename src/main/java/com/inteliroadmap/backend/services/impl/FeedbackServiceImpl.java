@@ -67,7 +67,6 @@ public class FeedbackServiceImpl implements FeedbackService {
                 .senderName(sender.getFullName())
                 .content(request.getContent())
                 .type(request.getType())
-                .rating(request.getRating())
                 .status(FeedbackStatus.NEW)
                 .build();
 
@@ -109,7 +108,6 @@ public class FeedbackServiceImpl implements FeedbackService {
         // Update feedback properties
         feedback.setContent(request.getContent());
         feedback.setType(request.getType());
-        feedback.setRating(request.getRating());
         feedback.setStatus(FeedbackStatus.UPDATED);
 
         log.info("FeedbackServiceImpl: Feedback updated successfully");
@@ -179,7 +177,6 @@ public class FeedbackServiceImpl implements FeedbackService {
                 .senderName(feedback.getSenderName())
                 .content(feedback.getContent())
                 .type(feedback.getType())
-                .rating(feedback.getRating())
                 .status(feedback.getStatus())
                 .createdAt(feedback.getCreatedAt())
                 .updatedAt(feedback.getUpdatedAt())

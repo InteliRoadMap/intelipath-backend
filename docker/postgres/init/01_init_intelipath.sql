@@ -235,7 +235,6 @@ CREATE TABLE IF NOT EXISTS feedback (
     sender_name VARCHAR(255),
     content     TEXT,
     type        VARCHAR(30) DEFAULT 'GENERAL',
-    rating      INT,
     status      VARCHAR(30) DEFAULT 'NEW',
     created_at  TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMP NOT NULL DEFAULT NOW(),
