@@ -16,6 +16,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -39,9 +40,11 @@ public class NodeType {
     @Column(name = "unlock_key_required")
     private Boolean unlockKeyRequired;
 
+    // Typed List<String> (not Object) so Hibernate's JSON mapper can bind it;
+    // an untyped Object here fails at flush with ArrayList->String ClassCastException.
     @JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "stage_unlock_key", columnDefinition = "jsonb")
-    private Object stageUnlockKey;
+    private List<String> stageUnlockKey;
 
     @Column(name = "weight")
     private Integer weight;

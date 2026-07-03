@@ -38,7 +38,9 @@ import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 @Component
 @RequiredArgsConstructor
@@ -212,8 +214,14 @@ public class DatabaseSeeder implements CommandLineRunner {
                 skill = skillRepository.save(skill);
 
                 for(String career: careers) {
-                    CareerRole role = careerRoleRepository.findByCareerName(career);
+                    CareerRole role = careerRoleRepository.findByCareerName(career.trim());
                     if (role != null) {
+                        // Skip mappings that already exist so re-running the seeder
+                        // (every app restart) does not violate uq_career_skill.
+                        boolean mappingExists = careerRequiredSkillRepository
+                                .existsByCareerRole_CareerIdAndSkill_SkillId(role.getCareerId(), skill.getSkillId());
+                        if (mappingExists) continue;
+
                         CareerRequiredSkill careerRequiredSkill = CareerRequiredSkill.builder()
                                 .careerRole(role)
                                 .skill(skill)
@@ -239,10 +247,22 @@ public class DatabaseSeeder implements CommandLineRunner {
             return;
         }
 
+        // Rows have no natural unique key, so re-running this import would duplicate
+        // the whole node tree. Seed only into an empty table.
+        if (skillNodeRepository.count() > 0) {
+            log.info("DatabaseSeeder: Skill nodes already present. Skipping roadmap import.");
+            return;
+        }
+
         log.info("DatabaseSeeder: Starting CSV Import for Roadmap Nodes...");
         try (CSVReader reader = new CSVReader(new FileReader(roadmapDataFile))) {
             String[] line;
             int rowNum = 0;
+
+            // Node names repeat across stages (e.g. "React" under CORE and again under
+            // ADVANCED), so a DB lookup by name is ambiguous. Resolve previous/parent
+            // references against the most recently imported node with that name instead.
+            Map<String, SkillNode> importedNodesByName = new HashMap<>();
 
             while ((line = reader.readNext()) != null) {
                 rowNum++;
@@ -293,8 +313,8 @@ public class DatabaseSeeder implements CommandLineRunner {
 
                 Skill skill = !skillName.isEmpty() ? skillRepository.findBySkillName(skillName) : null;
 
-                SkillNode previousNode = skillNodeRepository.findByNodeName(previousNodeName);
-                SkillNode parentNode = skillNodeRepository.findByNodeName(parentNodeName);
+                SkillNode previousNode = importedNodesByName.get(previousNodeName.trim());
+                SkillNode parentNode = importedNodesByName.get(parentNodeName.trim());
 
                 NodeType nodeType = NodeType.builder()
                         .stage(StageType.valueOf(stageName.toUpperCase()))
@@ -318,7 +338,8 @@ public class DatabaseSeeder implements CommandLineRunner {
                         .requiredProficiency(reqProficiency)
                         .evidenceKeywords(evidenceKeywords)
                         .build();
-                skillNodeRepository.save(skillNode);
+                skillNode = skillNodeRepository.save(skillNode);
+                importedNodesByName.put(nodeName.trim(), skillNode);
             }
             log.info("DatabaseSeeder: CSV Import for Roadmap completed successfully.");
         } catch (Exception e) {
