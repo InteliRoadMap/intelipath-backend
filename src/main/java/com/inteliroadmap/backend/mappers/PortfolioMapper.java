@@ -35,6 +35,7 @@ public class PortfolioMapper {
                 .email(user.getEmail())
                 .portfolioSlug(student.getPortfolioSlug())
                 .university(resolveUniversityDisplayName(student))
+                .avatarUrl(user.getAvatarUrl())
                 .build();
 
         PortfolioResponse.PortfolioConfigResponse configResponse = null;
