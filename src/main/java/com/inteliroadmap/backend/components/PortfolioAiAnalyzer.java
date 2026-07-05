@@ -5,6 +5,7 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Component;
 
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -38,6 +39,17 @@ public class PortfolioAiAnalyzer {
                - Sentence 2: Key technologies used and what makes it notable.
                - Keep it professional and suitable for a portfolio. No filler like "Đây là một dự án...".
 
+            3. **matchedSkills**: From the SKILL CATALOG below, decide which skills this repository
+               genuinely demonstrates and how strongly.
+               - Use ONLY skill names copied verbatim from the catalog. Do not invent names.
+               - "confidence" is 0.0-1.0 = how strongly the CODE (not just a mention) shows the skill.
+                 A skill that is the project's primary stack -> high (0.85-0.95). A library used in
+                 one config file or mentioned in passing -> low (0.4-0.6). Omit skills with no real signal.
+               - If the catalog is empty, return an empty list.
+
+            ## SKILL CATALOG
+            %s
+
             ## INPUT
             - Repo Name: %s
             - Description: %s
@@ -52,23 +64,34 @@ public class PortfolioAiAnalyzer {
               "techStack": {
                 "Backend": ["Spring Boot", "Java"],
                 "Database": ["PostgreSQL"]
-              }
+              },
+              "matchedSkills": [
+                {"skill": "TypeScript", "confidence": 0.9},
+                {"skill": "Frontend Framework", "confidence": 0.85}
+              ]
             }
             """;
 
     public AiGithubSummary analyzeGithubProject(String repoName, String description,
-                                                 String readmeContent, String extraContext) {
-        log.info("PortfolioAiAnalyzer: Analyzing GitHub project: {}", repoName);
+                                                 String readmeContent, String extraContext,
+                                                 List<String> skillCatalog) {
+        log.info("PortfolioAiAnalyzer: Analyzing GitHub project: {} against {} catalog skill(s)",
+                repoName, skillCatalog != null ? skillCatalog.size() : 0);
+        String catalogText = (skillCatalog == null || skillCatalog.isEmpty())
+                ? "(empty - return an empty matchedSkills list)"
+                : String.join("\n", skillCatalog.stream().map(s -> "- " + s).toList());
         try {
             return chatClient.prompt()
-                    .user(String.format(ANALYZE_PROMPT, repoName, description, readmeContent, extraContext))
+                    .user(String.format(ANALYZE_PROMPT, catalogText, repoName, description, readmeContent, extraContext))
                     .call()
                     .entity(AiGithubSummary.class);
         } catch (Exception e) {
             log.error("PortfolioAiAnalyzer: AI analysis failed for project: {}", repoName, e);
-            return new AiGithubSummary("Dự án " + repoName + ": " + description, new HashMap<>());
+            return new AiGithubSummary("Dự án " + repoName + ": " + description, new HashMap<>(), List.of());
         }
     }
 
-    public record AiGithubSummary(String summary, Map<String, Object> techStack) {}
+    public record SkillMatch(String skill, double confidence) {}
+
+    public record AiGithubSummary(String summary, Map<String, Object> techStack, List<SkillMatch> matchedSkills) {}
 }
