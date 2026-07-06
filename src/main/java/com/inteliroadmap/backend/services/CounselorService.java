@@ -3,39 +3,25 @@ package com.inteliroadmap.backend.services;
 import com.inteliroadmap.backend.domain.dto.request.ExportStudentListRequest;
 import com.inteliroadmap.backend.domain.dto.request.UpdateProfileRequest;
 import com.inteliroadmap.backend.domain.dto.response.CounselorResponse;
-import com.inteliroadmap.backend.domain.dto.response.StudentInfoProjection;
 import com.inteliroadmap.backend.domain.dto.response.UpdateProfileResponse;
-import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
-import com.inteliroadmap.backend.mappers.CounselorMapper;
-import com.inteliroadmap.backend.services.CounselorService;
-import jakarta.transaction.Transactional;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Pageable;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Service;
+
 import java.util.UUID;
-import org.springframework.http.HttpStatus;
-import org.springframework.web.server.ResponseStatusException;
 
 public interface CounselorService {
 
-    public CounselorResponse getCareerStatistics() ;
+    CounselorResponse getCareerStatistics() ;
 
-    public CounselorResponse getStudentsMissingSkills(String searchName) ;
+    CounselorResponse getStudentsMissingSkills(String searchName) ;
 
-    public CounselorResponse getAllFeedbacksSentToMe() ;
+    CounselorResponse getAllFeedbacksSentToMe() ;
 
-    public CounselorResponse getStudentInfos(String search, int page, int size) ;
+    CounselorResponse getStudentInfos(String search, int page, int size) ;
 
-    public CounselorResponse getStudentStatisticAndFeedback(UUID studentId) ;
+    CounselorResponse getStudentStatisticAndFeedback(UUID studentId) ;
 
-    public UpdateProfileResponse getProfile() ;
+    UpdateProfileResponse getProfile() ;
 
-    public UpdateProfileResponse updateProfile(UpdateProfileRequest request) ;
+    UpdateProfileResponse updateProfile(UpdateProfileRequest request) ;
 
-    @Transactional
     byte[] exportStudentList(ExportStudentListRequest request);
 }

@@ -7,33 +7,24 @@ import com.inteliroadmap.backend.domain.dto.response.student.MentorFeedbackItemR
 import com.inteliroadmap.backend.domain.dto.response.student.RecommendationItemResponse;
 import com.inteliroadmap.backend.domain.dto.response.student.SkillGapItemResponse;
 import com.inteliroadmap.backend.domain.entity.Student;
-import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
-import com.inteliroadmap.backend.mappers.StudentDashboardMapper;
-import com.inteliroadmap.backend.services.AuthenticatedStudentService;
-import com.inteliroadmap.backend.services.StudentDashboardService;
-import com.inteliroadmap.backend.services.StudentService;
-import jakarta.transaction.Transactional;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-import java.time.LocalDate;
+
 import java.util.List;
 
 public interface StudentDashboardService {
 
-    public DashboardRoadmapProgressResponse getRoadmapProgress() ;
+    DashboardRoadmapProgressResponse getRoadmapProgress() ;
 
     DashboardRoadmapProgressResponse getRoadmapProgress(Student student);
 
-    public List<SkillGapItemResponse> getSkillGaps() ;
+    List<SkillGapItemResponse> getSkillGaps() ;
 
     List<SkillGapItemResponse> getSkillGaps(Student student);
 
-    public List<MentorFeedbackItemResponse> getMentorFeedback() ;
+    List<MentorFeedbackItemResponse> getMentorFeedback() ;
 
-    public List<AiHistoryItemResponse> getAiHistory() ;
+    List<AiHistoryItemResponse> getAiHistory() ;
 
-    public MarketDemandResponse getMarketDemand() ;
+    MarketDemandResponse getMarketDemand() ;
 
-    public List<RecommendationItemResponse> getRecommendations() ;
+    List<RecommendationItemResponse> getRecommendations() ;
 }

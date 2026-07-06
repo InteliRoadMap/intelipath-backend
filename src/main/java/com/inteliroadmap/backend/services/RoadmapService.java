@@ -6,46 +6,30 @@ import com.inteliroadmap.backend.domain.dto.response.roadmap.StudentRoadmapRespo
 import com.inteliroadmap.backend.domain.dto.response.RoadmapResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapNodeDto;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.SkillGapResponse;
-import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
-import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
-import com.inteliroadmap.backend.security.JwtService;
-import com.inteliroadmap.backend.services.RoadmapService;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
-import java.util.Set;
+
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 public interface RoadmapService {
 
-    public RoadmapResponse getRoadmap(UUID careerId) ;
+    RoadmapResponse getRoadmap(UUID careerId) ;
 
-    public StudentRoadmapResponse getStudentRoadmap() ;
+    StudentRoadmapResponse getStudentRoadmap() ;
 
-    public RoadmapResponse getRoadmapProgress(UUID careerId) ;
+    RoadmapResponse getRoadmapProgress(UUID careerId) ;
 
-    public RoadmapResponse getNode(UUID nodeId) ;
+    RoadmapResponse getNode(UUID nodeId) ;
 
-    public RoadmapResponse updateNodeProgress(UpdateUserProgressRequest request) ;
+    RoadmapResponse updateNodeProgress(UpdateUserProgressRequest request) ;
 
-    public StudentRoadmapResponse getStudentRoadmap(String authHeader) ;
+    StudentRoadmapResponse getStudentRoadmap(String authHeader) ;
 
-    public StudentRoadmapResponse getCareerRoadmapTemplate(UUID careerId) ;
+    StudentRoadmapResponse getCareerRoadmapTemplate(UUID careerId) ;
 
-    public Integer getCareerProgress(UUID careerId, String authHeader) ;
+    Integer getCareerProgress(UUID careerId, String authHeader) ;
 
-    public RoadmapNodeDto getNodeDetail(UUID nodeId) ;
+    RoadmapNodeDto getNodeDetail(UUID nodeId) ;
 
-    public void updateNodeProgress(UpdateNodeProgressRequest request, String authHeader) ;
+    void updateNodeProgress(UpdateNodeProgressRequest request, String authHeader) ;
 
-    public SkillGapResponse compareSkills(String authHeader) ;
+    SkillGapResponse compareSkills(String authHeader) ;
 }

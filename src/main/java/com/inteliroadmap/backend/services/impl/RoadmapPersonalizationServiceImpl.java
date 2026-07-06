@@ -3,6 +3,7 @@ package com.inteliroadmap.backend.services.impl;
 import com.inteliroadmap.backend.components.RoadmapProgressCalculator;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapRecommendationDecisionResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapRecommendationResponse;
+import com.inteliroadmap.backend.domain.entity.CareerRequiredSkill;
 import com.inteliroadmap.backend.domain.entity.RoadmapRecommendation;
 import com.inteliroadmap.backend.domain.entity.RoadmapRecommendationItem;
 import com.inteliroadmap.backend.domain.entity.Skill;
@@ -12,12 +13,14 @@ import com.inteliroadmap.backend.domain.entity.StudentProgress;
 import com.inteliroadmap.backend.domain.entity.StudentSkill;
 import com.inteliroadmap.backend.domain.entity.StudentSkillEvidence;
 import com.inteliroadmap.backend.domain.enums.EvidenceStatus;
+import com.inteliroadmap.backend.domain.enums.ImportanceLevel;
 import com.inteliroadmap.backend.domain.enums.RecommendationAction;
 import com.inteliroadmap.backend.domain.enums.RecommendationStatus;
 import com.inteliroadmap.backend.domain.enums.RecommendationType;
 import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.mappers.RoadmapRecommendationMapper;
+import com.inteliroadmap.backend.repositories.CareerRequiredSkillRepository;
 import com.inteliroadmap.backend.repositories.RoadmapRecommendationItemRepository;
 import com.inteliroadmap.backend.repositories.RoadmapRecommendationRepository;
 import com.inteliroadmap.backend.repositories.SkillNodeRepository;
@@ -67,6 +70,17 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
     private static final BigDecimal PROFILE_SKILL_CONFIDENCE = new BigDecimal("0.80");
 
     /**
+     * Confidence a skill's evidence must clear to fast-track a node, scaled by how
+     * important that skill is to the career. HIGH-importance (foundational) skills
+     * demand stronger proof before we let the student skip them; LOW-importance
+     * skills are cheaper to accept. Applied as a floor on top of the node's own
+     * requiredProficiency, so we always take the stricter of the two.
+     */
+    private static final BigDecimal HIGH_IMPORTANCE_CONFIDENCE = new BigDecimal("0.85");
+    private static final BigDecimal AVG_IMPORTANCE_CONFIDENCE = new BigDecimal("0.70");
+    private static final BigDecimal LOW_IMPORTANCE_CONFIDENCE = new BigDecimal("0.60");
+
+    /**
      * Only EVIDENCE_ALLOWED nodes may be auto-suggested. NEVER_COMPLETE nodes are
      * group headers, and MANUAL_ONLY nodes must be ticked by the student directly.
      */
@@ -79,6 +93,7 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
     private final StudentProgressRepository studentProgressRepository;
     private final StudentSkillRepository studentSkillRepository;
     private final SkillNodeRepository skillNodeRepository;
+    private final CareerRequiredSkillRepository careerRequiredSkillRepository;
     private final RoadmapRecommendationMapper recommendationMapper;
     private final RoadmapProgressCalculator progressCalculator;
 
@@ -100,7 +115,8 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
         excludedNodeIds.addAll(findCompletedNodeIds(student.getUserId()));
         excludedNodeIds.addAll(findNodeIdsInPendingRecommendations(student.getUserId()));
 
-        Map<UUID, NodeCandidate> candidates = collectCandidates(student, careerNodes, excludedNodeIds);
+        Map<UUID, ImportanceLevel> importanceBySkillId = loadImportanceBySkillId(careerId);
+        Map<UUID, NodeCandidate> candidates = collectCandidates(student, careerNodes, excludedNodeIds, importanceBySkillId);
         if (candidates.isEmpty()) {
             log.info("RoadmapPersonalizationServiceImpl: No new skippable nodes found for user {}", student.getUserId());
             return List.of();
@@ -201,7 +217,20 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
     private record NodeCandidate(SkillNode node, BigDecimal confidence, String reason, List<UUID> evidenceIds) {
     }
 
-    private Map<UUID, NodeCandidate> collectCandidates(Student student, List<SkillNode> careerNodes, Set<UUID> excludedNodeIds) {
+    /** Maps each skill required by the career to its importance level, for the confidence gate. */
+    private Map<UUID, ImportanceLevel> loadImportanceBySkillId(UUID careerId) {
+        Map<UUID, ImportanceLevel> importanceBySkillId = new HashMap<>();
+        for (CareerRequiredSkill required : careerRequiredSkillRepository.findByCareerRole_CareerId(careerId)) {
+            if (required.getSkill() != null && required.getImportanceLevel() != null) {
+                importanceBySkillId.put(required.getSkill().getSkillId(), required.getImportanceLevel());
+            }
+        }
+        return importanceBySkillId;
+    }
+
+    private Map<UUID, NodeCandidate> collectCandidates(Student student, List<SkillNode> careerNodes,
+                                                       Set<UUID> excludedNodeIds,
+                                                       Map<UUID, ImportanceLevel> importanceBySkillId) {
         Map<UUID, NodeCandidate> candidates = new LinkedHashMap<>();
 
         Map<UUID, List<SkillNode>> nodesBySkillId = new HashMap<>();
@@ -226,7 +255,7 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
             }
             String reason = "You already have '" + studentSkill.getSkill().getSkillName() + "' in your skill profile";
             for (SkillNode node : nodesBySkillId.getOrDefault(studentSkill.getSkill().getSkillId(), List.of())) {
-                offerCandidate(candidates, excludedNodeIds, node, PROFILE_SKILL_CONFIDENCE, reason, null);
+                offerCandidate(candidates, excludedNodeIds, node, PROFILE_SKILL_CONFIDENCE, reason, null, importanceBySkillId);
             }
         }
 
@@ -242,10 +271,10 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
             String reason = buildEvidenceReason(evidence);
             if (evidence.getNodeId() != null && nodesById.containsKey(evidence.getNodeId())) {
                 offerCandidate(candidates, excludedNodeIds,
-                        nodesById.get(evidence.getNodeId()), confidence, reason, evidence.getEvidenceId());
+                        nodesById.get(evidence.getNodeId()), confidence, reason, evidence.getEvidenceId(), importanceBySkillId);
             } else if (evidence.getSkillName() != null) {
                 for (SkillNode node : nodesBySkillName.getOrDefault(evidence.getSkillName().toLowerCase(), List.of())) {
-                    offerCandidate(candidates, excludedNodeIds, node, confidence, reason, evidence.getEvidenceId());
+                    offerCandidate(candidates, excludedNodeIds, node, confidence, reason, evidence.getEvidenceId(), importanceBySkillId);
                 }
             }
         }
@@ -255,14 +284,15 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
 
     /** Adds or merges a candidate, keeping the highest confidence and every supporting evidence id. */
     private void offerCandidate(Map<UUID, NodeCandidate> candidates, Set<UUID> excludedNodeIds,
-                                SkillNode node, BigDecimal confidence, String reason, UUID evidenceId) {
+                                SkillNode node, BigDecimal confidence, String reason, UUID evidenceId,
+                                Map<UUID, ImportanceLevel> importanceBySkillId) {
         if (excludedNodeIds.contains(node.getNodeId())) {
             return;
         }
         if (!EVIDENCE_ALLOWED_POLICY.equalsIgnoreCase(node.getCompletionPolicy())) {
             return;
         }
-        if (!meetsNodeProficiency(node, confidence)) {
+        if (!meetsNodeProficiency(node, confidence, importanceBySkillId)) {
             return;
         }
 
@@ -286,17 +316,37 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
     }
 
     /**
-     * The node's requiredProficiency (0-100) is the confidence bar for
-     * suggesting it; nodes without one fall back to the default threshold.
+     * The node's requiredProficiency (0-100) is the confidence bar for suggesting
+     * it; nodes without one fall back to the default threshold. On top of that we
+     * apply an importance floor: HIGH-importance skills need stronger evidence
+     * before we let the student skip them. The stricter of the two wins.
      */
-    private boolean meetsNodeProficiency(SkillNode node, BigDecimal confidence) {
+    private boolean meetsNodeProficiency(SkillNode node, BigDecimal confidence,
+                                         Map<UUID, ImportanceLevel> importanceBySkillId) {
         if (confidence == null) {
             return false;
         }
         BigDecimal threshold = node.getRequiredProficiency() != null && node.getRequiredProficiency() > 0
                 ? BigDecimal.valueOf(node.getRequiredProficiency()).movePointLeft(2)
                 : MIN_EVIDENCE_CONFIDENCE;
+        threshold = threshold.max(importanceFloor(node, importanceBySkillId));
         return confidence.compareTo(threshold) >= 0;
+    }
+
+    /** The minimum confidence dictated by how important the node's skill is to the career. */
+    private BigDecimal importanceFloor(SkillNode node, Map<UUID, ImportanceLevel> importanceBySkillId) {
+        if (node.getSkill() == null) {
+            return AVG_IMPORTANCE_CONFIDENCE;
+        }
+        ImportanceLevel importance = importanceBySkillId.get(node.getSkill().getSkillId());
+        if (importance == null) {
+            return AVG_IMPORTANCE_CONFIDENCE;
+        }
+        return switch (importance) {
+            case HIGH -> HIGH_IMPORTANCE_CONFIDENCE;
+            case AVG -> AVG_IMPORTANCE_CONFIDENCE;
+            case LOW -> LOW_IMPORTANCE_CONFIDENCE;
+        };
     }
 
     private String buildEvidenceReason(StudentSkillEvidence evidence) {

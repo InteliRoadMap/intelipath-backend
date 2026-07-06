@@ -247,11 +247,15 @@ public class DatabaseSeeder implements CommandLineRunner {
             return;
         }
 
-        // Rows have no natural unique key, so re-running this import would duplicate
-        // the whole node tree. Seed only into an empty table.
-        if (skillNodeRepository.count() > 0) {
-            log.info("DatabaseSeeder: Skill nodes already present. Skipping roadmap import.");
-            return;
+        // Rows have no natural unique key, so re-importing a career would duplicate
+        // its node tree. Seed per-career: skip any career that already has nodes,
+        // but still import careers whose roadmap hasn't been seeded yet (e.g. adding
+        // Backend/Full Stack after Frontend already exists).
+        java.util.Set<java.util.UUID> careersAlreadySeeded = new java.util.HashSet<>();
+        for (SkillNode existing : skillNodeRepository.findAll()) {
+            if (existing.getCareerRole() != null && existing.getCareerRole().getCareerId() != null) {
+                careersAlreadySeeded.add(existing.getCareerRole().getCareerId());
+            }
         }
 
         log.info("DatabaseSeeder: Starting CSV Import for Roadmap Nodes...");
@@ -274,6 +278,8 @@ public class DatabaseSeeder implements CommandLineRunner {
                 CareerRole career = careerRoleRepository.findByCareerName(careerName);
                 // Skip import Roadmap nodes for non-existing career
                 if (career == null) continue;
+                // Skip careers that were already seeded in a previous run.
+                if (careersAlreadySeeded.contains(career.getCareerId())) continue;
 
                 String skillName = line[1];
                 String stageName = line[2];

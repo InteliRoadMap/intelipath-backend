@@ -27,6 +27,7 @@ public class PortfolioResponse {
         private String email;
         private String portfolioSlug;
         private String university;
+        private String avatarUrl;
     }
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor

@@ -2,15 +2,20 @@ package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.domain.dto.request.GithubImportRequest;
 import com.inteliroadmap.backend.domain.dto.response.PortfolioResponse;
+import com.inteliroadmap.backend.domain.entity.Student;
+import com.inteliroadmap.backend.domain.enums.EvidenceType;
 import com.inteliroadmap.backend.clients.GithubApiClient;
 import com.inteliroadmap.backend.components.PortfolioAiAnalyzer;
+import com.inteliroadmap.backend.services.AuthenticatedStudentService;
 import com.inteliroadmap.backend.services.GithubPortfolioService;
+import com.inteliroadmap.backend.services.SkillEvidenceService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.List;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -28,6 +33,8 @@ public class GithubPortfolioServiceImpl implements GithubPortfolioService {
 
     private final GithubApiClient githubApiClient;
     private final PortfolioAiAnalyzer portfolioAiAnalyzer;
+    private final AuthenticatedStudentService authenticatedStudentService;
+    private final SkillEvidenceService skillEvidenceService;
 
     /**
      * Imports and analyzes a GitHub repository based on the provided request.
@@ -75,13 +82,22 @@ public class GithubPortfolioServiceImpl implements GithubPortfolioService {
             extraContext = githubApiClient.fetchFileContent(rawBaseUrl + "build.gradle", 1500);
         }
 
-        // 4. Use AI to summarize README and extract Tech Stack
-        // Pass the gathered contents to the AI Analyzer to generate a cohesive summary and extract the core tech stack
+        // 4. Use AI to summarize README, extract Tech Stack, and match against the
+        // student's career skill catalog in a single call.
+        Student student = authenticatedStudentService.getRequiredStudent();
+        UUID careerId = student.getCareerRole() != null ? student.getCareerRole().getCareerId() : null;
+        List<String> catalog = skillEvidenceService.careerSkillCatalog(careerId);
+
         PortfolioAiAnalyzer.AiGithubSummary aiSummary = portfolioAiAnalyzer.analyzeGithubProject(
-                repo, metadata.description(), readmeContent, extraContext
+                repo, metadata.description(), readmeContent, extraContext, catalog
         );
 
-        // 5. Build and return DTO (Do NOT save to DB yet)
+        // 4b. Record AI-detected skills as PENDING evidence from the real repo read
+        // (not the editable techStack field), so shortcuts can be suggested later.
+        skillEvidenceService.recordEvidence(
+                student.getUserId(), aiSummary.matchedSkills(), EvidenceType.GITHUB_PROJECT, null);
+
+        // 5. Build and return DTO (Do NOT save the project to DB yet)
         // Construct the final response object with the extracted and AI-generated data
         return PortfolioResponse.PortfolioProjectResponse.builder()
                 .projectId(UUID.randomUUID()) // FE will replace or use this as temporary ID
