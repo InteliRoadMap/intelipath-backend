@@ -1,0 +1,27 @@
+# ============================================================
+# PROD overrides - use explicitly (they are NOT auto-applied):
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
+#
+# Differences from dev:
+# - Postgres and the AI service get NO host port (internal only) -> not reachable
+#   from outside the server. The backend still talks to them over the compose
+#   network (postgres:5432, ai-service:8000).
+# - A real POSTGRES_PASSWORD MUST be provided (via .env or the shell); compose
+#   refuses to start if it is unset, so the dev default is never used in prod.
+# - restart: always, so services come back after a host reboot.
+# ============================================================
+
+services:
+
+  postgres:
+    environment:
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in production}
+    restart: always
+
+  ai-service:
+    restart: always
+
+  backend:
+    environment:
+      DB_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in production}
+    restart: always
