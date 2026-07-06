@@ -1,6 +1,7 @@
 package com.inteliroadmap.backend.controllers;
 
 import com.inteliroadmap.backend.domain.dto.request.CreateFeedbackRequest;
+import com.inteliroadmap.backend.domain.dto.request.ExportStudentListRequest;
 import com.inteliroadmap.backend.domain.dto.request.ModifyFeedbackRequest;
 import com.inteliroadmap.backend.domain.dto.request.UpdateProfileRequest;
 import com.inteliroadmap.backend.domain.dto.response.CounselorResponse;
@@ -17,7 +18,9 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -315,5 +318,29 @@ public class CounselorController {
         // Soft deletes the feedback by changing its status
         feedbackService.deleteFeedback(feedbackId);
         return ResponseEntity.ok(HttpStatus.OK);
+    }
+
+    @PostMapping("/export-student")
+    @Operation(summary = "Export student list", description = "Export selected students to excel")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Selected student exported to excel successfully"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized or invalid token"),
+            @ApiResponse(responseCode = "404", description = "Student not found")
+    })
+    public ResponseEntity<byte[]> exportStudentList(
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Selected students payload", required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ExportStudentListRequest.class)
+                    )
+            )
+            @RequestBody @Valid ExportStudentListRequest request
+    ) {
+        log.info("Export student list request received");
+        byte[] excel = counselorService.exportStudentList(request);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=StudentList.xlsx")
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(excel);
     }
 }

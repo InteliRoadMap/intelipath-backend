@@ -1,5 +1,6 @@
 package com.inteliroadmap.backend.services;
 
+import com.inteliroadmap.backend.domain.dto.request.ExportStudentListRequest;
 import com.inteliroadmap.backend.domain.dto.request.UpdateProfileRequest;
 import com.inteliroadmap.backend.domain.dto.response.CounselorResponse;
 import com.inteliroadmap.backend.domain.dto.response.StudentInfoProjection;
@@ -36,4 +37,7 @@ public interface CounselorService {
     public UpdateProfileResponse getProfile() ;
 
     public UpdateProfileResponse updateProfile(UpdateProfileRequest request) ;
+
+    @Transactional
+    byte[] exportStudentList(ExportStudentListRequest request);
 }

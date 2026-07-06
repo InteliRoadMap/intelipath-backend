@@ -8,7 +8,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 
-import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 
 @Entity
@@ -57,5 +57,19 @@ public class SkillNode {
     @JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "resource", columnDefinition = "jsonb")
     private Object resource;
+
+    @JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
+    @Column(columnDefinition = "jsonb")
+    private Map<String, Object> descriptions;
+
+    @Column(name = "completion_policy", columnDefinition = "TEXT")
+    private String completionPolicy;
+
+    @Column(name = "required_proficiency")
+    private Integer requiredProficiency;
+
+    @JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
+    @Column(name = "evidence_keywords", columnDefinition = "jsonb")
+    private com.fasterxml.jackson.databind.JsonNode evidenceKeywords;
 }
 

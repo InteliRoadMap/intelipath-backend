@@ -23,9 +23,9 @@ public class Recruitment {
     @Column(name = "recruitment_id", nullable = false)
     private String topCvRecruitmentId;
 
-    @Column(name = "recruitment_link", columnDefinition = "TEXT")
-    private String recruitmentLink;
-
+//    @Column(name = "recruitment_link", columnDefinition = "TEXT")
+//    private String recruitmentLink;
+//
 //    @Column(name = "title", columnDefinition = "TEXT")
 //    private String title;
 //
@@ -37,17 +37,21 @@ public class Recruitment {
 //
 //    @Column(name = "experience", columnDefinition = "TEXT")
 //    private String experience;
-
-    @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "basic_info", columnDefinition = "jsonb")
-    private Map<String, Object> basicInfo;
-
-    @Column(name = "application_deadline")
-    private LocalDate applicationDeadline;
-
+//
+//    @JdbcTypeCode(SqlTypes.JSON)
+//    @Column(name = "basic_info", columnDefinition = "jsonb")
+//    private Map<String, Object> basicInfo;
+//
+//    @Column(name = "application_deadline")
+//    private LocalDate applicationDeadline;
+//
 //    @JdbcTypeCode(SqlTypes.JSON)
 //    @Column(columnDefinition = "jsonb")
 //    private Map<String, List<String>> tags;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "recruitment_infos", columnDefinition = "jsonb")
+    private Map<String, Object> recruitmentInfos;
 
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")

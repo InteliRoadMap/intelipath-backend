@@ -21,28 +21,32 @@ public class Company {
     @Id
     @Column(name = "company_id", nullable = false)
     private String topCvCompanyId;
-
-    @Column(name = "company_link", columnDefinition = "TEXT")
-    private String companyLink;
-
-    @Column(name = "logo", columnDefinition = "TEXT")
-    private String logo;
-
-    @Column(name = "name", columnDefinition = "TEXT")
-    private String name;
-
+//
+//    @Column(name = "company_link", columnDefinition = "TEXT")
+//    private String companyLink;
+//
+//    @Column(name = "logo", columnDefinition = "TEXT")
+//    private String logo;
+//
+//    @Column(name = "name", columnDefinition = "TEXT")
+//    private String name;
+//
 //    @JdbcTypeCode(SqlTypes.JSON)
 //    @Column(columnDefinition = "jsonb")
 //    private List<String> introduction;
 
-    @JdbcTypeCode(SqlTypes.JSON)
+    @JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
-    private Map<String, Object> info;
+    private com.fasterxml.jackson.databind.JsonNode signatures;
 
-    @JdbcTypeCode(SqlTypes.JSON)
+    @JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(columnDefinition = "jsonb")
-    private List<String> contact;
+    private com.fasterxml.jackson.databind.JsonNode infos;
 
+//    @JdbcTypeCode(SqlTypes.JSON)
+//    @Column(columnDefinition = "jsonb")
+//    private List<String> contact;
+//
 //    @OneToMany(mappedBy = "company", cascade = CascadeType.ALL, orphanRemoval = true)
 //    @Builder.Default
 //    private List<RecruitmentPost> recruitmentPosts = new ArrayList<>();
