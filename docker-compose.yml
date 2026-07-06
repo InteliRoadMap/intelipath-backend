@@ -1,16 +1,10 @@
 # ============================================================
-# BASE compose - config shared by every environment.
-# Edit THIS file for changes common to dev and prod.
-#
-# Dev  : docker compose up -d
-#        (auto-merges docker-compose.override.yml -> DB/AI exposed on localhost)
-# Prod : docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --build
-#        (DB/AI stay internal, a real POSTGRES_PASSWORD is required)
-#
-# By default only the backend API (8080) is published. Postgres and the AI
-# service have NO host port here - they are reachable only inside the compose
-# network. Each environment file decides how (or whether) to expose them.
+# Usage:
+# - Start: docker compose up -d
+# - Stop:  docker compose down
+# - Logs:  docker compose logs -f backend
 # ============================================================
+
 
 services:
 
@@ -21,6 +15,8 @@ services:
       POSTGRES_DB: ${POSTGRES_DB:-intelipath}
       POSTGRES_USER: ${POSTGRES_USER:-intelipath}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-intelipath_dev_password}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
@@ -37,6 +33,8 @@ services:
       context: ../intelipath-service
       dockerfile: Dockerfile
     container_name: intelipath-service
+    ports:
+      - "8000:8000"
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8000/"]
       interval: 10s
@@ -54,6 +52,7 @@ services:
       - "8080:8080"
     volumes:
       - ./data:/app/data:ro
+
     env_file:
       - .env
     environment:
