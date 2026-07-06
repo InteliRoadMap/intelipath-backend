@@ -1,6 +1,7 @@
 package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.components.RoadmapProgressCalculator;
+import com.inteliroadmap.backend.domain.dto.request.ExportStudentListRequest;
 import com.inteliroadmap.backend.domain.dto.request.UpdateProfileRequest;
 import com.inteliroadmap.backend.domain.dto.response.CounselorResponse;
 import com.inteliroadmap.backend.domain.dto.response.StudentInfoProjection;
@@ -26,6 +27,10 @@ import com.inteliroadmap.backend.services.CounselorService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -37,6 +42,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
@@ -324,5 +331,56 @@ public class CounselorServiceImpl implements CounselorService {
 
         log.info("CounselorServiceImpl: Update profile successfully");
         return counselorMapper.toCrudProfileResponse(user, counselor);
+    }
+
+    @Transactional
+    @Override
+    public byte[] exportStudentList(ExportStudentListRequest request){
+        log.info("CounselorServiceImpl: Export student list request received");
+        getAuthenticatedCounselor();
+
+        List<UUID> studentIds = request.getStudentIds();
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Student List");
+
+            // Header
+            org.apache.poi.ss.usermodel.Row header = sheet.createRow(0);
+            header.createCell(0).setCellValue("Name");
+            header.createCell(1).setCellValue("Email");
+            header.createCell(2).setCellValue("University");
+            header.createCell(3).setCellValue("Major");
+            header.createCell(4).setCellValue("Skills");
+            header.createCell(5).setCellValue("Github Profile");
+
+            // Body
+            int rowNum = 1;
+            for(UUID studentId: studentIds){
+                User user = userRepository.findByUserId(studentId);
+                Student student = studentRepository.findByUserId(studentId);
+                University university = student.getUniversity();
+                List<String> skillNames = studentSkillRepository.findSkillNamesByStudent_UserId(studentId);
+
+                Row row = sheet.createRow(rowNum++);
+                row.createCell(0).setCellValue(user.getFullName());
+                row.createCell(1).setCellValue(user.getEmail());
+                row.createCell(2).setCellValue(student.getUniversity().getName());
+                row.createCell(3).setCellValue(student.getMajor());
+                row.createCell(4).setCellValue(skillNames.toString());
+                row.createCell(5).setCellValue(student.getGithubProfile());
+            }
+
+            // Auto size columns
+            for (int i = 0; i < 6; i++) sheet.autoSizeColumn(i);
+
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            workbook.write(output);
+
+            return output.toByteArray();
+
+        } catch (IOException e) {
+            log.error("CounselorServiceImpl: Error while exporting student list", e);
+        }
+        return null;
     }
 }
