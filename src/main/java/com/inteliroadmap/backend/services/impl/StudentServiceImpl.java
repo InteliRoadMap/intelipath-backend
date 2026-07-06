@@ -135,6 +135,10 @@ public class StudentServiceImpl implements StudentService {
             student.setMajor(request.getMajor());
         }
 
+        if (request.getGithubProfile() != null) {
+            student.setGithubProfile(request.getGithubProfile().trim());
+        }
+
         if (request.getCareerId() != null) {
             CareerRole career = careerRoleRepository.findByCareerId(request.getCareerId());
             if (career == null) {

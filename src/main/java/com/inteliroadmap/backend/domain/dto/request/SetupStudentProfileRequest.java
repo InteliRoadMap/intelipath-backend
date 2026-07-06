@@ -22,6 +22,8 @@ public class SetupStudentProfileRequest {
 
     private UUID careerId;
 
+    private String githubProfile;
+
     private String bio;
 
     private String yob;
