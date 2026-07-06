@@ -31,6 +31,10 @@ public interface StudentDashboardService {
 
     public List<MentorFeedbackItemResponse> getMentorFeedback() ;
 
+    void markFeedbackRead(java.util.UUID feedbackId);
+
+    void dismissFeedback(java.util.UUID feedbackId);
+
     public List<AiHistoryItemResponse> getAiHistory() ;
 
     public MarketDemandResponse getMarketDemand() ;

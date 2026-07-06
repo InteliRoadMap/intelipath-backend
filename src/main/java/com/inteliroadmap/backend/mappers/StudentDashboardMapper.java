@@ -72,6 +72,7 @@ public class StudentDashboardMapper {
                 .name(feedback.getSenderName())
                 .time(formatRelativeTime(feedback.getCreatedAt()))
                 .text(feedback.getContent())
+                .read(feedback.getStatus() == com.inteliroadmap.backend.domain.enums.FeedbackStatus.READ)
                 .build();
     }
 

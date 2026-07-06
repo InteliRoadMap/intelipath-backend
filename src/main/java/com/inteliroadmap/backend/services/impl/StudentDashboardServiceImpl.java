@@ -12,6 +12,7 @@ import com.inteliroadmap.backend.domain.entity.CareerRole;
 import com.inteliroadmap.backend.domain.entity.ChatMessage;
 import com.inteliroadmap.backend.domain.entity.ChatSession;
 import com.inteliroadmap.backend.domain.entity.Feedback;
+import com.inteliroadmap.backend.domain.enums.FeedbackStatus;
 import com.inteliroadmap.backend.domain.entity.SkillNode;
 import com.inteliroadmap.backend.domain.entity.SkillTrend;
 import com.inteliroadmap.backend.domain.entity.Student;
@@ -173,11 +174,47 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
 
         User user = getCurrentUser();
         List<Feedback> feedbackList = feedbackRepository
-                .findTop5ByReceiver_UserIdOrderByCreatedAtDesc(user.getUserId());
+                .findTop5ByReceiver_UserIdAndStatusNotOrderByCreatedAtDesc(
+                        user.getUserId(), FeedbackStatus.DELETED);
 
         return feedbackList.stream()
                 .map(studentDashboardMapper::toMentorFeedbackItemResponse)
                 .toList();
+    }
+
+    /**
+     * Loads a feedback item that belongs to the current student (as receiver),
+     * or throws 404 so we never reveal or mutate someone else's feedback.
+     */
+    private Feedback getOwnedFeedback(UUID feedbackId) {
+        User user = getCurrentUser();
+        Feedback feedback = feedbackRepository.findByFeedbackId(feedbackId);
+        if (feedback == null || feedback.getReceiver() == null
+                || !user.getUserId().equals(feedback.getReceiver().getUserId())) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.NOT_FOUND, "Feedback not found");
+        }
+        return feedback;
+    }
+
+    @Transactional
+    @Override
+    public void markFeedbackRead(UUID feedbackId) {
+        Feedback feedback = getOwnedFeedback(feedbackId);
+        if (feedback.getStatus() != FeedbackStatus.READ && feedback.getStatus() != FeedbackStatus.DELETED) {
+            feedback.setStatus(FeedbackStatus.READ);
+            feedbackRepository.save(feedback);
+        }
+    }
+
+    @Transactional
+    @Override
+    public void dismissFeedback(UUID feedbackId) {
+        Feedback feedback = getOwnedFeedback(feedbackId);
+        if (feedback.getStatus() != FeedbackStatus.DELETED) {
+            feedback.setStatus(FeedbackStatus.DELETED);
+            feedbackRepository.save(feedback);
+        }
     }
 
     /**

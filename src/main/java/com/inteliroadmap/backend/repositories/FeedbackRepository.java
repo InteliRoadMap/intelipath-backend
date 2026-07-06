@@ -15,6 +15,9 @@ import java.util.UUID;
 public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     Feedback findByFeedbackId(UUID feedbackId);
     List<Feedback> findTop5ByReceiver_UserIdOrderByCreatedAtDesc(UUID receiverId);
+    // Notification inbox: newest feedback the student hasn't dismissed (status != DELETED).
+    List<Feedback> findTop5ByReceiver_UserIdAndStatusNotOrderByCreatedAtDesc(
+            UUID receiverId, com.inteliroadmap.backend.domain.enums.FeedbackStatus status);
     List<Feedback> findByReceiver(User receiver);
 
     @Query("SELECT COUNT(f) FROM Feedback f WHERE f.sender.userId = :senderId AND f.createdAt >= :since")

@@ -55,25 +55,10 @@ public class Feedback {
     @Enumerated(EnumType.STRING)
     private FeedbackType type;
 
-    // New
+    // Notification/lifecycle state: NEW (unread) -> READ, or DELETED (dismissed).
     @Column(name = "status")
     @Enumerated(EnumType.STRING)
     private FeedbackStatus status;
-
-    // Per-recipient notification state (independent of the lifecycle `status`).
-    @Column(name = "is_read", nullable = false)
-    @Builder.Default
-    private boolean read = false;
-
-    @Column(name = "read_at")
-    private LocalDateTime readAt;
-
-    @Column(name = "is_dismissed", nullable = false)
-    @Builder.Default
-    private boolean dismissed = false;
-
-    @Column(name = "dismissed_at")
-    private LocalDateTime dismissedAt;
 
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;

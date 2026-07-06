@@ -105,10 +105,10 @@ public class FeedbackServiceImpl implements FeedbackService {
             throw new ResourceNotFoundException("Feedback not found");
         }
         
-        // Update feedback properties
+        // Update feedback properties (updated_at is bumped automatically; the
+        // read/unread status is preserved).
         feedback.setContent(request.getContent());
         feedback.setType(request.getType());
-        feedback.setStatus(FeedbackStatus.UPDATED);
 
         log.info("FeedbackServiceImpl: Feedback updated successfully");
         // Save the modifications

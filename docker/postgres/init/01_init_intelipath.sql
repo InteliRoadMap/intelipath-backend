@@ -260,18 +260,15 @@ CREATE TABLE IF NOT EXISTS feedback (
     sender_name VARCHAR(255),
     content     TEXT,
     type        VARCHAR(30) DEFAULT 'GENERAL',
+    -- status doubles as the recipient's notification state:
+    --   NEW = unread, READ = read, DELETED = dismissed/soft-deleted
     status      VARCHAR(30) DEFAULT 'NEW',
-    -- Per-recipient notification state (independent of the lifecycle `status`)
-    is_read       BOOLEAN NOT NULL DEFAULT FALSE,
-    read_at       TIMESTAMP,
-    is_dismissed  BOOLEAN NOT NULL DEFAULT FALSE,
-    dismissed_at  TIMESTAMP,
     created_at  TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMP NOT NULL DEFAULT NOW(),
     CONSTRAINT ck_feedback_type
         CHECK (type IS NULL OR type IN ('GENERAL', 'SKILL', 'CAREER', 'PORTFOLIO')),
     CONSTRAINT ck_feedback_status
-        CHECK (status IS NULL OR status IN ('NEW', 'READ', 'UPDATED', 'DELETED')),
+        CHECK (status IS NULL OR status IN ('NEW', 'READ', 'DELETED')),
     CONSTRAINT fk_fb_sender
         FOREIGN KEY (sender_id) REFERENCES users (user_id) ON DELETE CASCADE,
     CONSTRAINT fk_fb_receiver
@@ -489,7 +486,7 @@ CREATE INDEX IF NOT EXISTS idx_portfolio_configs_user_id         ON portfolio_co
 CREATE INDEX IF NOT EXISTS idx_student_education_user_id         ON student_education (user_id);
 CREATE INDEX IF NOT EXISTS idx_feedback_sender_id                ON feedback (sender_id);
 CREATE INDEX IF NOT EXISTS idx_feedback_receiver_id              ON feedback (receiver_id);
-CREATE INDEX IF NOT EXISTS idx_feedback_receiver_inbox           ON feedback (receiver_id, is_read) WHERE is_dismissed = FALSE;
+CREATE INDEX IF NOT EXISTS idx_feedback_receiver_status          ON feedback (receiver_id, status);
 CREATE INDEX IF NOT EXISTS idx_prr_student_id                    ON portfolio_review_requests (student_id);
 CREATE INDEX IF NOT EXISTS idx_skill_trends_skill_id             ON skill_trends (skill_id);
 CREATE INDEX IF NOT EXISTS idx_sse_user_id                       ON student_skill_evidence (user_id);
