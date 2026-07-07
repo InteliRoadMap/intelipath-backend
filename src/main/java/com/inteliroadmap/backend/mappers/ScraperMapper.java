@@ -21,31 +21,41 @@ public class ScraperMapper {
                 .build();
     }
 
+    /** Safe String read from a JSONB map. */
+    public static String str(Map<String, Object> map, String key) {
+        Object v = map != null ? map.get(key) : null;
+        return v != null ? v.toString() : null;
+    }
+
     public CompanyResponse toCompanyResponse(Company company) {
+        Map<String, Object> sig = company.getSignatures();
+        Map<String, Object> infos = company.getInfos();
         return CompanyResponse.builder()
                 .companyId(company.getTopCvCompanyId())
-                .companyLink(company.getCompanyLink())
-                .name(company.getName())
-                .logo(company.getLogo())
-                .introductions(company.getInfo() != null ? (java.util.List<String>) company.getInfo().get("introduction") : null)
-                .infos(company.getInfo())
-                .contacts(company.getContact())
+                .companyLink(str(sig, "link"))
+                .name(str(sig, "name"))
+                .logo(str(sig, "logo"))
+                .introductions(null)
+                .infos(infos)
+                .contacts(str(infos, "contact") != null ? List.of(str(infos, "contact")) : null)
                 .build();
     }
 
     public RecruitmentResponse toRecruitmentResponse(Recruitment recruitment) {
+        Map<String, Object> info = recruitment.getRecruitmentInfos();
+        Map<String, Object> desc = recruitment.getDescriptions();
         return RecruitmentResponse.builder()
                 .topCvRecruitmentId(recruitment.getTopCvRecruitmentId())
-                .recruitmentLink(recruitment.getRecruitmentLink())
-                .title(recruitment.getBasicInfo() != null ? (String) recruitment.getBasicInfo().get("title") : null)
-                .salary(recruitment.getBasicInfo() != null ? (String) recruitment.getBasicInfo().get("salary") : null)
-                .location(recruitment.getBasicInfo() != null ? (String) recruitment.getBasicInfo().get("location") : null)
-                .experience(recruitment.getBasicInfo() != null ? (String) recruitment.getBasicInfo().get("experience") : null)
+                .recruitmentLink(str(info, "link"))
+                .title(str(info, "title"))
+                .salary(str(info, "salary"))
+                .location(str(info, "location"))
+                .experience(str(info, "experience"))
                 .applicationDeadline(recruitment.getApplicationDeadline())
-                .tags(recruitment.getDescriptions() != null ? recruitment.getDescriptions().get("tags") : null)
-                .descriptions(recruitment.getDescriptions() != null ? recruitment.getDescriptions() : null)
-                .generalInfos(recruitment.getDescriptions() != null ? recruitment.getDescriptions().get("generalInfos") : null)
-                .relatedTags(recruitment.getDescriptions() != null ? recruitment.getDescriptions().get("relatedTags") : null)
+                .tags(desc != null ? desc.get("tags") : null)
+                .descriptions(desc)
+                .generalInfos(desc != null ? desc.get("general_infos") : null)
+                .relatedTags(desc != null ? desc.get("related_tags") : null)
                 .build();
     }
 }

@@ -391,33 +391,28 @@ CREATE TABLE IF NOT EXISTS rag_documents (
 -- Recruitment processed cache
 -- ============================================================
 
-CREATE TABLE IF NOT EXISTS processed_companies (
-    company_id   VARCHAR(255) PRIMARY KEY,
-    company_link TEXT,
-    logo         TEXT,
-    name         TEXT,
-    info         JSONB,
-    contact      JSONB
+CREATE TABLE IF NOT EXISTS companies (
+    company_id  VARCHAR(255) PRIMARY KEY,
+    signatures  JSONB,
+    infos       JSONB
 );
 
-CREATE TABLE IF NOT EXISTS processed_recruitments (
+CREATE TABLE IF NOT EXISTS recruitments (
     recruitment_id       VARCHAR(255) PRIMARY KEY,
-    recruitment_link     TEXT,
-    basic_info           JSONB,
+    recruitment_infos    JSONB,
     descriptions         JSONB,
     application_deadline DATE
 );
 
-CREATE TABLE IF NOT EXISTS processed_recruitment_posts (
+CREATE TABLE IF NOT EXISTS recruitment_posts (
     post_id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id     VARCHAR(255) NOT NULL,
     recruitment_id VARCHAR(255) NOT NULL,
     expired_at     DATE,
-    CONSTRAINT uq_processed_recruitment_post UNIQUE (company_id, recruitment_id),
     CONSTRAINT fk_rp_company
-        FOREIGN KEY (company_id) REFERENCES processed_companies (company_id) ON DELETE CASCADE,
+        FOREIGN KEY (company_id) REFERENCES companies (company_id) ON DELETE CASCADE,
     CONSTRAINT fk_rp_recruitment
-        FOREIGN KEY (recruitment_id) REFERENCES processed_recruitments (recruitment_id) ON DELETE CASCADE
+        FOREIGN KEY (recruitment_id) REFERENCES recruitments (recruitment_id) ON DELETE CASCADE
 );
 
 -- ============================================================
@@ -498,8 +493,8 @@ CREATE INDEX IF NOT EXISTS idx_rr_recommend_career_id            ON roadmap_reco
 CREATE INDEX IF NOT EXISTS idx_rri_recommendation_id             ON roadmap_recommendation_items (recommendation_id);
 CREATE INDEX IF NOT EXISTS idx_rri_node_id                       ON roadmap_recommendation_items (node_id);
 CREATE INDEX IF NOT EXISTS idx_rag_documents_owner_source        ON rag_documents (owner_user_id, source_type);
-CREATE INDEX IF NOT EXISTS idx_recruitment_posts_company_id      ON processed_recruitment_posts (company_id);
-CREATE INDEX IF NOT EXISTS idx_recruitment_posts_recruitment_id  ON processed_recruitment_posts (recruitment_id);
+CREATE INDEX IF NOT EXISTS idx_recruitment_posts_company_id      ON recruitment_posts (company_id);
+CREATE INDEX IF NOT EXISTS idx_recruitment_posts_recruitment_id  ON recruitment_posts (recruitment_id);
 CREATE INDEX IF NOT EXISTS idx_oauth_accounts_user_id            ON oauth_accounts (user_id);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id            ON refresh_tokens (user_id);
 CREATE INDEX IF NOT EXISTS idx_chat_sessions_user_id             ON chat_sessions (user_id);

@@ -16,11 +16,12 @@ public class MarketTrendMapper {
         if (company == null) {
             return null;
         }
+        var sig = company.getSignatures();
         return MarketTrendResponse.CompanyTrendResponse.builder()
                 .topCvCompanyId(company.getTopCvCompanyId())
-                .name(company.getName())
-                .logo(company.getLogo())
-                .companyLink(company.getCompanyLink())
+                .name(ScraperMapper.str(sig, "name"))
+                .logo(ScraperMapper.str(sig, "logo"))
+                .companyLink(ScraperMapper.str(sig, "link"))
                 .recruitmentCount(0)
                 .build();
     }

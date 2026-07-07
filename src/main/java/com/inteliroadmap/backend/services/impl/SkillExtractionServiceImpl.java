@@ -65,7 +65,7 @@ public class SkillExtractionServiceImpl implements SkillExtractionService {
         for (Recruitment r : recruitments) {
             StringBuilder descBuilder = new StringBuilder();
             // Append title to the description
-            String title = r.getBasicInfo() != null ? (String) r.getBasicInfo().get("title") : null;
+            String title = com.inteliroadmap.backend.mappers.ScraperMapper.str(r.getRecruitmentInfos(), "title");
             if (title != null) {
                 descBuilder.append(title).append(". ");
             }

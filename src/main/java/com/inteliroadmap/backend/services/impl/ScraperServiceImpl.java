@@ -1,5 +1,6 @@
 package com.inteliroadmap.backend.services.impl;
 
+import static com.inteliroadmap.backend.mappers.ScraperMapper.str;
 import com.inteliroadmap.backend.domain.dto.response.CompanyResponse;
 import com.inteliroadmap.backend.domain.dto.response.RecruitmentPostDto;
 import com.inteliroadmap.backend.domain.dto.response.RecruitmentResponse;
@@ -56,28 +57,28 @@ public class ScraperServiceImpl implements ScraperService {
 
             // Build company DTO
             RecruitmentPostDto.CompanyDto companyDto = RecruitmentPostDto.CompanyDto.builder()
-                    .name(company.getName())
-                    .logo(company.getLogo())
-                    .companyLink(company.getCompanyLink())
+                    .name(str(company.getSignatures(), "name"))
+                    .logo(str(company.getSignatures(), "logo"))
+                    .companyLink(str(company.getSignatures(), "link"))
                     .build();
 
-            // Flatten the map of tags into a single list
+            // descriptions.tags is an AI-summarised string (older data may hold a map/list).
             List<String> flattenedTags = new ArrayList<>();
-            if (recruitment.getDescriptions() != null && recruitment.getDescriptions().get("tags") != null) {
-                Map<String, List<String>> tagsMap = (Map<String, List<String>>) recruitment.getDescriptions().get("tags");
-                for (List<String> tagList : tagsMap.values()) {
-                    if (tagList != null) {
-                        flattenedTags.addAll(tagList);
-                    }
+            Object tagsObj = recruitment.getDescriptions() != null ? recruitment.getDescriptions().get("tags") : null;
+            if (tagsObj instanceof String s && !s.isBlank()) {
+                flattenedTags.add(s);
+            } else if (tagsObj instanceof List<?> list) {
+                for (Object t : list) {
+                    if (t != null) flattenedTags.add(t.toString());
                 }
             }
 
             // Build recruitment DTO
             RecruitmentPostDto.RecruitmentDto recruitmentDto = RecruitmentPostDto.RecruitmentDto.builder()
-                    .title(recruitment.getBasicInfo() != null ? (String) recruitment.getBasicInfo().get("title") : null)
-                    .salary(recruitment.getBasicInfo() != null ? (String) recruitment.getBasicInfo().get("salary") : null)
-                    .location(recruitment.getBasicInfo() != null ? (String) recruitment.getBasicInfo().get("location") : null)
-                    .experience(recruitment.getBasicInfo() != null ? (String) recruitment.getBasicInfo().get("experience") : null)
+                    .title(str(recruitment.getRecruitmentInfos(), "title"))
+                    .salary(str(recruitment.getRecruitmentInfos(), "salary"))
+                    .location(str(recruitment.getRecruitmentInfos(), "location"))
+                    .experience(str(recruitment.getRecruitmentInfos(), "experience"))
                     .applicationDeadline(recruitment.getApplicationDeadline())
                     .tags(flattenedTags)
                     .build();
@@ -114,12 +115,12 @@ public class ScraperServiceImpl implements ScraperService {
         log.info("ScraperServiceImpl: Company Infos Retrieved");
         return CompanyResponse.builder()
                 .companyId(company.getTopCvCompanyId())
-                .companyLink(company.getCompanyLink())
-                .name(company.getName())
-                .logo(company.getLogo())
-                .introductions(company.getInfo() != null ? (List<String>) company.getInfo().get("introduction") : null)
-                .infos(company.getInfo())
-                .contacts(company.getContact())
+                .companyLink(str(company.getSignatures(), "link"))
+                .name(str(company.getSignatures(), "name"))
+                .logo(str(company.getSignatures(), "logo"))
+                .introductions(null)
+                .infos(company.getInfos())
+                .contacts(str(company.getInfos(), "contact") != null ? List.of(str(company.getInfos(), "contact")) : null)
                 .build();
     }
 
@@ -141,16 +142,16 @@ public class ScraperServiceImpl implements ScraperService {
         log.info("ScraperServiceImpl: Recruitment Infos Retrieved");
         return RecruitmentResponse.builder()
                 .topCvRecruitmentId(recruitment.getTopCvRecruitmentId())
-                .recruitmentLink(recruitment.getRecruitmentLink())
-                .title(recruitment.getBasicInfo() != null ? (String) recruitment.getBasicInfo().get("title") : null)
-                .salary(recruitment.getBasicInfo() != null ? (String) recruitment.getBasicInfo().get("salary") : null)
-                .location(recruitment.getBasicInfo() != null ? (String) recruitment.getBasicInfo().get("location") : null)
-                .experience(recruitment.getBasicInfo() != null ? (String) recruitment.getBasicInfo().get("experience") : null)
+                .recruitmentLink(str(recruitment.getRecruitmentInfos(), "link"))
+                .title(str(recruitment.getRecruitmentInfos(), "title"))
+                .salary(str(recruitment.getRecruitmentInfos(), "salary"))
+                .location(str(recruitment.getRecruitmentInfos(), "location"))
+                .experience(str(recruitment.getRecruitmentInfos(), "experience"))
                 .applicationDeadline(recruitment.getApplicationDeadline())
                 .tags(recruitment.getDescriptions() != null ? recruitment.getDescriptions().get("tags") : null)
-                .descriptions(recruitment.getDescriptions() != null ? recruitment.getDescriptions() : null)
-                .generalInfos(recruitment.getDescriptions() != null ? recruitment.getDescriptions().get("generalInfos") : null)
-                .relatedTags(recruitment.getDescriptions() != null ? recruitment.getDescriptions().get("relatedTags") : null)
+                .descriptions(recruitment.getDescriptions())
+                .generalInfos(recruitment.getDescriptions() != null ? recruitment.getDescriptions().get("general_infos") : null)
+                .relatedTags(recruitment.getDescriptions() != null ? recruitment.getDescriptions().get("related_tags") : null)
                 .build();
     }
 }
