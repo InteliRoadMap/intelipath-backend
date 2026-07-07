@@ -42,11 +42,9 @@ public class ScraperServiceImpl implements ScraperService {
     @Override
     public List<RecruitmentPostDto> getRecruitmentPosts() {
         log.info("ScraperServiceImpl: Retrieving Recruitment Posts...");
-        // Fetch all recruitment posts from the database
+        // Fetch all recruitment posts from the database. An empty result is a
+        // valid state (nothing scraped yet) -> return an empty list, not a 404.
         List<RecruitmentPost> posts = recruitmentPostRepository.findAll();
-        if(posts.isEmpty()) {
-            throw new ResourceNotFoundException("No recruitment posts found");
-        }
 
         List<RecruitmentPostDto> postDtos = new ArrayList<>();
         // Iterate through each post to build the response DTO
