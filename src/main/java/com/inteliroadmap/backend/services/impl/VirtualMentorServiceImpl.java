@@ -23,9 +23,14 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import reactor.core.publisher.Flux;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -46,6 +51,8 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
     private final JwtService jwtService;
     private final ChatClient chatClient;
     private final VectorStore vectorStore;
+    private final String systemPromptTemplate;
+    private final String ragPromptTemplate;
 
     /**
      * Constructs a VirtualMentorServiceImpl with the required dependencies.
@@ -63,15 +70,23 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
                                 StudentRepository studentRepository,
                                 UserRepository userRepository,
                                 JwtService jwtService,
-                                ChatClient.Builder chatClientBuilder,
-                                VectorStore vectorStore) {
+                                ChatClient chatClient,
+                                VectorStore vectorStore,
+                                @Value("classpath:prompts/virtual-mentor-system.st") Resource systemPrompt,
+                                @Value("classpath:prompts/virtual-mentor-rag.st") Resource ragPrompt) {
         this.chatSessionRepository = chatSessionRepository;
         this.chatMessageRepository = chatMessageRepository;
         this.studentRepository = studentRepository;
         this.userRepository = userRepository;
         this.jwtService = jwtService;
         this.vectorStore = vectorStore;
-        this.chatClient = chatClientBuilder.build();
+        this.chatClient = chatClient;
+        try {
+            this.systemPromptTemplate = systemPrompt.getContentAsString(StandardCharsets.UTF_8);
+            this.ragPromptTemplate = ragPrompt.getContentAsString(StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to load virtual mentor prompts", e);
+        }
     }
 
     /**
@@ -244,11 +259,7 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
                 // Configure Vector Store Search request to attach relevant context retrieved from embedding DB
                 .advisors(QuestionAnswerAdvisor.builder(vectorStore)
                         .searchRequest(SearchRequest.builder().build())
-                        .promptTemplate(new PromptTemplate("\n\n[OPTIONAL RETRIEVED CONTEXT]\n" +
-                        "---------------------\n" +
-                        "{question_answer_context}\n" +
-                        "---------------------\n" +
-                        "If the above context is relevant to the user's question, use it. Otherwise, ignore it and rely completely on the conversation history, the attached PDF (if any), and your own knowledge. DO NOT say you cannot answer just because the context is empty or irrelevant."))
+                        .promptTemplate(new PromptTemplate(ragPromptTemplate))
                         .build())
                 .toolNames("jobMarketTool", "studentProgressTool", "markItDownTool")
                 .stream()
@@ -274,23 +285,11 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
      * @return the constructed system prompt string
      */
     private String buildSystemPrompt(User user, Student student) {
-        StringBuilder prompt = new StringBuilder();
-        prompt.append("You are an expert AI Virtual Career Mentor for the InteliRoadMap platform.\n");
-        prompt.append("Your goal is to provide actionable, encouraging, and highly technical career advice to IT students.\n");
-        prompt.append("User Name: ").append(user.getFullName()).append("\n");
-        
-        if (student != null) {
-            prompt.append("University: ").append(student.getUniversity() != null ? student.getUniversity().getName() : "N/A").append("\n");
-            prompt.append("Major: ").append(student.getMajor() != null ? student.getMajor() : "N/A").append("\n");
-            prompt.append("GitHub Profile: ").append(student.getGithubProfile() != null ? student.getGithubProfile() : "N/A").append("\n");
-            prompt.append("Transcript Info: ").append(student.getTranscriptUrl() != null ? student.getTranscriptUrl() : "N/A").append("\n");
-            // Here we could implement the Retrieval Augmented Generation (RAG) by downloading and parsing 
-            // the transcript URL or fetching GitHub API directly.
-        }
-        
-        prompt.append("\nRespond in Markdown format. Keep your answers concise, structured, and helpful. ");
-        prompt.append("If the user asks about something unrelated to IT careers or learning paths, politely redirect them.");
-        return prompt.toString();
+        String university = student != null && student.getUniversity() != null ? student.getUniversity().getName() : "N/A";
+        String major = student != null && student.getMajor() != null ? student.getMajor() : "N/A";
+        String github = student != null && student.getGithubProfile() != null ? student.getGithubProfile() : "N/A";
+        String transcript = student != null && student.getTranscriptUrl() != null ? student.getTranscriptUrl() : "N/A";
+        return String.format(systemPromptTemplate, user.getFullName(), university, major, github, transcript);
     }
 
     /**

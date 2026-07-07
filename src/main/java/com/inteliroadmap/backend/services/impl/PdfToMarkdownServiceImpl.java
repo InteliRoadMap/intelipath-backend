@@ -79,10 +79,10 @@ public class PdfToMarkdownServiceImpl implements PdfToMarkdownService {
     /**
      * Constructor for PdfToMarkdownServiceImpl.
      *
-     * @param chatClientBuilder the builder used to construct the {@link ChatClient}
+     * @param chatClient the shared {@link ChatClient}
      */
-    public PdfToMarkdownServiceImpl(ChatClient.Builder chatClientBuilder) {
-        this.chatClient = chatClientBuilder.build();
+    public PdfToMarkdownServiceImpl(ChatClient chatClient) {
+        this.chatClient = chatClient;
     }
 
     /**
