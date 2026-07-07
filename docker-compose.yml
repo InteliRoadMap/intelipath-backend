@@ -35,6 +35,13 @@ services:
     container_name: intelipath-service
     ports:
       - "8000:8000"
+    environment:
+      # Service owns its OWN database ("scraper") on the shared Postgres server,
+      # reached over the compose network (host = postgres), not localhost.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-intelipath}:${POSTGRES_PASSWORD:-intelipath_dev_password}@postgres:5432/scraper
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8000/"]
       interval: 10s
