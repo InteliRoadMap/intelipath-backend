@@ -1,6 +1,5 @@
 package com.inteliroadmap.backend.domain.dto.request;
 
-import jakarta.validation.constraints.NotBlank;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -11,6 +10,9 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class VirtualMentorChatRequest {
-    @NotBlank(message = "Message content is required")
+    /** The user's message. May be blank when only a document is attached. */
     private String message;
+
+    /** Optional URL of a document the user attached, to be read into the prompt. */
+    private String fileUrl;
 }

@@ -1,5 +1,6 @@
 package com.inteliroadmap.backend.services.impl;
 
+import com.inteliroadmap.backend.ai.client.AiServiceClient;
 import com.inteliroadmap.backend.domain.dto.request.VirtualMentorChatRequest;
 import com.inteliroadmap.backend.domain.entity.ChatMessage;
 import com.inteliroadmap.backend.domain.entity.ChatSession;
@@ -51,8 +52,12 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
     private final JwtService jwtService;
     private final ChatClient chatClient;
     private final VectorStore vectorStore;
+    private final AiServiceClient aiServiceClient;
     private final String systemPromptTemplate;
     private final String ragPromptTemplate;
+
+    /** Cap on how much extracted document text to inject, to keep prompts bounded. */
+    private static final int MAX_ATTACHMENT_CHARS = 12000;
 
     /**
      * Constructs a VirtualMentorServiceImpl with the required dependencies.
@@ -72,6 +77,7 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
                                 JwtService jwtService,
                                 ChatClient chatClient,
                                 VectorStore vectorStore,
+                                AiServiceClient aiServiceClient,
                                 @Value("classpath:prompts/virtual-mentor-system.st") Resource systemPrompt,
                                 @Value("classpath:prompts/virtual-mentor-rag.st") Resource ragPrompt) {
         this.chatSessionRepository = chatSessionRepository;
@@ -81,6 +87,7 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
         this.jwtService = jwtService;
         this.vectorStore = vectorStore;
         this.chatClient = chatClient;
+        this.aiServiceClient = aiServiceClient;
         try {
             this.systemPromptTemplate = systemPrompt.getContentAsString(StandardCharsets.UTF_8);
             this.ragPromptTemplate = ragPrompt.getContentAsString(StandardCharsets.UTF_8);
@@ -250,12 +257,16 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
             }
         }
         
+        // If the user attached a document, read it once and inject its text so the
+        // model answers about the actual content (reliable, and no tool round-trip).
+        String userPrompt = augmentWithAttachment(request.getMessage(), request.getFileUrl());
+
         // We use StringBuffer to accumulate the full response for saving to DB asynchronously
         StringBuffer fullResponse = new StringBuffer();
 
         return chatClient.prompt()
                 .messages(messageHistory)
-                .user(request.getMessage())
+                .user(userPrompt)
                 // Configure Vector Store Search request to attach relevant context retrieved from embedding DB
                 .advisors(QuestionAnswerAdvisor.builder(vectorStore)
                         .searchRequest(SearchRequest.builder().build())
@@ -284,6 +295,34 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
      * @param student the student profile associated with the user, if any
      * @return the constructed system prompt string
      */
+    /**
+     * If a document was attached, read its text via the AI service once and append
+     * it to the user's message so the model can answer about the real content.
+     * Falls back gracefully (keeps the original message) if extraction fails.
+     */
+    private String augmentWithAttachment(String message, String fileUrl) {
+        String base = message == null ? "" : message;
+        if (fileUrl == null || fileUrl.isBlank()) {
+            return base;
+        }
+        try {
+            String docText = aiServiceClient.extractMarkdown(fileUrl);
+            if (docText == null || docText.isBlank()) {
+                return base;
+            }
+            if (docText.length() > MAX_ATTACHMENT_CHARS) {
+                docText = docText.substring(0, MAX_ATTACHMENT_CHARS) + "\n...[truncated]";
+            }
+            String lead = base.isBlank() ? "Please review the attached document." : base;
+            return lead + "\n\n[Attached document content]\n" + docText;
+        } catch (Exception e) {
+            log.warn("VirtualMentorServiceImpl: failed to read attachment {}: {}", fileUrl, e.getMessage());
+            return base.isBlank()
+                    ? "The user attached a document but it could not be read. Ask them to re-upload it."
+                    : base;
+        }
+    }
+
     private String buildSystemPrompt(User user, Student student) {
         String university = student != null && student.getUniversity() != null ? student.getUniversity().getName() : "N/A";
         String major = student != null && student.getMajor() != null ? student.getMajor() : "N/A";
