@@ -12,7 +12,7 @@ import java.util.stream.Collectors;
 @Component
 public class MarketTrendMapper {
 
-    public MarketTrendResponse.CompanyTrendResponse toCompanyTrendResponse(Company company) {
+    public MarketTrendResponse.CompanyTrendResponse toCompanyTrendResponse(Company company, long recruitmentCount) {
         if (company == null) {
             return null;
         }
@@ -22,7 +22,7 @@ public class MarketTrendMapper {
                 .name(ScraperMapper.str(sig, "name"))
                 .logo(ScraperMapper.str(sig, "logo"))
                 .companyLink(ScraperMapper.str(sig, "link"))
-                .recruitmentCount(0)
+                .recruitmentCount((int) recruitmentCount)
                 .build();
     }
 
