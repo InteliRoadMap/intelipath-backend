@@ -22,6 +22,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -166,7 +167,7 @@ public class UserController {
             description = "Upload and update the avatar image for the authenticated user"
     )
     public ResponseEntity<UserResponse> updateAvatar(
-            @org.springframework.web.bind.annotation.RequestParam("file") org.springframework.web.multipart.MultipartFile file
+            @RequestParam("file") MultipartFile file
     ) {
         return ResponseEntity.ok(userService.updateAvatar(file));
     }

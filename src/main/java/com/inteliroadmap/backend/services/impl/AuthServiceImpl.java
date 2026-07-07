@@ -98,7 +98,7 @@ public class AuthServiceImpl implements AuthService {
 
         RefreshToken newStoredToken = RefreshToken.builder()
                 .token(newRefreshToken)
-                .user(com.inteliroadmap.backend.domain.entity.User.builder().userId(user.getUserId()).build())
+                .user(User.builder().userId(user.getUserId()).build())
                 .expiredAt(LocalDateTime.now().plus(Duration.ofMillis(jwtService.getRefreshExpiration())))
                 .build();
 

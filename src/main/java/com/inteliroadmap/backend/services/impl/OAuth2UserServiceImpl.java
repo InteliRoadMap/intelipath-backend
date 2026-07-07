@@ -242,7 +242,7 @@ public class OAuth2UserServiceImpl extends DefaultOAuth2UserService {
 
         // Create a new OauthAccount record to link the external provider ID to the local user
         OauthAccount oauthAccount = OauthAccount.builder()
-                .user(com.inteliroadmap.backend.domain.entity.User.builder().userId(user.getUserId()).build())
+                .user(User.builder().userId(user.getUserId()).build())
                 .providerId(userInfo.getProviderId())
                 .providerName(provider)
                 .build();

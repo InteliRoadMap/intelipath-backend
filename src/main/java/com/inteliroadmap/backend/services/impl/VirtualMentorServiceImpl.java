@@ -27,6 +27,7 @@ import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 
 import java.io.IOException;
@@ -161,7 +162,7 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
      * @return the updated ChatSession
      * @throws ResourceNotFoundException if the session is not found or access is denied
      */
-    @org.springframework.transaction.annotation.Transactional
+    @Transactional
     @Override
     public ChatSession renameSession(String authorizationHeader, UUID sessionId, String newName) {
         User user = getAuthenticatedUser(authorizationHeader);
@@ -183,7 +184,7 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
      * @param sessionId the ID of the chat session to delete
      * @throws ResourceNotFoundException if the session is not found or access is denied
      */
-    @org.springframework.transaction.annotation.Transactional
+    @Transactional
     @Override
     public void deleteSession(String authorizationHeader, UUID sessionId) {
         User user = getAuthenticatedUser(authorizationHeader);

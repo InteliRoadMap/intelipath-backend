@@ -62,8 +62,8 @@ public class FeedbackServiceImpl implements FeedbackService {
 
         // Initialize a new Feedback entity with sender, receiver, and content details
         Feedback feedback = Feedback.builder()
-                .sender(com.inteliroadmap.backend.domain.entity.User.builder().userId(sender.getUserId()).build())
-                .receiver(com.inteliroadmap.backend.domain.entity.User.builder().userId(receiver.getUserId()).build())
+                .sender(User.builder().userId(sender.getUserId()).build())
+                .receiver(User.builder().userId(receiver.getUserId()).build())
                 .senderName(sender.getFullName())
                 .content(request.getContent())
                 .type(request.getType())

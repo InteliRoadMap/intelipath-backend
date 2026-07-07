@@ -418,7 +418,7 @@ public class RoadmapServiceImpl implements RoadmapService {
             progress = progressOptional.get();
         } else {
             progress = StudentProgress.builder()
-                    .student(com.inteliroadmap.backend.domain.entity.Student.builder().userId(student.getUserId()).build())
+                    .student(Student.builder().userId(student.getUserId()).build())
                     .skillNode(node)
                     .createdAt(LocalDateTime.now())
                     .build();
@@ -462,7 +462,7 @@ public class RoadmapServiceImpl implements RoadmapService {
 
                         if (allCompleted) {
                             StudentSkill newSkill = StudentSkill.builder()
-                                    .student(com.inteliroadmap.backend.domain.entity.Student.builder().userId(student.getUserId()).build())
+                                    .student(Student.builder().userId(student.getUserId()).build())
                                     .skill(skill)
                                     .build();
                             studentSkillRepository.save(newSkill);

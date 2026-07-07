@@ -13,7 +13,6 @@ import java.time.Duration;
 @ConfigurationProperties(prefix = "ai-service")
 public class AiServiceProperties {
 
-    /** Root URL of the AI service, e.g. {@code http://ai-service:8000}. */
     private String baseUrl = "http://localhost:8000";
 
     /** Shared secret sent as the {@code x-api-key} header on every call. */

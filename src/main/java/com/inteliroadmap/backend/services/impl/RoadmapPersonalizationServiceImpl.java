@@ -209,10 +209,6 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
                 .build();
     }
 
-    // ------------------------------------------------------------------
-    // Generation helpers
-    // ------------------------------------------------------------------
-
     /** A roadmap node the student can likely skip, with the best supporting confidence. */
     private record NodeCandidate(SkillNode node, BigDecimal confidence, String reason, List<UUID> evidenceIds) {
     }

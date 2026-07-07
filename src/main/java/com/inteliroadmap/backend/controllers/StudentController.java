@@ -26,6 +26,7 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -144,7 +145,7 @@ public class StudentController {
             )
     })
     public ResponseEntity<StudentResponse> uploadTranscript(
-            @org.springframework.web.bind.annotation.RequestParam("file") org.springframework.web.multipart.MultipartFile file
+            @RequestParam("file") MultipartFile file
     ) {
         log.info("StudentController: Student transcript upload request received");
         return ResponseEntity.ok(studentService.uploadTranscript(file));
