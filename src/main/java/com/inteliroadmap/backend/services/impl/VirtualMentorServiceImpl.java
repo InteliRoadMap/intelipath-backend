@@ -314,7 +314,7 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
                 docText = docText.substring(0, MAX_ATTACHMENT_CHARS) + "\n...[truncated]";
             }
             String lead = base.isBlank() ? "Please review the attached document." : base;
-            return lead + "\n\n[Attached document content]\n" + docText;
+            return lead + "\n\n[Attached document content — analyze it, but reply in the language of my message above]\n" + docText;
         } catch (Exception e) {
             log.warn("VirtualMentorServiceImpl: failed to read attachment {}: {}", fileUrl, e.getMessage());
             return base.isBlank()
