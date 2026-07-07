@@ -38,6 +38,9 @@ public class SkillExtractionServiceImpl implements SkillExtractionService {
     @Value("${ai.service.base-url:http://localhost:8000}")
     private String aiServiceBaseUrl;
 
+    @Value("${ai-service.api-key:}")
+    private String aiServiceApiKey;
+
     public record SkillExtractRequest(List<String> descriptions) {}
     public record SkillExtractResponse(List<List<String>> skills_per_doc) {}
 
@@ -103,9 +106,14 @@ public class SkillExtractionServiceImpl implements SkillExtractionService {
         String extractUrl = aiServiceBaseUrl + "/api/extract-skills";
         
         log.info("SkillExtractionServiceImpl: Sending {} descriptions to AI Service at: {}", descriptions.size(), extractUrl);
-        ResponseEntity<SkillExtractResponse> response = restTemplate.postForEntity(
+        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+        headers.set("x-api-key", aiServiceApiKey);
+        org.springframework.http.HttpEntity<SkillExtractRequest> entity =
+                new org.springframework.http.HttpEntity<>(new SkillExtractRequest(descriptions), headers);
+        ResponseEntity<SkillExtractResponse> response = restTemplate.exchange(
                 extractUrl,
-                new SkillExtractRequest(descriptions),
+                org.springframework.http.HttpMethod.POST,
+                entity,
                 SkillExtractResponse.class
         );
 

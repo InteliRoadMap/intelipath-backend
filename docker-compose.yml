@@ -35,6 +35,10 @@ services:
     container_name: intelipath-service
     ports:
       - "8000:8000"
+    env_file:
+      # Service secrets (SERVICE_API_KEY, LLM_API_KEY, ...). DATABASE_URL below
+      # overrides the one in .env (localhost) with the compose network host.
+      - ../intelipath-service/.env
     environment:
       # Service owns its OWN database ("scraper") on the shared Postgres server,
       # reached over the compose network (host = postgres), not localhost.

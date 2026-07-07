@@ -36,6 +36,9 @@ public class JobScrapingScheduler {
     @Value("${SCRAPER_LIMIT:20}")
     private int scraperLimit;
 
+    @Value("${ai-service.api-key:}")
+    private String aiServiceApiKey;
+
     private final RestTemplate restTemplate = new RestTemplate();
     private final CompanyRepository companyRepository;
     private final RecruitmentRepository recruitmentRepository;
@@ -51,7 +54,14 @@ public class JobScrapingScheduler {
         log.info("JobScrapingScheduler: Triggering Python Scraper API at {}", pythonApiUrl);
 
         try {
-            ScraperResponseDto response = restTemplate.getForObject(pythonApiUrl, ScraperResponseDto.class);
+            org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
+            headers.set("x-api-key", aiServiceApiKey);
+            ScraperResponseDto response = restTemplate.exchange(
+                    pythonApiUrl,
+                    org.springframework.http.HttpMethod.GET,
+                    new org.springframework.http.HttpEntity<>(headers),
+                    ScraperResponseDto.class
+            ).getBody();
             if (response == null) {
                 log.warn("JobScrapingScheduler: Received empty response from Scraper API");
                 return;
