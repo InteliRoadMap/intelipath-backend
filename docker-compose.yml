@@ -78,8 +78,6 @@ services:
       DB_USERNAME: ${POSTGRES_USER:-intelipath}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-intelipath_dev_password}
       AI_SERVICE_BASE_URL: http://ai-service:8000
-      AI_SERVICE_URL: http://ai-service:8000/api/extract
-      SCRAPER_API: http://ai-service:8000/api/v1/scraper/scrape/topcv/
       MCP_DOCUMENT_SERVICE_ENABLED: "true"
       MCP_DOCUMENT_SERVICE_URL: http://ai-service:8000
     depends_on:

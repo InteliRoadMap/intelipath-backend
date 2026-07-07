@@ -3,12 +3,10 @@ package com.inteliroadmap.backend.scheduler;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.context.event.EventListener;
-import org.springframework.core.metrics.ApplicationStartup;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 
+import com.inteliroadmap.backend.ai.client.AiServiceClient;
 import com.inteliroadmap.backend.domain.dto.response.scraper.ScraperResponseDto;
 import com.inteliroadmap.backend.domain.dto.response.scraper.ScrapedCompanyDto;
 import com.inteliroadmap.backend.domain.dto.response.scraper.ScrapedRecruitmentDto;
@@ -30,16 +28,10 @@ import java.util.Optional;
 @Slf4j
 public class JobScrapingScheduler {
 
-    @Value("${SCRAPER_API}")
-    private String scraperTopCVApi;
-
     @Value("${SCRAPER_LIMIT:20}")
     private int scraperLimit;
 
-    @Value("${ai-service.api-key:}")
-    private String aiServiceApiKey;
-
-    private final RestTemplate restTemplate = new RestTemplate();
+    private final AiServiceClient aiServiceClient;
     private final CompanyRepository companyRepository;
     private final RecruitmentRepository recruitmentRepository;
     private final RecruitmentPostRepository recruitmentPostRepository;
@@ -49,19 +41,11 @@ public class JobScrapingScheduler {
 //    @EventListener(org.springframework.boot.context.event.ApplicationReadyEvent.class)
     @Transactional
     public void fetchJobsFromPython() {
-        int limit = scraperLimit; // Define a default limit or configure it
-        String pythonApiUrl = scraperTopCVApi + limit;
-        log.info("JobScrapingScheduler: Triggering Python Scraper API at {}", pythonApiUrl);
+        int limit = scraperLimit;
+        log.info("JobScrapingScheduler: Triggering TopCV scrape via AI service (limit={})", limit);
 
         try {
-            org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
-            headers.set("x-api-key", aiServiceApiKey);
-            ScraperResponseDto response = restTemplate.exchange(
-                    pythonApiUrl,
-                    org.springframework.http.HttpMethod.GET,
-                    new org.springframework.http.HttpEntity<>(headers),
-                    ScraperResponseDto.class
-            ).getBody();
+            ScraperResponseDto response = aiServiceClient.triggerTopCvScrape(limit);
             if (response == null) {
                 log.warn("JobScrapingScheduler: Received empty response from Scraper API");
                 return;

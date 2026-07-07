@@ -1,5 +1,6 @@
 package com.inteliroadmap.backend.services.impl;
 
+import com.inteliroadmap.backend.ai.client.AiServiceClient;
 import com.inteliroadmap.backend.domain.entity.Recruitment;
 import com.inteliroadmap.backend.domain.entity.Skill;
 import com.inteliroadmap.backend.domain.entity.SkillTrend;
@@ -9,11 +10,8 @@ import com.inteliroadmap.backend.repositories.SkillTrendRepository;
 import com.inteliroadmap.backend.services.SkillExtractionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -34,15 +32,7 @@ public class SkillExtractionServiceImpl implements SkillExtractionService {
     private final RecruitmentRepository recruitmentRepository;
     private final SkillRepository skillRepository;
     private final SkillTrendRepository skillTrendRepository;
-
-    @Value("${ai.service.base-url:http://localhost:8000}")
-    private String aiServiceBaseUrl;
-
-    @Value("${ai-service.api-key:}")
-    private String aiServiceApiKey;
-
-    public record SkillExtractRequest(List<String> descriptions) {}
-    public record SkillExtractResponse(List<List<String>> skills_per_doc) {}
+    private final AiServiceClient aiServiceClient;
 
     /**
      * Extracts skills from recruitment descriptions using an external AI service
@@ -102,27 +92,12 @@ public class SkillExtractionServiceImpl implements SkillExtractionService {
             dates.add(date);
         }
 
-        RestTemplate restTemplate = new RestTemplate();
-        String extractUrl = aiServiceBaseUrl + "/api/extract-skills";
-        
-        log.info("SkillExtractionServiceImpl: Sending {} descriptions to AI Service at: {}", descriptions.size(), extractUrl);
-        org.springframework.http.HttpHeaders headers = new org.springframework.http.HttpHeaders();
-        headers.set("x-api-key", aiServiceApiKey);
-        org.springframework.http.HttpEntity<SkillExtractRequest> entity =
-                new org.springframework.http.HttpEntity<>(new SkillExtractRequest(descriptions), headers);
-        ResponseEntity<SkillExtractResponse> response = restTemplate.exchange(
-                extractUrl,
-                org.springframework.http.HttpMethod.POST,
-                entity,
-                SkillExtractResponse.class
-        );
-
-        if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
-            log.error("SkillExtractionServiceImpl: Error occurred while calling AI Service.");
+        log.info("SkillExtractionServiceImpl: Sending {} descriptions to AI Service", descriptions.size());
+        List<List<String>> extractedSkills = aiServiceClient.extractSkills(descriptions);
+        if (extractedSkills.isEmpty()) {
+            log.warn("SkillExtractionServiceImpl: AI Service returned no skills; nothing to rebuild.");
             return;
         }
-
-        List<List<String>> extractedSkills = response.getBody().skills_per_doc();
         log.info("SkillExtractionServiceImpl: AI Service extraction completed successfully.");
 
         // 3. Group by (SkillName, Date) -> Count

@@ -12,17 +12,14 @@ import com.inteliroadmap.backend.repositories.CareerRoleRepository;
 import com.inteliroadmap.backend.repositories.SkillNodeRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.security.JwtService;
+import com.inteliroadmap.backend.ai.client.AiServiceClient;
 import com.inteliroadmap.backend.services.AdminService;
 import com.inteliroadmap.backend.utils.BearerTokenUtil;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import com.zaxxer.hikari.HikariDataSource;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.ResponseEntity;
-import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
 
 import javax.sql.DataSource;
 import java.lang.management.ManagementFactory;
@@ -48,9 +45,7 @@ public class AdminServiceImpl implements AdminService {
     private final JwtService  jwtService;
     private final AdminMapper adminMapper;
     private final DataSource dataSource;
-
-    @Value("${ai.service.base-url:http://localhost:8000}")
-    private String aiServiceBaseUrl;
+    private final AiServiceClient aiServiceClient;
 
     /**
      * Retrieves the total users metric for the admin dashboard.
@@ -128,7 +123,7 @@ public class AdminServiceImpl implements AdminService {
         services.add(new AdminSystemHealthResponse.ServiceStatus("Database", dbUp));
 
         // AI Service: ping its root endpoint with a short timeout.
-        services.add(new AdminSystemHealthResponse.ServiceStatus("AI Service", pingAiService()));
+        services.add(new AdminSystemHealthResponse.ServiceStatus("AI Service", aiServiceClient.isHealthy()));
 
         int up = (int) services.stream()
                 .filter(AdminSystemHealthResponse.ServiceStatus::isUp)
@@ -169,21 +164,6 @@ public class AdminServiceImpl implements AdminService {
             log.warn("AdminServiceImpl: Could not read DB pool stats: {}", e.getMessage());
         }
         return null;
-    }
-
-    /** Ping the AI service root with short timeouts so a slow/down service never hangs the dashboard. */
-    private boolean pingAiService() {
-        try {
-            SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
-            factory.setConnectTimeout(1500);
-            factory.setReadTimeout(1500);
-            RestTemplate restTemplate = new RestTemplate(factory);
-            ResponseEntity<String> response = restTemplate.getForEntity(aiServiceBaseUrl + "/", String.class);
-            return response.getStatusCode().is2xxSuccessful();
-        } catch (Exception e) {
-            log.warn("AdminServiceImpl: AI service health check failed: {}", e.getMessage());
-            return false;
-        }
     }
 
     /**
