@@ -1,4 +1,4 @@
-package com.inteliroadmap.backend.domain.dto.response;
+package com.inteliroadmap.backend.domain.dto.response.student;
 
 import lombok.AllArgsConstructor;
 import lombok.Builder;

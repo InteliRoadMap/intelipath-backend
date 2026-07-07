@@ -2,7 +2,7 @@ package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.domain.dto.request.CreateFeedbackRequest;
 import com.inteliroadmap.backend.domain.dto.request.ModifyFeedbackRequest;
-import com.inteliroadmap.backend.domain.dto.response.FeedbackResponse;
+import com.inteliroadmap.backend.domain.dto.response.counselor.FeedbackResponse;
 import com.inteliroadmap.backend.domain.entity.Feedback;
 import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.domain.enums.FeedbackStatus;

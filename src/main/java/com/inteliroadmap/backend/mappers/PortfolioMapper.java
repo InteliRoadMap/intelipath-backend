@@ -1,7 +1,7 @@
 package com.inteliroadmap.backend.mappers;
 
 import com.inteliroadmap.backend.domain.dto.request.PortfolioUpsertRequest;
-import com.inteliroadmap.backend.domain.dto.response.PortfolioResponse;
+import com.inteliroadmap.backend.domain.dto.response.portfolio.PortfolioResponse;
 import com.inteliroadmap.backend.domain.entity.PortfolioConfig;
 import com.inteliroadmap.backend.domain.entity.PortfolioProject;
 import com.inteliroadmap.backend.domain.entity.Skill;

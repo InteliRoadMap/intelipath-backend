@@ -1,7 +1,7 @@
 package com.inteliroadmap.backend.services;
 
-import com.inteliroadmap.backend.domain.dto.response.SkillResponse;
-import com.inteliroadmap.backend.domain.dto.response.StudentResponse;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.SkillResponse;
+import com.inteliroadmap.backend.domain.dto.response.student.StudentResponse;
 import com.inteliroadmap.backend.domain.entity.*;
 import org.springframework.web.multipart.MultipartFile;
 

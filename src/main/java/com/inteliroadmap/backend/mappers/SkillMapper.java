@@ -1,7 +1,7 @@
 package com.inteliroadmap.backend.mappers;
 
-import com.inteliroadmap.backend.domain.dto.response.RequiredSkillResponse;
-import com.inteliroadmap.backend.domain.dto.response.SkillItemResponse;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.RequiredSkillResponse;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.SkillItemResponse;
 import com.inteliroadmap.backend.domain.entity.CareerRequiredSkill;
 import com.inteliroadmap.backend.domain.entity.CareerRole;
 import com.inteliroadmap.backend.domain.entity.Skill;

@@ -2,9 +2,9 @@ package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.components.RoadmapProgressCalculator;
 import com.inteliroadmap.backend.domain.dto.request.SetupStudentProfileRequest;
-import com.inteliroadmap.backend.domain.dto.response.RequiredSkillResponse;
-import com.inteliroadmap.backend.domain.dto.response.SkillResponse;
-import com.inteliroadmap.backend.domain.dto.response.StudentResponse;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.RequiredSkillResponse;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.SkillResponse;
+import com.inteliroadmap.backend.domain.dto.response.student.StudentResponse;
 import com.inteliroadmap.backend.domain.entity.CareerRequiredSkill;
 import com.inteliroadmap.backend.domain.entity.CareerRole;
 import com.inteliroadmap.backend.domain.entity.RagDocument;

@@ -2,9 +2,9 @@ package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.components.RoadmapProgressCalculator;
 import com.inteliroadmap.backend.domain.dto.request.UpdateProfileRequest;
-import com.inteliroadmap.backend.domain.dto.response.CounselorResponse;
+import com.inteliroadmap.backend.domain.dto.response.counselor.CounselorResponse;
 import com.inteliroadmap.backend.domain.projection.StudentInfoProjection;
-import com.inteliroadmap.backend.domain.dto.response.UpdateProfileResponse;
+import com.inteliroadmap.backend.domain.dto.response.student.UpdateProfileResponse;
 import com.inteliroadmap.backend.domain.entity.AcademicCounselor;
 import com.inteliroadmap.backend.domain.entity.CareerRole;
 import com.inteliroadmap.backend.domain.entity.Feedback;

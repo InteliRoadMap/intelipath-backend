@@ -2,7 +2,7 @@ package com.inteliroadmap.backend.services;
 
 import com.inteliroadmap.backend.domain.dto.request.CompareStRmSkillRequest;
 import com.inteliroadmap.backend.domain.dto.request.ImportSkillsRequest;
-import com.inteliroadmap.backend.domain.dto.response.SkillResponse;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.SkillResponse;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.services.AuthenticatedStudentService;
 import com.inteliroadmap.backend.mappers.SkillMapper;

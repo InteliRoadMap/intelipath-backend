@@ -2,7 +2,7 @@ package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.domain.dto.request.SetupUserProfileRequest;
 import com.inteliroadmap.backend.domain.dto.request.UserRequest;
-import com.inteliroadmap.backend.domain.dto.response.UserResponse;
+import com.inteliroadmap.backend.domain.dto.response.auth.UserResponse;
 import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.mappers.UserMapper;

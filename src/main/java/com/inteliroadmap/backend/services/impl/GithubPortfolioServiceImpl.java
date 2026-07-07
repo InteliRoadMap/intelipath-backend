@@ -1,7 +1,7 @@
 package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.domain.dto.request.GithubImportRequest;
-import com.inteliroadmap.backend.domain.dto.response.PortfolioResponse;
+import com.inteliroadmap.backend.domain.dto.response.portfolio.PortfolioResponse;
 import com.inteliroadmap.backend.domain.entity.Student;
 import com.inteliroadmap.backend.domain.enums.EvidenceType;
 import com.inteliroadmap.backend.clients.GithubApiClient;

@@ -1,7 +1,7 @@
 package com.inteliroadmap.backend.services;
 
 import com.inteliroadmap.backend.domain.dto.request.GithubImportRequest;
-import com.inteliroadmap.backend.domain.dto.response.PortfolioResponse;
+import com.inteliroadmap.backend.domain.dto.response.portfolio.PortfolioResponse;
 import com.inteliroadmap.backend.clients.GithubApiClient;
 import com.inteliroadmap.backend.ai.analyzer.PortfolioAiAnalyzer;
 import com.inteliroadmap.backend.services.GithubPortfolioService;

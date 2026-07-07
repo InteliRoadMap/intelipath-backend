@@ -1,7 +1,7 @@
 package com.inteliroadmap.backend.controllers;
 
 import com.inteliroadmap.backend.domain.dto.request.CreateFeedbackRequest;
-import com.inteliroadmap.backend.domain.dto.response.MentorResponse;
+import com.inteliroadmap.backend.domain.dto.response.mentor.MentorResponse;
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorCareerDistributionResponse;
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorDashboardMetrics;
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorFeedbackHistoryDto;

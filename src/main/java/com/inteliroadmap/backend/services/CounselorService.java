@@ -1,9 +1,9 @@
 package com.inteliroadmap.backend.services;
 
 import com.inteliroadmap.backend.domain.dto.request.UpdateProfileRequest;
-import com.inteliroadmap.backend.domain.dto.response.CounselorResponse;
+import com.inteliroadmap.backend.domain.dto.response.counselor.CounselorResponse;
 import com.inteliroadmap.backend.domain.projection.StudentInfoProjection;
-import com.inteliroadmap.backend.domain.dto.response.UpdateProfileResponse;
+import com.inteliroadmap.backend.domain.dto.response.student.UpdateProfileResponse;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.mappers.CounselorMapper;
 import com.inteliroadmap.backend.services.CounselorService;

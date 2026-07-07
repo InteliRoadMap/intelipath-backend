@@ -1,4 +1,4 @@
-package com.inteliroadmap.backend.domain.dto.response;
+package com.inteliroadmap.backend.domain.dto.response.counselor;
 
 import com.inteliroadmap.backend.domain.enums.FeedbackType;
 import lombok.AllArgsConstructor;

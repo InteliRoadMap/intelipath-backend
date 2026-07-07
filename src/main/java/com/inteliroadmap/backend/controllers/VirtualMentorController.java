@@ -2,8 +2,8 @@ package com.inteliroadmap.backend.controllers;
 
 import com.inteliroadmap.backend.domain.dto.request.VirtualMentorChatRequest;
 import com.inteliroadmap.backend.domain.dto.request.VirtualMentorSessionRequest;
-import com.inteliroadmap.backend.domain.dto.response.VirtualMentorMessageResponse;
-import com.inteliroadmap.backend.domain.dto.response.VirtualMentorSessionResponse;
+import com.inteliroadmap.backend.domain.dto.response.mentor.VirtualMentorMessageResponse;
+import com.inteliroadmap.backend.domain.dto.response.mentor.VirtualMentorSessionResponse;
 import com.inteliroadmap.backend.domain.entity.ChatMessage;
 import com.inteliroadmap.backend.domain.entity.ChatSession;
 import com.inteliroadmap.backend.services.SupabaseStorageService;

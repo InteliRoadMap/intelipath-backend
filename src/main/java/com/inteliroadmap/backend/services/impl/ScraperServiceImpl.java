@@ -1,9 +1,9 @@
 package com.inteliroadmap.backend.services.impl;
 
 import static com.inteliroadmap.backend.mappers.ScraperMapper.str;
-import com.inteliroadmap.backend.domain.dto.response.CompanyResponse;
-import com.inteliroadmap.backend.domain.dto.response.RecruitmentPostDto;
-import com.inteliroadmap.backend.domain.dto.response.RecruitmentResponse;
+import com.inteliroadmap.backend.domain.dto.response.scraper.CompanyResponse;
+import com.inteliroadmap.backend.domain.dto.response.scraper.RecruitmentPostDto;
+import com.inteliroadmap.backend.domain.dto.response.scraper.RecruitmentResponse;
 import com.inteliroadmap.backend.domain.entity.Company;
 import com.inteliroadmap.backend.domain.entity.Recruitment;
 import com.inteliroadmap.backend.domain.entity.RecruitmentPost;

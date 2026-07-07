@@ -1,6 +1,6 @@
 package com.inteliroadmap.backend.mappers;
 
-import com.inteliroadmap.backend.domain.dto.response.StudentResponse;
+import com.inteliroadmap.backend.domain.dto.response.student.StudentResponse;
 import com.inteliroadmap.backend.domain.entity.Student;
 import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.repositories.UserRepository;

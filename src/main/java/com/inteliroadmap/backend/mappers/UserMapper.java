@@ -1,6 +1,6 @@
 package com.inteliroadmap.backend.mappers;
 
-import com.inteliroadmap.backend.domain.dto.response.UserResponse;
+import com.inteliroadmap.backend.domain.dto.response.auth.UserResponse;
 import com.inteliroadmap.backend.domain.entity.User;
 import org.springframework.stereotype.Component;
 

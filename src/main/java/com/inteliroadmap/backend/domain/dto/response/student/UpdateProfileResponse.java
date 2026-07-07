@@ -1,4 +1,4 @@
-package com.inteliroadmap.backend.domain.dto.response;
+package com.inteliroadmap.backend.domain.dto.response.student;
 
 import com.inteliroadmap.backend.domain.entity.AcademicCounselor;
 import com.inteliroadmap.backend.domain.entity.IndustryMentor;

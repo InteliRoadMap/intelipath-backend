@@ -1,6 +1,6 @@
 package com.inteliroadmap.backend.services;
 
-import com.inteliroadmap.backend.domain.dto.response.RefreshResponse;
+import com.inteliroadmap.backend.domain.dto.response.auth.RefreshResponse;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;

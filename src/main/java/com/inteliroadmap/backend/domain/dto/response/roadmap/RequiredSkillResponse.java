@@ -1,4 +1,4 @@
-package com.inteliroadmap.backend.domain.dto.response;
+package com.inteliroadmap.backend.domain.dto.response.roadmap;
 
 import com.inteliroadmap.backend.domain.enums.ImportanceLevel;
 import lombok.AllArgsConstructor;

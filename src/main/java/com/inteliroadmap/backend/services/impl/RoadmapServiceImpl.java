@@ -3,7 +3,7 @@ package com.inteliroadmap.backend.services.impl;
 import com.inteliroadmap.backend.components.RoadmapProgressCalculator;
 import com.inteliroadmap.backend.domain.dto.request.UpdateUserProgressRequest;
 import com.inteliroadmap.backend.domain.dto.request.UpdateNodeProgressRequest;
-import com.inteliroadmap.backend.domain.dto.response.RoadmapResponse;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapNodeDto;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.SkillGapResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.StudentRoadmapResponse;
