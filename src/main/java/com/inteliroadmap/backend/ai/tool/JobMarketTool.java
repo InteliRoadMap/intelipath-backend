@@ -7,7 +7,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.annotation.Description;
 import org.springframework.stereotype.Service;
 
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -26,8 +29,8 @@ public class JobMarketTool implements Function<JobMarketTool.Request, JobMarketT
     @Override
     public Response apply(Request request) {
         log.info("JobMarketTool: AI Called JobMarketTool to search for: {}", request.keyword());
-        List<Recruitment> recruitments = recruitmentRepository.findTop10ByTitleContainingIgnoreCase(request.keyword());
-        
+        List<Recruitment> recruitments = searchJobs(request.keyword());
+
         if (recruitments.isEmpty()) {
             return new Response(List.of(), "No jobs found for keyword: " + request.keyword());
         }
@@ -44,5 +47,42 @@ public class JobMarketTool implements Function<JobMarketTool.Request, JobMarketT
 
         String summary = String.format("Found %d jobs for %s.", jobs.size(), request.keyword());
         return new Response(jobs, summary);
+    }
+
+    /**
+     * Search job titles for a keyword. First tries the whole phrase; if that
+     * finds nothing (e.g. "Tester QC" when the DB has "Manual Tester"), falls
+     * back to matching individual words and ranks results by how many words hit,
+     * so near-synonym queries still return the closest jobs.
+     */
+    private List<Recruitment> searchJobs(String keyword) {
+        String phrase = keyword == null ? "" : keyword.trim();
+        if (phrase.isEmpty()) {
+            return List.of();
+        }
+
+        List<Recruitment> exact = recruitmentRepository.findTop10ByTitleContainingIgnoreCase(phrase);
+        if (!exact.isEmpty()) {
+            return exact;
+        }
+
+        // Token fallback: match any meaningful word, rank by number of words matched.
+        Map<String, Recruitment> byId = new LinkedHashMap<>();
+        Map<String, Integer> score = new HashMap<>();
+        for (String token : phrase.split("\\s+")) {
+            if (token.length() < 2) {
+                continue; // skip noise like "QC" is length 2 -> kept; single chars dropped
+            }
+            for (Recruitment r : recruitmentRepository.findTop10ByTitleContainingIgnoreCase(token)) {
+                String id = r.getTopCvRecruitmentId();
+                byId.putIfAbsent(id, r);
+                score.merge(id, 1, Integer::sum);
+            }
+        }
+
+        return byId.values().stream()
+                .sorted((a, b) -> score.get(b.getTopCvRecruitmentId()) - score.get(a.getTopCvRecruitmentId()))
+                .limit(10)
+                .collect(Collectors.toList());
     }
 }
