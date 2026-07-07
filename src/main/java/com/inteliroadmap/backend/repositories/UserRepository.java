@@ -23,4 +23,7 @@ public interface UserRepository extends JpaRepository<User, UUID> {
 
     @Query("SELECT u FROM User u ORDER BY u.createdAt DESC")
     List<User> findAllUsers();
+
+    long countByCreatedAtAfter(java.time.LocalDateTime dateTime);
+    long countByCreatedAtBetween(java.time.LocalDateTime start, java.time.LocalDateTime end);
 }

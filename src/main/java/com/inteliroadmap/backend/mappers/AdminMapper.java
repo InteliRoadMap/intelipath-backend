@@ -1,7 +1,6 @@
 package com.inteliroadmap.backend.mappers;
 
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminCourseMetricResponse;
-import com.inteliroadmap.backend.domain.dto.response.admin.AdminSystemHealthResponse;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminUserListItemResponse;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminUserMetricResponse;
 import com.inteliroadmap.backend.domain.entity.User;
@@ -26,13 +25,6 @@ public class AdminMapper {
                 .total(total)
                 .status(status)
                 .progress(progress)
-                .build();
-    }
-
-    public AdminSystemHealthResponse toSystemHealthResponse(double uptime, String status) {
-        return AdminSystemHealthResponse.builder()
-                .uptime(uptime)
-                .status(status)
                 .build();
     }
 

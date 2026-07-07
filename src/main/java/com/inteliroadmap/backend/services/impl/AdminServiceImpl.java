@@ -9,6 +9,7 @@ import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.mappers.AdminMapper;
 import com.inteliroadmap.backend.repositories.CareerRoleRepository;
+import com.inteliroadmap.backend.repositories.SkillNodeRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.security.JwtService;
 import com.inteliroadmap.backend.services.AdminService;
@@ -16,8 +17,14 @@ import com.inteliroadmap.backend.utils.BearerTokenUtil;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
 
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -34,8 +41,12 @@ public class AdminServiceImpl implements AdminService {
 
     private final UserRepository userRepository;
     private final CareerRoleRepository careerRoleRepository;
+    private final SkillNodeRepository skillNodeRepository;
     private final JwtService  jwtService;
     private final AdminMapper adminMapper;
+
+    @Value("${ai.service.base-url:http://localhost:8000}")
+    private String aiServiceBaseUrl;
 
     /**
      * Retrieves the total users metric for the admin dashboard.
@@ -50,8 +61,15 @@ public class AdminServiceImpl implements AdminService {
 
         log.info("AdminServiceImpl: Get user metric data");
 
-        // Return user metrics with total count and a default growth percentage of 12%
-        return adminMapper.toUserMetricResponse(userRepository.count(), 12);
+        // Real month-over-month growth: sign-ups in the last 30 days vs the 30 before.
+        LocalDateTime now = LocalDateTime.now();
+        long last30 = userRepository.countByCreatedAtAfter(now.minusDays(30));
+        long prev30 = userRepository.countByCreatedAtBetween(now.minusDays(60), now.minusDays(30));
+        int growth = prev30 == 0
+                ? (last30 > 0 ? 100 : 0)
+                : (int) Math.round((last30 - prev30) * 100.0 / prev30);
+
+        return adminMapper.toUserMetricResponse(userRepository.count(), growth);
     }
 
     /**
@@ -67,11 +85,14 @@ public class AdminServiceImpl implements AdminService {
 
         log.info("AdminServiceImpl: Get course metric data");
 
-        // Retrieve total number of career roles as active courses
+        // "Courses" = career roles. Progress = how many of them actually have a
+        // roadmap built out (at least one skill node), not an arbitrary number.
         long total = careerRoleRepository.count();
+        long withRoadmap = skillNodeRepository.countDistinctCareersWithNodes();
+        int progress = total == 0 ? 0 : (int) Math.round(withRoadmap * 100.0 / total);
+        String status = total > 0 ? "ACTIVE" : "EMPTY";
 
-        // Return course metrics including total, active status, and arbitrary percentage
-        return adminMapper.toCourseMetricResponse(total, "ACTIVE", 78);
+        return adminMapper.toCourseMetricResponse(total, status, progress);
     }
 
     /**
@@ -86,8 +107,50 @@ public class AdminServiceImpl implements AdminService {
 
         log.info("AdminServiceImpl: Get system health");
 
-        // Return static system health status indicating 99.9% uptime and ONLINE status
-        return adminMapper.toSystemHealthResponse(99.9, "ONLINE");
+        List<AdminSystemHealthResponse.ServiceStatus> services = new ArrayList<>();
+
+        // API: if this request is being served, the API layer is up.
+        services.add(new AdminSystemHealthResponse.ServiceStatus("API", true));
+
+        // Database: a lightweight query proves connectivity.
+        boolean dbUp;
+        try {
+            userRepository.count();
+            dbUp = true;
+        } catch (Exception e) {
+            log.warn("AdminServiceImpl: Database health check failed: {}", e.getMessage());
+            dbUp = false;
+        }
+        services.add(new AdminSystemHealthResponse.ServiceStatus("Database", dbUp));
+
+        // AI Service: ping its root endpoint with a short timeout.
+        services.add(new AdminSystemHealthResponse.ServiceStatus("AI Service", pingAiService()));
+
+        int up = (int) services.stream()
+                .filter(AdminSystemHealthResponse.ServiceStatus::isUp)
+                .count();
+
+        return AdminSystemHealthResponse.builder()
+                .status(up == services.size() ? "Operational" : "Degraded")
+                .servicesUp(up)
+                .servicesTotal(services.size())
+                .services(services)
+                .build();
+    }
+
+    /** Ping the AI service root with short timeouts so a slow/down service never hangs the dashboard. */
+    private boolean pingAiService() {
+        try {
+            SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+            factory.setConnectTimeout(1500);
+            factory.setReadTimeout(1500);
+            RestTemplate restTemplate = new RestTemplate(factory);
+            ResponseEntity<String> response = restTemplate.getForEntity(aiServiceBaseUrl + "/", String.class);
+            return response.getStatusCode().is2xxSuccessful();
+        } catch (Exception e) {
+            log.warn("AdminServiceImpl: AI service health check failed: {}", e.getMessage());
+            return false;
+        }
     }
 
     /**
