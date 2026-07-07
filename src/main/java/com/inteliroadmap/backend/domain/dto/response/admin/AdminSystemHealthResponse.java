@@ -19,6 +19,13 @@ public class AdminSystemHealthResponse {
     // Per-dependency status so the admin can see exactly which system is down.
     private List<ServiceStatus> services;
 
+    // Extra runtime detail for the dedicated System tab.
+    private long uptimeMillis;
+    private String version;
+    private String javaVersion;
+    private DbPool db;
+    private Memory memory;
+
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
@@ -26,5 +33,25 @@ public class AdminSystemHealthResponse {
     public static class ServiceStatus {
         private String name;
         private boolean up;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class DbPool {
+        private int active;
+        private int idle;
+        private int total;
+        private int max;
+    }
+
+    @Data
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class Memory {
+        private long usedMb;
+        private long maxMb;
     }
 }

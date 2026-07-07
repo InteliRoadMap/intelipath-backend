@@ -17,12 +17,15 @@ import com.inteliroadmap.backend.utils.BearerTokenUtil;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.zaxxer.hikari.HikariDataSource;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 
+import javax.sql.DataSource;
+import java.lang.management.ManagementFactory;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -44,6 +47,7 @@ public class AdminServiceImpl implements AdminService {
     private final SkillNodeRepository skillNodeRepository;
     private final JwtService  jwtService;
     private final AdminMapper adminMapper;
+    private final DataSource dataSource;
 
     @Value("${ai.service.base-url:http://localhost:8000}")
     private String aiServiceBaseUrl;
@@ -130,12 +134,41 @@ public class AdminServiceImpl implements AdminService {
                 .filter(AdminSystemHealthResponse.ServiceStatus::isUp)
                 .count();
 
+        Runtime runtime = Runtime.getRuntime();
+        long usedMb = (runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024);
+        long maxMb = runtime.maxMemory() / (1024 * 1024);
+
+        String version = getClass().getPackage().getImplementationVersion();
+
         return AdminSystemHealthResponse.builder()
                 .status(up == services.size() ? "Operational" : "Degraded")
                 .servicesUp(up)
                 .servicesTotal(services.size())
                 .services(services)
+                .uptimeMillis(ManagementFactory.getRuntimeMXBean().getUptime())
+                .version(version != null ? version : "dev")
+                .javaVersion(System.getProperty("java.version"))
+                .db(readDbPool())
+                .memory(new AdminSystemHealthResponse.Memory(usedMb, maxMb))
                 .build();
+    }
+
+    /** Live HikariCP connection-pool stats; nulls out gracefully if unavailable. */
+    private AdminSystemHealthResponse.DbPool readDbPool() {
+        try {
+            if (dataSource instanceof HikariDataSource hikari && hikari.getHikariPoolMXBean() != null) {
+                var pool = hikari.getHikariPoolMXBean();
+                return AdminSystemHealthResponse.DbPool.builder()
+                        .active(pool.getActiveConnections())
+                        .idle(pool.getIdleConnections())
+                        .total(pool.getTotalConnections())
+                        .max(hikari.getMaximumPoolSize())
+                        .build();
+            }
+        } catch (Exception e) {
+            log.warn("AdminServiceImpl: Could not read DB pool stats: {}", e.getMessage());
+        }
+        return null;
     }
 
     /** Ping the AI service root with short timeouts so a slow/down service never hangs the dashboard. */
