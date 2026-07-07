@@ -1,6 +1,6 @@
 package com.inteliroadmap.backend.services;
 
-import com.inteliroadmap.backend.components.PortfolioAiAnalyzer.SkillMatch;
+import com.inteliroadmap.backend.ai.analyzer.PortfolioAiAnalyzer.SkillMatch;
 import com.inteliroadmap.backend.domain.enums.EvidenceType;
 
 import java.util.List;

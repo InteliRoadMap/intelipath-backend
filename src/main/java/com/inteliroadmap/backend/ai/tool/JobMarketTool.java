@@ -1,4 +1,4 @@
-package com.inteliroadmap.backend.tools;
+package com.inteliroadmap.backend.ai.tool;
 
 import com.inteliroadmap.backend.domain.entity.Recruitment;
 import com.inteliroadmap.backend.repositories.RecruitmentRepository;

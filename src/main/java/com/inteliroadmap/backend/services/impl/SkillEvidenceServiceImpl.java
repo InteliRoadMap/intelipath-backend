@@ -1,6 +1,6 @@
 package com.inteliroadmap.backend.services.impl;
 
-import com.inteliroadmap.backend.components.PortfolioAiAnalyzer.SkillMatch;
+import com.inteliroadmap.backend.ai.analyzer.PortfolioAiAnalyzer.SkillMatch;
 import com.inteliroadmap.backend.domain.entity.CareerRequiredSkill;
 import com.inteliroadmap.backend.domain.entity.Skill;
 import com.inteliroadmap.backend.domain.entity.StudentSkillEvidence;

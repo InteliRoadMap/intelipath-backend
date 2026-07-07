@@ -1,4 +1,4 @@
-package com.inteliroadmap.backend.tools;
+package com.inteliroadmap.backend.ai.tool;
 
 import com.inteliroadmap.backend.domain.dto.response.student.DashboardRoadmapProgressResponse;
 import com.inteliroadmap.backend.domain.dto.response.student.SkillGapItemResponse;
