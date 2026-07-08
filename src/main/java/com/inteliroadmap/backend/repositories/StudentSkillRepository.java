@@ -23,4 +23,7 @@ public interface StudentSkillRepository extends JpaRepository<StudentSkill, UUID
     List<String> findMissingSkillsByStudentIdAndCareerId(@Param("userId") UUID userId, @Param("careerId") UUID careerId);
 
     List<String> findSkillNamesByStudent_UserId(UUID studentId);
+
+    @Query("SELECT ss.student.userId, ss.skill.skillName FROM StudentSkill ss WHERE ss.student.userId IN :studentIds")
+    List<Object[]> findSkillNamesByStudentIds(@Param("studentIds") List<UUID> studentIds);
 }

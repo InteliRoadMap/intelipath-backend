@@ -1,6 +1,7 @@
 package com.inteliroadmap.backend.mappers;
 
 import com.inteliroadmap.backend.domain.dto.response.CounselorResponse;
+import com.inteliroadmap.backend.domain.dto.response.FeedbackAttachmentResponse;
 import com.inteliroadmap.backend.domain.dto.response.FeedbackResponse;
 import com.inteliroadmap.backend.domain.dto.response.UpdateProfileResponse;
 import com.inteliroadmap.backend.domain.entity.AcademicCounselor;
@@ -64,8 +65,20 @@ public class CounselorMapper {
                 .senderId(f.getSender().getUserId())
                 .receiverId(f.getReceiver().getUserId())
                 .senderName(f.getSenderName())
+                .receiverName(f.getReceiver().getFullName())
                 .content(f.getContent())
                 .type(f.getType())
+                .status(f.getStatus())
+                .attachments(
+                        f.getAttachments() != null ? f.getAttachments().stream()
+                                .map(att -> FeedbackAttachmentResponse.builder()
+                                        .attachmentId(att.getAttachmentId())
+                                        .fileName(att.getFileName())
+                                        .fileType(att.getFileType())
+                                        .fileSize(att.getFileSize())
+                                        .build())
+                                .collect(java.util.stream.Collectors.toList()) : new java.util.ArrayList<>()
+                )
                 .createdAt(f.getCreatedAt())
                 .updatedAt(f.getUpdatedAt())
                 .build();

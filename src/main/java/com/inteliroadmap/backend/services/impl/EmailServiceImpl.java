@@ -2,17 +2,19 @@ package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.services.EmailService;
 import com.inteliroadmap.backend.utils.EmailUtil;
+import jakarta.mail.MessagingException;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.core.io.ByteArrayResource;
 
-/**
- * Implementation of {@link EmailService} for handling email operations.
- * Currently provides functionality to send notification emails.
- */
+import java.io.IOException;
+import java.util.List;
+
 @Service
 @RequiredArgsConstructor
 @Slf4j
@@ -50,7 +52,7 @@ public class EmailServiceImpl implements EmailService {
      * @param email The recipient's email address
      */
     @Override
-    public void sendFeedbackNotificationEmail(String email, String receiverName, String senderName, String content) {
+    public void sendFeedbackNotificationEmail(String email, String receiverName, String senderName, String content, List<MultipartFile> attachments) {
         log.info("EmailServiceImpl: Preparing Feedback Notification email for {}", email);
 
         try {
@@ -64,12 +66,25 @@ public class EmailServiceImpl implements EmailService {
             helper.setSubject("You Have A Feedback Notification !!");
             helper.setText(htmlContent, true);
 
-            mailSender.send(message);
-            log.info("EmailServiceImpl: OTP email successfully sent to {}", email);
+            if (attachments != null && !attachments.isEmpty()) {
+                for (MultipartFile file : attachments) {
+                    if (!file.isEmpty() && file.getOriginalFilename() != null) {
+                        helper.addAttachment(
+                            file.getOriginalFilename(),
+                            new ByteArrayResource(file.getBytes())
+                        );
+                    }
+                }
+            }
 
-        } catch (jakarta.mail.MessagingException e) {
-            log.error("EmailServiceImpl: Failed to send OTP email", e);
-            throw new RuntimeException("Email Module: Failed to send OTP email");
+            mailSender.send(message);
+            log.info("EmailServiceImpl: Notification email successfully sent to {}", email);
+
+        } catch (MessagingException e) {
+            log.error("EmailServiceImpl: Failed to send Notification email", e);
+            throw new RuntimeException("Email Module: Failed to send Notification email");
+        } catch (IOException e) {
+            throw new RuntimeException(e);
         }
     }
 }

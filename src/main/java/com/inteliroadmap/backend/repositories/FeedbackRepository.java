@@ -15,7 +15,7 @@ import java.util.UUID;
 public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     Feedback findByFeedbackId(UUID feedbackId);
     List<Feedback> findTop5ByReceiver_UserIdOrderByCreatedAtDesc(UUID receiverId);
-    List<Feedback> findByReceiver(User receiver);
+    List<Feedback> findBySender(User receiver);
 
     @Query("SELECT COUNT(f) FROM Feedback f WHERE f.sender.userId = :senderId AND f.createdAt >= :since")
     long countFeedbacksBySenderIdSince(@Param("senderId") UUID senderId, @Param("since") java.time.LocalDateTime since);

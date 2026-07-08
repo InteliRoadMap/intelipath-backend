@@ -10,8 +10,7 @@ import java.util.Optional;
 import java.util.UUID;
 @Repository
 public interface CareerRequiredSkillRepository extends JpaRepository<CareerRequiredSkill, UUID> {
-
-    List<CareerRequiredSkill> findByCareerRole_CareerId(UUID careerRoleId);
+    List<CareerRequiredSkill> findByCareerRole_CareerId(UUID careerId);
 
     boolean existsByCareerRole_CareerIdAndSkill_SkillId(UUID careerId, UUID skillId);
 }

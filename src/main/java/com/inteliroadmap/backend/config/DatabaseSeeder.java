@@ -3,14 +3,8 @@ package com.inteliroadmap.backend.config;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.node.ArrayNode;
-import com.inteliroadmap.backend.domain.entity.CareerRequiredSkill;
-import com.inteliroadmap.backend.domain.entity.CareerRole;
-import com.inteliroadmap.backend.domain.entity.NodeType;
-import com.inteliroadmap.backend.domain.entity.Skill;
-import com.inteliroadmap.backend.domain.entity.SkillNode;
-import com.inteliroadmap.backend.domain.entity.University;
-import com.inteliroadmap.backend.domain.enums.ImportanceLevel;
-import com.inteliroadmap.backend.domain.enums.StageType;
+import com.inteliroadmap.backend.domain.entity.*;
+import com.inteliroadmap.backend.domain.enums.*;
 import com.inteliroadmap.backend.repositories.AcademicCounselorRepository;
 import com.inteliroadmap.backend.repositories.CareerRequiredSkillRepository;
 import com.inteliroadmap.backend.repositories.CareerRoleRepository;
@@ -37,10 +31,9 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
+
+import org.springframework.transaction.annotation.Transactional;
 
 @Component
 @RequiredArgsConstructor
@@ -63,18 +56,19 @@ public class DatabaseSeeder implements CommandLineRunner {
     private static final String ROADMAP_TEMPLATE = "data/RoadmapDataTemplate.csv";
     private static final String SKILL_TEMPLATE = "data/SkillDataTemplate.csv";
     private static final String CAREER_TEMPLATE = "data/CareerDataTemplate.csv";
-    private static final String UNIVERSITY_TEMPLATE = "data/vietnam_universities_en.csv";
+    private static final String UNIVERSITY_TEMPLATE = "data/VNUniversityDataTemplate.csv";
 
     @Override
+    @Transactional
     public void run(String... args) {
         log.info("DatabaseSeeder: =====================================================");
         log.info("DatabaseSeeder:  CHECKING DATABASE SEED DATA... ");
 
+        importUniversityData();
         importCareerData();
         importSkillData();
         importRoadmapData();
-//        importMockUsersData();
-        importUniversityData();
+        importMockUsersData();
 
         log.info("DatabaseSeeder: =====================================================");
         log.info("DatabaseSeeder:  SEEDING SUMMARY NOTIFICATION ");
@@ -83,6 +77,7 @@ public class DatabaseSeeder implements CommandLineRunner {
         log.info("DatabaseSeeder:  - Skills loaded: {}", skillRepository.count());
         log.info("DatabaseSeeder:  - Career Required Skills loaded: {}", careerRequiredSkillRepository.count());
         log.info("DatabaseSeeder:  - Skill Nodes loaded: {}", skillNodeRepository.count());
+        log.info("DatabaseSeeder:  - Mock Students loaded: {}", studentRepository.count());
         log.info("DatabaseSeeder: =====================================================");
     }
 
@@ -353,174 +348,158 @@ public class DatabaseSeeder implements CommandLineRunner {
         }
     }
 
-//    public void importMockUsersData(){
-//        log.info("Seeding Mock Data (Students, Counselors, Feedbacks, Progress)...");
-//
-//        // Import admin
-//        User admin = userRepository.findByEmail("thanhhau2110@gmail.com");
-//        if (admin == null) {
-//            admin = User.builder()
-//                    .email("thanhhau2110@gmail.com")
-//                    .fullName("Hau Admin")
-//                    .role(UserRole.ADMIN)
-//                    .build();
-//        } else if (admin.getRole() != UserRole.ADMIN) {
-//            admin.setRole(UserRole.ADMIN);
-//        }
-//        userRepository.save(admin);
-//
-//        // Import Counselor
-//        User uCounselor = userRepository.findByEmail("mainclone1@gmail.com");
-//        if (uCounselor == null) {
-//            uCounselor = User.builder()
-//                    .email("mainclone1@gmail.com")
-//                    .fullName("Hau Counselor")
-//                    .role(UserRole.COUNSELOR)
-//                    .build();
-//        } else if (uCounselor.getRole() != UserRole.COUNSELOR) {
-//            uCounselor.setRole(UserRole.COUNSELOR);
-//        }
-//        userRepository.save(uCounselor);
-//
-//        AcademicCounselor counselor = academicCounselorRepository.findByUserId(uCounselor.getUserId());
-//        if (counselor == null) {
-//            counselor = AcademicCounselor.builder()
-//                    .university("FPT")
-//                    .department("Software Engineer")
-//                    .build();
-//            academicCounselorRepository.save(counselor);
-//        }
-//
-//        // Import Students
-//        //        Student st = studentRepository.findByUserId(uCounselor.getUserId());
-////        if (st == null) {
-////             st = Student.builder()
-////                     .userId(uCounselor.getUserId())
-////                     .university("FPT")
-////                     .major("Software Engineer")
-////                     .build();
-////        } else st.setUniversity("FPT");
-////        studentRepository.save(st);
-//
-//        if (studentRepository.count() >= 50) {
-//            log.info("Mock data (50+ students) already seeded. Skipping...");
-//            return;
-//        }
-//
-//        CareerRole dataScienceCareer = careerRoleRepository.findByCareerName("Data Science");
-//        if (dataScienceCareer == null) {
-//            log.warn("Cannot seed 50 Data Science students: Data Science career not found.");
-//            return;
-//        }
-//
-//        List<CareerRequiredSkill> dsRequiredSkills = careerRequiredSkillRepository.findByCareerRole_CareerId(dataScienceCareer.getCareerId());
-//        List<Skill> dataScienceSkills = dsRequiredSkills.stream().map(CareerRequiredSkill::getSkill).toList();
-//
-//        List<SkillNode> dataScienceNodes = skillNodeRepository.findByCareerRole_CareerId(dataScienceCareer.getCareerId());
-//
-//        Random random = new Random();
-//
-//        log.info("Generating 50 Data Science mock students...");
-//
-//        for (int i = 1; i <= 50; i++) {
-//            User sUser = User.builder()
-//                    .email("ds_student" + i + "@example.com")
-//                    .fullName("Data Science Student " + i)
-//                    .role(UserRole.STUDENT)
-//                    .build();
-//            sUser = userRepository.save(sUser);
-//
-//            Student stu = Student.builder()
-//                    .userId(sUser.getUserId())
-//                    .careerRole(dataScienceCareer)
-//                    .university("FPT")
-//                    .yearOfAdmission(LocalDate.now().getYear() - random.nextInt(4))
-//                    .major("Data Science")
-//                    .build();
-//            stu = studentRepository.save(stu);
-//
-//            // Assign random skills from Data Science
-//            if (!dataScienceSkills.isEmpty()) {
-//                int numSkills = 2 + random.nextInt(Math.min(10, dataScienceSkills.size()));
-//                Set<Skill> assignedSkills = new HashSet<>();
-//                for (int j = 0; j < numSkills; j++) {
-//                    Skill randomSkill = dataScienceSkills.get(random.nextInt(dataScienceSkills.size()));
-//                    if (assignedSkills.add(randomSkill)) {
-//                        StudentSkill ss = StudentSkill.builder()
-//                                .student(stu)
-//                                .skill(randomSkill)
-//                                .build();
-//                        studentSkillRepository.save(ss);
-//                    }
-//                }
-//            }
-//
-//            // Roadmap Progress
-//            if (!dataScienceNodes.isEmpty() && random.nextBoolean()) {
-//                int numProgress = 1 + random.nextInt(Math.min(15, dataScienceNodes.size()));
-//                Set<UUID> addedProgressNodes = new HashSet<>();
-//                for (int k = 0; k < numProgress; k++) {
-//                    SkillNode node = dataScienceNodes.get(random.nextInt(dataScienceNodes.size()));
-//                    if (addedProgressNodes.add(node.getNodeId())) {
-//                        RoadmapStepStatus status = random.nextBoolean() ? RoadmapStepStatus.COMPLETED : RoadmapStepStatus.IN_PROGRESS;
-//                        StudentProgress progress = StudentProgress.builder()
-//                                .student(stu)
-//                                .skillNode(node)
-//                                .status(status)
-//                                .createdAt(LocalDateTime.now().minusDays(random.nextInt(30)))
-//                                .build();
-//                        if (status == RoadmapStepStatus.COMPLETED) {
-//                            progress.setCompletedAt(LocalDateTime.now().minusDays(random.nextInt(5)));
-//                        }
-//                        studentProgressRepository.save(progress);
-//                    }
-//                }
-//            }
-//
-//            // Feedbacks to counselor
-//            FeedbackType[] types = FeedbackType.values();
-//            String[] counselorMessages = {
-//                    "You are doing a great job progressing on your Data Science roadmap. Keep it up!",
-//                    "I noticed you are missing some key Python skills. Consider taking a course on it.",
-//                    "Your recent test results look promising. Let's schedule a meeting to discuss next steps.",
-//                    "Please review the recommended study materials for Machine Learning."
-//            };
-//            String[] studentMessages = {
-//                    "Thank you for the advice, I'll look into those resources.",
-//                    "I'm struggling a bit with Pandas, do you have any specific tutorials to recommend?",
-//                    "I've completed the assignments you gave me. What's next?",
-//                    "The roadmap is very clear, thanks for your help."
-//            };
-//
-//            // 1 counselor feedback to student
-//            if (random.nextBoolean()) {
-//                Feedback f1 = Feedback.builder()
-//                        .sender(uCounselor)
-//                        .receiver(sUser)
-//                        .senderName(uCounselor.getFullName())
-//                        .content(counselorMessages[random.nextInt(counselorMessages.length)])
-//                        .type(types[random.nextInt(types.length)])
-//                        .createdAt(LocalDateTime.now().minusDays(random.nextInt(10)))
-//                        .updatedAt(LocalDateTime.now().minusDays(random.nextInt(10)))
-//                        .build();
-//                feedbackRepository.save(f1);
-//            }
-//
-//            // 1 student feedback to counselor
-//            if (random.nextBoolean()) {
-//                Feedback f2 = Feedback.builder()
-//                        .sender(sUser)
-//                        .receiver(uCounselor)
-//                        .senderName(sUser.getFullName())
-//                        .content(studentMessages[random.nextInt(studentMessages.length)])
-//                        .type(types[random.nextInt(types.length)])
-//                        .createdAt(LocalDateTime.now().minusDays(random.nextInt(10)))
-//                        .updatedAt(LocalDateTime.now().minusDays(random.nextInt(10)))
-//                        .build();
-//                feedbackRepository.save(f2);
-//            }
-//        }
-//
-//        log.info("Mock data seeding completed successfully.");
-//    }
+    public void importMockUsersData(){
+        log.info("DatabaseSeeder: Seeding Mock Data (Students, Counselors, Feedbacks, Progress)...");
+
+        // ---------------------------- Import Admin Account ---------------------------- //
+        User admin = userRepository.findByEmail("thanhhau2110@gmail.com");
+        if (admin == null) {
+            admin = User.builder().email("thanhhau2110@gmail.com").build();
+        }
+        admin.setFullName("Hau Admin");
+        admin.setRole(UserRole.ADMIN);
+        userRepository.save(admin);
+
+        // ------------------------------- Get University ------------------------------- //
+        University uni = universityRepository.findByCode("FPTU").orElse(null);
+
+        // -------------------------- Import Counselor Account -------------------------- //
+        User userCou = userRepository.findByEmail("mainclone1@gmail.com");
+        if (userCou == null) {
+            userCou = User.builder().email("mainclone1@gmail.com").build();
+        }
+        userCou.setFullName("Hau Counselor");
+        userCou.setRole(UserRole.COUNSELOR);
+        userCou = userRepository.save(userCou);
+
+        AcademicCounselor counselor = academicCounselorRepository.findByUserId(userCou.getUserId());
+        if (counselor == null) {
+            counselor = AcademicCounselor.builder().userId(userCou.getUserId()).build();
+        }
+        counselor.setUniversity(uni);
+        counselor.setDepartment("Software Engineer");
+        academicCounselorRepository.save(counselor);
+
+        // -------------------------- Import Students Accounts -------------------------- //
+        // ------------------ Specific Student Account ------------------ //
+        User userSt = userRepository.findByEmail("mainclone2@gmail.com");
+        if (userSt == null) {
+            userSt = User.builder().email("mainclone2@gmail.com").build();
+        }
+        userSt.setFullName("Hau ST");
+        userSt.setYob(LocalDate.now().minusYears(10));
+        userSt.setRole(UserRole.STUDENT);
+        userSt = userRepository.save(userSt);
+
+        Student st = studentRepository.findByUserId(userSt.getUserId());
+        if (st == null) {
+            st = Student.builder().userId(userSt.getUserId()).build();
+        }
+        st.setUniversity(uni);
+        st.setUniversityName(uni.getName());
+        st.setCareerRole(careerRoleRepository.findByCareerName("Frontend"));
+        st.setMajor("Software Engineer");
+        studentRepository.save(st);
+
+        // ------------------- Random Student Accounts ------------------ //
+        int limit = 100;
+        if (studentRepository.count() >= limit) {
+            log.info("DatabaseSeeder: Mock data ({}+ students) already seeded. Skipping...", limit);
+            return;
+        }
+
+        CareerRole frontend = careerRoleRepository.findByCareerName("Frontend");
+        if (frontend == null) {
+            log.warn("DatabaseSeeder: Cannot seed {} Frontend students: Frontend career not found.", limit);
+            return;
+        }
+
+        List<CareerRequiredSkill> feRequiredSkills = careerRequiredSkillRepository.findByCareerRole_CareerId(frontend.getCareerId());
+        List<Skill> frontendSkills = feRequiredSkills.stream().map(CareerRequiredSkill::getSkill).toList();
+        List<SkillNode> frontendNodes = skillNodeRepository.findByCareerRole_CareerId(frontend.getCareerId());
+
+        Random random = new Random();
+
+        log.info("DatabaseSeeder: Generating {} Frontend mock students...", limit);
+
+        for (int i = 1; i <= limit; i++) {
+            User sUser = User.builder()
+                    .email("fe_student" + i + "@example.com")
+                    .fullName("Frontend Student " + i)
+                    .role(UserRole.STUDENT)
+                    .build();
+            sUser = userRepository.save(sUser);
+
+            Student stu = Student.builder()
+                    .userId(sUser.getUserId())
+                    .careerRole(frontend)
+                    .university(uni)
+                    .universityName(uni.getName())
+                    .yearOfAdmission(LocalDate.now().getYear() - random.nextInt(4))
+                    .major("Software Engineer")
+                    .build();
+            stu = studentRepository.save(stu);
+
+            // Assign random skills from Frontend
+            if (!frontendSkills.isEmpty()) {
+                int numSkills = 2 + random.nextInt(Math.min(10, frontendSkills.size()));
+                Set<Skill> assignedSkills = new HashSet<>();
+                for (int j = 0; j < numSkills; j++) {
+                    Skill randomSkill = frontendSkills.get(random.nextInt(frontendSkills.size()));
+                    if (assignedSkills.add(randomSkill)) {
+                        StudentSkill ss = StudentSkill.builder()
+                                .student(stu)
+                                .skill(randomSkill)
+                                .build();
+                        studentSkillRepository.save(ss);
+                    }
+                }
+            }
+
+            // Roadmap Progress
+            if (!frontendNodes.isEmpty() && random.nextBoolean()) {
+                int numProgress = 1 + random.nextInt(Math.min(15, frontendNodes.size()));
+                Set<UUID> addedProgressNodes = new HashSet<>();
+                for (int k = 0; k < numProgress; k++) {
+                    SkillNode node = frontendNodes.get(random.nextInt(frontendNodes.size()));
+                    if (addedProgressNodes.add(node.getNodeId())) {
+                        RoadmapStepStatus status = random.nextBoolean() ? RoadmapStepStatus.COMPLETED : RoadmapStepStatus.IN_PROGRESS;
+                        StudentProgress progress = StudentProgress.builder()
+                                .student(stu)
+                                .skillNode(node)
+                                .status(status)
+                                .createdAt(LocalDateTime.now().minusDays(random.nextInt(30)))
+                                .build();
+                        if (status == RoadmapStepStatus.COMPLETED) {
+                            progress.setCompletedAt(LocalDateTime.now().minusDays(random.nextInt(5)));
+                        }
+                        studentProgressRepository.save(progress);
+                    }
+                }
+            }
+
+            // Feedbacks to counselor
+            FeedbackType[] types = FeedbackType.values();
+            String[] counselorMessages = {
+                    "You are doing a great job progressing on your Frontend roadmap. Keep it up!",
+                    "I noticed you are missing some key Python skills. Consider taking a course on it.",
+                    "Your recent test results look promising. Let's schedule a meeting to discuss next steps.",
+                    "Please review the recommended study materials for Machine Learning."
+            };
+
+            // 1 counselor feedback to student
+            if (random.nextBoolean()) {
+                Feedback f1 = Feedback.builder()
+                        .sender(userCou)
+                        .receiver(sUser)
+                        .content(counselorMessages[random.nextInt(counselorMessages.length)])
+                        .type(types[random.nextInt(types.length)])
+                        .createdAt(LocalDateTime.now().minusDays(random.nextInt(10)))
+                        .updatedAt(LocalDateTime.now().minusDays(random.nextInt(10)))
+                        .build();
+                feedbackRepository.save(f1);
+            }
+        }
+        log.info("DatabaseSeeder: Mock data seeding completed successfully.");
+    }
 }

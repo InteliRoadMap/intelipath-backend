@@ -273,6 +273,15 @@ CREATE TABLE IF NOT EXISTS feedback (
         FOREIGN KEY (receiver_id) REFERENCES users (user_id) ON DELETE CASCADE
 );
 
+CREATE TABLE IF NOT EXISTS feedback_attachment (
+    attachment_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    feedback_id   UUID         NOT NULL REFERENCES feedback(feedback_id) ON DELETE CASCADE,
+    file_name     VARCHAR(255) NOT NULL,
+    file_type     VARCHAR(100),
+    file_size     BIGINT,
+    data          BYTEA        NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS portfolio_review_requests (
     request_id  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     student_id  UUID NOT NULL,
