@@ -10,24 +10,29 @@ public class ScrapedRecruitmentDto {
     @JsonProperty("recruitment_id")
     private String recruitmentId;
 
-    @JsonProperty("recruitment_link")
-    private String recruitmentLink;
+//    @JsonProperty("recruitment_link")
+//    private String recruitmentLink;
 
-    private String title;
-    private String salary;
-    private String location;
-    private String experience;
+    @JsonProperty("recruitment_infos")
+    private Map<String, String> recruitmentInfos;
+
+    private Map<String, String> descriptions;
+
+//    private String title;
+//    private String salary;
+//    private String location;
+//    private String experience;
 
     @JsonProperty("application_deadline")
     private String applicationDeadline;
 
-    private Map<String, Object> tags;
-
-    private Map<String, Object> descriptions;
-
-    @JsonProperty("general_infos")
-    private Map<String, Object> generalInfos;
-
-    @JsonProperty("related_tags")
-    private Map<String, Object> relatedTags;
+//    private Map<String, Object> tags;
+//
+//    private Map<String, Object> descriptions;
+//
+//    @JsonProperty("general_infos")
+//    private Map<String, Object> generalInfos;
+//
+//    @JsonProperty("related_tags")
+//    private Map<String, Object> relatedTags;
 }

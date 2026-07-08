@@ -24,6 +24,7 @@ import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.UUID;
 import java.util.Optional;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
 @Service
 @RequiredArgsConstructor
@@ -58,44 +59,41 @@ public class JobScrapingScheduler {
             }
 
             log.info("JobScrapingScheduler: Received {} companies, {} recruitments, {} posts",
-                response.getCompanies().size(), response.getRecruitments().size(), response.getRecruitmentPosts().size());
+                response.getProcessedCompanies().size(), response.getProcessedRecruitments().size(), response.getRecruitmentPosts().size());
 
+            ObjectMapper mapper = new ObjectMapper();
             // 1. Save Companies
-            for (ScrapedCompanyDto cDto : response.getCompanies()) {
+            for (ScrapedCompanyDto cDto : response.getProcessedCompanies()) {
                 Company company = companyRepository.findById(cDto.getCompanyId()).orElse(new Company());
                 company.setTopCvCompanyId(cDto.getCompanyId());
-                company.setCompanyLink(cDto.getCompanyLink());
-                company.setLogo(cDto.getLogo());
-                company.setName(cDto.getName());
-                if (company.getInfo() == null) company.setInfo(new java.util.HashMap<>());
-                if (cDto.getInfo() != null) company.getInfo().putAll((java.util.Map) cDto.getInfo());
-                if (cDto.getIntroduction() != null) company.getInfo().put("introduction", cDto.getIntroduction());
-                company.setContact(cDto.getContact());
+                if (cDto.getSignatures() != null) {
+                    company.setSignatures(mapper.valueToTree(cDto.getSignatures()));
+                }
+                if (cDto.getInfos() != null) {
+                    company.setInfos(mapper.valueToTree(cDto.getInfos()));
+                }
                 companyRepository.save(company);
             }
 
             // 2. Save Recruitments
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-            for (ScrapedRecruitmentDto rDto : response.getRecruitments()) {
+            for (ScrapedRecruitmentDto rDto : response.getProcessedRecruitments()) {
                 Recruitment recruitment = recruitmentRepository.findById(rDto.getRecruitmentId()).orElse(new Recruitment());
                 recruitment.setTopCvRecruitmentId(rDto.getRecruitmentId());
-                recruitment.setRecruitmentLink(rDto.getRecruitmentLink());
                 
-                if (recruitment.getBasicInfo() == null) recruitment.setBasicInfo(new java.util.HashMap<>());
-                if (rDto.getTitle() != null) recruitment.getBasicInfo().put("title", rDto.getTitle());
-                if (rDto.getSalary() != null) recruitment.getBasicInfo().put("salary", rDto.getSalary());
-                if (rDto.getLocation() != null) recruitment.getBasicInfo().put("location", rDto.getLocation());
-                if (rDto.getExperience() != null) recruitment.getBasicInfo().put("experience", rDto.getExperience());
+                if (rDto.getRecruitmentInfos() != null) {
+                    if (recruitment.getRecruitmentInfos() == null) recruitment.setRecruitmentInfos(new java.util.HashMap<>());
+                    recruitment.getRecruitmentInfos().putAll((java.util.Map) rDto.getRecruitmentInfos());
+                }
 
                 if (rDto.getApplicationDeadline() != null) {
                     recruitment.setApplicationDeadline(LocalDate.parse(rDto.getApplicationDeadline(), formatter));
                 }
 
                 if (recruitment.getDescriptions() == null) recruitment.setDescriptions(new java.util.HashMap<>());
-                if (rDto.getTags() != null) recruitment.getDescriptions().put("tags", rDto.getTags());
-                if (rDto.getDescriptions() != null) recruitment.getDescriptions().putAll(rDto.getDescriptions());
-                if (rDto.getGeneralInfos() != null) recruitment.getDescriptions().put("generalInfos", rDto.getGeneralInfos());
-                if (rDto.getRelatedTags() != null) recruitment.getDescriptions().put("relatedTags", rDto.getRelatedTags());
+                if (rDto.getDescriptions() != null) {
+                    recruitment.getDescriptions().putAll((java.util.Map) rDto.getDescriptions());
+                }
 
                 recruitmentRepository.save(recruitment);
             }

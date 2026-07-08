@@ -18,9 +18,9 @@ public class MarketTrendMapper {
         }
         return MarketTrendResponse.CompanyTrendResponse.builder()
                 .topCvCompanyId(company.getTopCvCompanyId())
-                .name(company.getName())
-                .logo(company.getLogo())
-                .companyLink(company.getCompanyLink())
+                .name(company.getSignatures() != null && company.getSignatures().has("name") ? company.getSignatures().get("name").asText() : null)
+                .logo(company.getSignatures() != null && company.getSignatures().has("logo") ? company.getSignatures().get("logo").asText() : null)
+                .companyLink(company.getSignatures() != null && company.getSignatures().has("link") ? company.getSignatures().get("link").asText() : null)
                 .recruitmentCount(0)
                 .build();
     }

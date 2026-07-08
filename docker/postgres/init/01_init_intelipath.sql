@@ -482,7 +482,7 @@ CREATE INDEX IF NOT EXISTS idx_skill_nodes_career_id             ON skill_nodes 
 CREATE INDEX IF NOT EXISTS idx_skill_nodes_skill_id              ON skill_nodes (skill_id);
 CREATE INDEX IF NOT EXISTS idx_skill_nodes_type_id               ON skill_nodes (type_id);
 CREATE INDEX IF NOT EXISTS idx_skill_nodes_previous_node         ON skill_nodes (previous_node);
-CREATE INDEX IF NOT EXISTS idx_roadmap_node_layouts_node_id       ON roadmap_node_layouts (node_id);
+CREATE INDEX IF NOT EXISTS idx_roadmap_node_layouts_node_id      ON roadmap_node_layouts (node_id);
 CREATE INDEX IF NOT EXISTS idx_skill_nodes_parent_node           ON skill_nodes (parent_node);
 CREATE INDEX IF NOT EXISTS idx_student_skills_user_id            ON student_skills (user_id);
 CREATE INDEX IF NOT EXISTS idx_student_skills_skill_id           ON student_skills (skill_id);
@@ -493,6 +493,7 @@ CREATE INDEX IF NOT EXISTS idx_portfolio_configs_user_id         ON portfolio_co
 CREATE INDEX IF NOT EXISTS idx_student_education_user_id         ON student_education (user_id);
 CREATE INDEX IF NOT EXISTS idx_feedback_sender_id                ON feedback (sender_id);
 CREATE INDEX IF NOT EXISTS idx_feedback_receiver_id              ON feedback (receiver_id);
+CREATE INDEX IF NOT EXISTS idx_feedback_attachment_feedback_id   ON feedback_attachment(feedback_id);
 CREATE INDEX IF NOT EXISTS idx_prr_student_id                    ON portfolio_review_requests (student_id);
 CREATE INDEX IF NOT EXISTS idx_skill_trends_skill_id             ON skill_trends (skill_id);
 CREATE INDEX IF NOT EXISTS idx_sse_user_id                       ON student_skill_evidence (user_id);
@@ -510,3 +511,4 @@ CREATE INDEX IF NOT EXISTS idx_oauth_accounts_user_id            ON oauth_accoun
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id            ON refresh_tokens (user_id);
 CREATE INDEX IF NOT EXISTS idx_chat_sessions_user_id             ON chat_sessions (user_id);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_session_id          ON chat_messages (session_id);
+

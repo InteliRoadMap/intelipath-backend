@@ -18,6 +18,8 @@ import org.springframework.stereotype.Service;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.core.type.TypeReference;
 
 /**
  * Implementation of the {@link ScraperService} interface.
@@ -56,28 +58,35 @@ public class ScraperServiceImpl implements ScraperService {
 
             // Build company DTO
             RecruitmentPostDto.CompanyDto companyDto = RecruitmentPostDto.CompanyDto.builder()
-                    .name(company.getName())
-                    .logo(company.getLogo())
-                    .companyLink(company.getCompanyLink())
+                    .name(company.getSignatures() != null && company.getSignatures().has("name") ? company.getSignatures().get("name").asText() : null)
+                    .logo(company.getSignatures() != null && company.getSignatures().has("logo") ? company.getSignatures().get("logo").asText() : null)
+                    .companyLink(company.getSignatures() != null && company.getSignatures().has("link") ? company.getSignatures().get("link").asText() : null)
                     .build();
 
             // Flatten the map of tags into a single list
             List<String> flattenedTags = new ArrayList<>();
             if (recruitment.getDescriptions() != null && recruitment.getDescriptions().get("tags") != null) {
-                Map<String, List<String>> tagsMap = (Map<String, List<String>>) recruitment.getDescriptions().get("tags");
-                for (List<String> tagList : tagsMap.values()) {
-                    if (tagList != null) {
-                        flattenedTags.addAll(tagList);
+                Object tagsObj = recruitment.getDescriptions().get("tags");
+                if (tagsObj instanceof String) {
+                    flattenedTags.add((String) tagsObj);
+                } else if (tagsObj instanceof List) {
+                    flattenedTags.addAll((List<String>) tagsObj);
+                } else if (tagsObj instanceof Map) {
+                    Map<String, List<String>> tagsMap = (Map<String, List<String>>) tagsObj;
+                    for (List<String> tagList : tagsMap.values()) {
+                        if (tagList != null) {
+                            flattenedTags.addAll(tagList);
+                        }
                     }
                 }
             }
 
             // Build recruitment DTO
             RecruitmentPostDto.RecruitmentDto recruitmentDto = RecruitmentPostDto.RecruitmentDto.builder()
-                    .title(recruitment.getBasicInfo() != null ? (String) recruitment.getBasicInfo().get("title") : null)
-                    .salary(recruitment.getBasicInfo() != null ? (String) recruitment.getBasicInfo().get("salary") : null)
-                    .location(recruitment.getBasicInfo() != null ? (String) recruitment.getBasicInfo().get("location") : null)
-                    .experience(recruitment.getBasicInfo() != null ? (String) recruitment.getBasicInfo().get("experience") : null)
+                    .title(recruitment.getRecruitmentInfos() != null ? (String) recruitment.getRecruitmentInfos().get("title") : null)
+                    .salary(recruitment.getRecruitmentInfos() != null ? (String) recruitment.getRecruitmentInfos().get("salary") : null)
+                    .location(recruitment.getRecruitmentInfos() != null ? (String) recruitment.getRecruitmentInfos().get("location") : null)
+                    .experience(recruitment.getRecruitmentInfos() != null ? (String) recruitment.getRecruitmentInfos().get("experience") : null)
                     .applicationDeadline(recruitment.getApplicationDeadline())
                     .tags(flattenedTags)
                     .build();
@@ -112,14 +121,17 @@ public class ScraperServiceImpl implements ScraperService {
         }
 
         log.info("ScraperServiceImpl: Company Infos Retrieved");
+        ObjectMapper mapper = new ObjectMapper();
+        Map<String, Object> infosMap = company.getInfos() != null ? mapper.convertValue(company.getInfos(), new TypeReference<Map<String, Object>>(){}) : null;
+
         return CompanyResponse.builder()
                 .companyId(company.getTopCvCompanyId())
-                .companyLink(company.getCompanyLink())
-                .name(company.getName())
-                .logo(company.getLogo())
-                .introductions(company.getInfo() != null ? (List<String>) company.getInfo().get("introduction") : null)
-                .infos(company.getInfo())
-                .contacts(company.getContact())
+                .companyLink(company.getSignatures() != null && company.getSignatures().has("link") ? company.getSignatures().get("link").asText() : null)
+                .name(company.getSignatures() != null && company.getSignatures().has("name") ? company.getSignatures().get("name").asText() : null)
+                .logo(company.getSignatures() != null && company.getSignatures().has("logo") ? company.getSignatures().get("logo").asText() : null)
+                .introductions(company.getInfos() != null && company.getInfos().has("info") ? List.of(company.getInfos().get("info").asText()) : null)
+                .infos(infosMap)
+                .contacts(company.getInfos() != null && company.getInfos().has("contact") ? List.of(company.getInfos().get("contact").asText()) : null)
                 .build();
     }
 
@@ -141,16 +153,16 @@ public class ScraperServiceImpl implements ScraperService {
         log.info("ScraperServiceImpl: Recruitment Infos Retrieved");
         return RecruitmentResponse.builder()
                 .topCvRecruitmentId(recruitment.getTopCvRecruitmentId())
-                .recruitmentLink(recruitment.getRecruitmentLink())
-                .title(recruitment.getBasicInfo() != null ? (String) recruitment.getBasicInfo().get("title") : null)
-                .salary(recruitment.getBasicInfo() != null ? (String) recruitment.getBasicInfo().get("salary") : null)
-                .location(recruitment.getBasicInfo() != null ? (String) recruitment.getBasicInfo().get("location") : null)
-                .experience(recruitment.getBasicInfo() != null ? (String) recruitment.getBasicInfo().get("experience") : null)
+                .recruitmentLink(recruitment.getRecruitmentInfos() != null ? (String) recruitment.getRecruitmentInfos().get("link") : null)
+                .title(recruitment.getRecruitmentInfos() != null ? (String) recruitment.getRecruitmentInfos().get("title") : null)
+                .salary(recruitment.getRecruitmentInfos() != null ? (String) recruitment.getRecruitmentInfos().get("salary") : null)
+                .location(recruitment.getRecruitmentInfos() != null ? (String) recruitment.getRecruitmentInfos().get("location") : null)
+                .experience(recruitment.getRecruitmentInfos() != null ? (String) recruitment.getRecruitmentInfos().get("experience") : null)
                 .applicationDeadline(recruitment.getApplicationDeadline())
                 .tags(recruitment.getDescriptions() != null ? recruitment.getDescriptions().get("tags") : null)
                 .descriptions(recruitment.getDescriptions() != null ? recruitment.getDescriptions() : null)
-                .generalInfos(recruitment.getDescriptions() != null ? recruitment.getDescriptions().get("generalInfos") : null)
-                .relatedTags(recruitment.getDescriptions() != null ? recruitment.getDescriptions().get("relatedTags") : null)
+                .generalInfos(recruitment.getDescriptions() != null ? recruitment.getDescriptions().get("general_infos") : null)
+                .relatedTags(recruitment.getDescriptions() != null ? recruitment.getDescriptions().get("related_tags") : null)
                 .build();
     }
 }

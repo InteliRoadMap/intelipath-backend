@@ -9,7 +9,11 @@ public class ScraperResponseDto {
     @JsonProperty("recruitment_posts")
     private List<ScrapedPostDto> recruitmentPosts;
 
-    private List<ScrapedCompanyDto> companies;
+//    private List<ScrapedCompanyDto> companies;
+    @JsonProperty("processed_companies")
+    private List<ScrapedCompanyDto> processedCompanies;
 
-    private List<ScrapedRecruitmentDto> recruitments;
+//    private List<ScrapedRecruitmentDto> recruitments;
+    @JsonProperty("processed_recruitments")
+    private List<ScrapedRecruitmentDto> processedRecruitments;
 }

@@ -49,8 +49,8 @@ public class Recruitment {
 //    @Column(name = "basic_info", columnDefinition = "jsonb")
 //    private Map<String, Object> basicInfo;
 //
-//    @Column(name = "application_deadline")
-//    private LocalDate applicationDeadline;
+    @Column(name = "application_deadline")
+    private LocalDate applicationDeadline;
 //
 //    @JdbcTypeCode(SqlTypes.JSON)
 //    @Column(columnDefinition = "jsonb")
