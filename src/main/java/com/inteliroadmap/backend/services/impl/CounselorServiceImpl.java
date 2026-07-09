@@ -251,13 +251,9 @@ public class CounselorServiceImpl implements CounselorService {
         Student student = studentRepository.findByUserId(studentId);
 
         // Weighted roadmap progress, shared formula with the student-facing views
-        int progress = 0;
-        if (student.getCareerRole() != null) {
-            log.info("Student doesnt have career role.");
-            progress = roadmapProgressCalculator.calculateProgress(
-                    skillNodeRepository.findByCareerRole_CareerId(student.getCareerRole().getCareerId()),
-                    studentProgressRepository.findByStudent_UserId(student.getUserId()));
-        }
+        int progress = roadmapProgressCalculator.calculateProgress(
+                skillNodeRepository.findByCareerRole_CareerId(student.getCareerRole().getCareerId()),
+                studentProgressRepository.findByStudent_UserId(student.getUserId()));
 
         // Fetch the list of skills the student has yet to acquire for their current career
         List<String> missingSkillNames = studentSkillRepository
@@ -338,8 +334,10 @@ public class CounselorServiceImpl implements CounselorService {
             header.createCell(1).setCellValue("Email");
             header.createCell(2).setCellValue("University");
             header.createCell(3).setCellValue("Major");
-            header.createCell(4).setCellValue("Skills");
-            header.createCell(5).setCellValue("Github Profile");
+            header.createCell(4).setCellValue("Target Career");
+            header.createCell(5).setCellValue("Learning Progress");
+            header.createCell(6).setCellValue("Skills");
+            header.createCell(7).setCellValue("Github Profile");
 
             // Fetch all users and students at once
             Map<UUID, User> userMap = userRepository.findAllById(studentIds)
@@ -365,13 +363,19 @@ public class CounselorServiceImpl implements CounselorService {
 
                 if (user == null || student == null) continue;
 
+                int progress = roadmapProgressCalculator.calculateProgress(
+                        skillNodeRepository.findByCareerRole_CareerId(student.getCareerRole().getCareerId()),
+                        studentProgressRepository.findByStudent_UserId(student.getUserId()));
+
                 Row row = sheet.createRow(rowNum++);
                 row.createCell(0).setCellValue(user.getFullName());
                 row.createCell(1).setCellValue(user.getEmail());
                 row.createCell(2).setCellValue(student.getUniversity() != null ? student.getUniversity().getName() : "");
                 row.createCell(3).setCellValue(student.getMajor());
-                row.createCell(4).setCellValue(skillNames.toString().replace("[]",""));
-                row.createCell(5).setCellValue(student.getGithubProfile());
+                row.createCell(4).setCellValue(student.getCareerRole().getCareerName());
+                row.createCell(5).setCellValue(progress + "%");
+                row.createCell(6).setCellValue(skillNames.toString());
+                row.createCell(7).setCellValue(student.getGithubProfile());
             }
 
             // Auto size columns
