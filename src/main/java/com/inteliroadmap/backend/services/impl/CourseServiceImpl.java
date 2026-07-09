@@ -16,6 +16,7 @@ import com.inteliroadmap.backend.repositories.CareerRoleRepository;
 import com.inteliroadmap.backend.repositories.CourseEnrollmentRepository;
 import com.inteliroadmap.backend.repositories.CourseLessonRepository;
 import com.inteliroadmap.backend.repositories.CourseRepository;
+import com.inteliroadmap.backend.repositories.SkillNodeRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.services.CourseService;
 import lombok.RequiredArgsConstructor;
@@ -38,6 +39,7 @@ public class CourseServiceImpl implements CourseService {
     private final CourseEnrollmentRepository enrollmentRepository;
     private final UserRepository userRepository;
     private final CareerRoleRepository careerRoleRepository;
+    private final SkillNodeRepository skillNodeRepository;
 
     // ---------------------------------------------------------------- Mentor
 
@@ -49,6 +51,7 @@ public class CourseServiceImpl implements CourseService {
         Course course = Course.builder()
                 .mentorId(mentorId)
                 .careerId(request.getCareerId())
+                .nodeId(request.getNodeId())
                 .title(request.getTitle())
                 .description(request.getDescription())
                 .level(request.getLevel() != null ? request.getLevel() : CourseLevel.BEGINNER)
@@ -69,6 +72,7 @@ public class CourseServiceImpl implements CourseService {
         course.setTitle(request.getTitle());
         course.setDescription(request.getDescription());
         course.setCareerId(request.getCareerId());
+        course.setNodeId(request.getNodeId());
         if (request.getLevel() != null) {
             course.setLevel(request.getLevel());
         }
@@ -109,11 +113,16 @@ public class CourseServiceImpl implements CourseService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<CourseResponse> browseCourses(UUID careerId) {
+    public List<CourseResponse> browseCourses(UUID careerId, UUID nodeId) {
         UUID studentId = currentUserId();
-        List<Course> courses = careerId != null
-                ? courseRepository.findByStatusAndCareerIdOrderByCreatedAtDesc(CourseStatus.PUBLISHED, careerId)
-                : courseRepository.findByStatusOrderByCreatedAtDesc(CourseStatus.PUBLISHED);
+        List<Course> courses;
+        if (nodeId != null) {
+            courses = courseRepository.findByStatusAndNodeIdOrderByCreatedAtDesc(CourseStatus.PUBLISHED, nodeId);
+        } else if (careerId != null) {
+            courses = courseRepository.findByStatusAndCareerIdOrderByCreatedAtDesc(CourseStatus.PUBLISHED, careerId);
+        } else {
+            courses = courseRepository.findByStatusOrderByCreatedAtDesc(CourseStatus.PUBLISHED);
+        }
         return courses.stream().map(c -> toResponse(c, false, studentId)).toList();
     }
 
@@ -220,6 +229,8 @@ public class CourseServiceImpl implements CourseService {
         String mentorName = userRepository.findById(c.getMentorId()).map(User::getFullName).orElse(null);
         String careerName = c.getCareerId() == null ? null
                 : careerRoleRepository.findById(c.getCareerId()).map(CareerRole::getCareerName).orElse(null);
+        String nodeName = c.getNodeId() == null ? null
+                : skillNodeRepository.findById(c.getNodeId()).map(n -> n.getNodeName()).orElse(null);
 
         CourseResponse.CourseResponseBuilder b = CourseResponse.builder()
                 .courseId(c.getCourseId())
@@ -231,6 +242,8 @@ public class CourseServiceImpl implements CourseService {
                 .mentorName(mentorName)
                 .careerId(c.getCareerId())
                 .careerName(careerName)
+                .nodeId(c.getNodeId())
+                .nodeName(nodeName)
                 .lessonCount(lessonRepository.countByCourseId(c.getCourseId()))
                 .enrolledCount(enrollmentRepository.countByCourseId(c.getCourseId()))
                 .createdAt(c.getCreatedAt())

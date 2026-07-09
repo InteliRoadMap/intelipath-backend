@@ -513,11 +513,14 @@ CREATE TABLE IF NOT EXISTS courses (
     status        VARCHAR(20) NOT NULL DEFAULT 'DRAFT',
     created_at    TIMESTAMP NOT NULL DEFAULT now(),
     updated_at    TIMESTAMP NOT NULL DEFAULT now(),
+    node_id       UUID,
     CONSTRAINT fk_course_mentor FOREIGN KEY (mentor_id) REFERENCES industry_mentor (user_id) ON DELETE CASCADE,
-    CONSTRAINT fk_course_career FOREIGN KEY (career_id) REFERENCES career_roles (career_id) ON DELETE CASCADE
+    CONSTRAINT fk_course_career FOREIGN KEY (career_id) REFERENCES career_roles (career_id) ON DELETE CASCADE,
+    CONSTRAINT fk_course_node FOREIGN KEY (node_id) REFERENCES skill_nodes (node_id) ON DELETE SET NULL
 );
 CREATE INDEX IF NOT EXISTS idx_courses_mentor ON courses (mentor_id);
 CREATE INDEX IF NOT EXISTS idx_courses_status ON courses (status);
+CREATE INDEX IF NOT EXISTS idx_courses_node ON courses (node_id);
 
 CREATE TABLE IF NOT EXISTS course_lessons (
     lesson_id     UUID PRIMARY KEY DEFAULT gen_random_uuid(),

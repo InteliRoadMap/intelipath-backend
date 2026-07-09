@@ -40,6 +40,10 @@ public class Course {
     @Column(name = "career_id", nullable = false)
     private UUID careerId;
 
+    /** Optional specific roadmap skill-node this course targets within the career. */
+    @Column(name = "node_id")
+    private UUID nodeId;
+
     @Column(name = "title", nullable = false)
     private String title;
 

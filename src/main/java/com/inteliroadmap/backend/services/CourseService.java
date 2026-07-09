@@ -25,7 +25,7 @@ public interface CourseService {
     List<CourseResponse> getMentorCourses();
 
     // ---- Student ----
-    List<CourseResponse> browseCourses(UUID careerId);
+    List<CourseResponse> browseCourses(UUID careerId, UUID nodeId);
 
     CourseResponse getCourseDetail(UUID courseId);
 

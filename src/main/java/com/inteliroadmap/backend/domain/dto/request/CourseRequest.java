@@ -23,6 +23,9 @@ public class CourseRequest {
     @NotNull(message = "A career is required for the course")
     private UUID careerId;
 
+    /** Optional specific roadmap node this course targets within the career. */
+    private UUID nodeId;
+
     private List<LessonRequest> lessons;
 
     @Data

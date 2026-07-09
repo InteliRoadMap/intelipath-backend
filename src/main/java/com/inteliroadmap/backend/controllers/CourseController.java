@@ -30,9 +30,10 @@ public class CourseController {
     private final CourseService courseService;
 
     @GetMapping
-    @Operation(summary = "Browse published courses (optionally filtered by career)")
-    public ResponseEntity<List<CourseResponse>> browse(@RequestParam(required = false) UUID careerId) {
-        return ResponseEntity.ok(courseService.browseCourses(careerId));
+    @Operation(summary = "Browse published courses (filter by career and/or a specific node)")
+    public ResponseEntity<List<CourseResponse>> browse(@RequestParam(required = false) UUID careerId,
+                                                       @RequestParam(required = false) UUID nodeId) {
+        return ResponseEntity.ok(courseService.browseCourses(careerId, nodeId));
     }
 
     @GetMapping("/me/enrollments")

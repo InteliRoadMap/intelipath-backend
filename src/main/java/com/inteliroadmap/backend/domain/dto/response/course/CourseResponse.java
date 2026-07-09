@@ -22,6 +22,8 @@ public class CourseResponse {
     private String mentorName;
     private UUID careerId;
     private String careerName;
+    private UUID nodeId;
+    private String nodeName;
 
     private long lessonCount;
     private long enrolledCount;
