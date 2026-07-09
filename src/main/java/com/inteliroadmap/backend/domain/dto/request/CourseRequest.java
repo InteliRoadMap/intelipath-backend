@@ -2,6 +2,7 @@ package com.inteliroadmap.backend.domain.dto.request;
 
 import com.inteliroadmap.backend.domain.enums.CourseLevel;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 import java.util.List;
@@ -18,7 +19,8 @@ public class CourseRequest {
 
     private CourseLevel level;
 
-    /** Optional career path this course supports. */
+    /** The career path this course supports (required). */
+    @NotNull(message = "A career is required for the course")
     private UUID careerId;
 
     private List<LessonRequest> lessons;

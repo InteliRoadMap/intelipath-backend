@@ -36,8 +36,8 @@ public class Course {
     @Column(name = "mentor_id", nullable = false)
     private UUID mentorId;
 
-    /** Optional career path this course supports. */
-    @Column(name = "career_id")
+    /** The career path this course supports (required — courses complement a roadmap). */
+    @Column(name = "career_id", nullable = false)
     private UUID careerId;
 
     @Column(name = "title", nullable = false)

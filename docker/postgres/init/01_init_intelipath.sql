@@ -506,7 +506,7 @@ CREATE INDEX IF NOT EXISTS idx_chat_messages_session_id          ON chat_message
 CREATE TABLE IF NOT EXISTS courses (
     course_id     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     mentor_id     UUID NOT NULL,
-    career_id     UUID,
+    career_id     UUID NOT NULL,
     title         VARCHAR(255) NOT NULL,
     description   TEXT,
     level         VARCHAR(20) NOT NULL DEFAULT 'BEGINNER',
@@ -514,7 +514,7 @@ CREATE TABLE IF NOT EXISTS courses (
     created_at    TIMESTAMP NOT NULL DEFAULT now(),
     updated_at    TIMESTAMP NOT NULL DEFAULT now(),
     CONSTRAINT fk_course_mentor FOREIGN KEY (mentor_id) REFERENCES industry_mentor (user_id) ON DELETE CASCADE,
-    CONSTRAINT fk_course_career FOREIGN KEY (career_id) REFERENCES career_roles (career_id) ON DELETE SET NULL
+    CONSTRAINT fk_course_career FOREIGN KEY (career_id) REFERENCES career_roles (career_id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_courses_mentor ON courses (mentor_id);
 CREATE INDEX IF NOT EXISTS idx_courses_status ON courses (status);
