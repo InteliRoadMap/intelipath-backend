@@ -60,6 +60,10 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
     /** Cap on how much extracted document text to inject, to keep prompts bounded. */
     private static final int MAX_ATTACHMENT_CHARS = 12000;
 
+    /** When false, skip RAG retrieval (embedding + vector search) for faster replies. */
+    @Value("${mentor.rag-enabled:true}")
+    private boolean ragEnabled;
+
     /**
      * Constructs a VirtualMentorServiceImpl with the required dependencies.
      *
@@ -265,15 +269,21 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
         // We use StringBuffer to accumulate the full response for saving to DB asynchronously
         StringBuffer fullResponse = new StringBuffer();
 
-        return chatClient.prompt()
+        var promptSpec = chatClient.prompt()
                 .messages(messageHistory)
                 .user(userPrompt)
-                // Configure Vector Store Search request to attach relevant context retrieved from embedding DB
-                .advisors(QuestionAnswerAdvisor.builder(vectorStore)
-                        .searchRequest(SearchRequest.builder().build())
-                        .promptTemplate(new PromptTemplate(ragPromptTemplate))
-                        .build())
-                .toolNames("jobMarketTool", "studentProgressTool", "markItDownTool")
+                .toolNames("jobMarketTool", "studentProgressTool", "markItDownTool");
+
+        // Attach vector-store retrieval only when RAG is enabled (embedding +
+        // search add latency; skipping is much faster when knowledge is unused).
+        if (ragEnabled) {
+            promptSpec = promptSpec.advisors(QuestionAnswerAdvisor.builder(vectorStore)
+                    .searchRequest(SearchRequest.builder().build())
+                    .promptTemplate(new PromptTemplate(ragPromptTemplate))
+                    .build());
+        }
+
+        return promptSpec
                 .stream()
                 .content()
                 .doOnNext(fullResponse::append)

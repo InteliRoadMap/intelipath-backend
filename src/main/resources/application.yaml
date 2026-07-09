@@ -62,6 +62,9 @@ spring:
       chat:
         options:
           model: ${OPENAI_MODEL}
+          # Lower = more consistent/deterministic answers (good for analysis).
+          # Raise toward 0.7 for more creative replies. Tune here.
+          temperature: ${OPENAI_TEMPERATURE:0.3}
     vectorstore:
       pgvector:
         initialize-schema: true
@@ -98,3 +101,9 @@ ai-service:
   api-key: ${AI_SERVICE_API_KEY:}
   connect-timeout: ${AI_SERVICE_CONNECT_TIMEOUT:5s}
   read-timeout: ${AI_SERVICE_READ_TIMEOUT:300s}
+
+mentor:
+  # RAG retrieval embeds every message and queries the vector store, adding
+  # latency. Set false to skip it and make chat noticeably faster when you are
+  # not using ingested knowledge. Tune here.
+  rag-enabled: ${MENTOR_RAG_ENABLED:true}
