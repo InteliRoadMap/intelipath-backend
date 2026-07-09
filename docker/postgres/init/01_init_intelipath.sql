@@ -499,3 +499,46 @@ CREATE INDEX IF NOT EXISTS idx_oauth_accounts_user_id            ON oauth_accoun
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id            ON refresh_tokens (user_id);
 CREATE INDEX IF NOT EXISTS idx_chat_sessions_user_id             ON chat_sessions (user_id);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_session_id          ON chat_messages (session_id);
+
+-- ============================================================
+-- COURSES: mentor-authored learning courses students can opt into
+-- ============================================================
+CREATE TABLE IF NOT EXISTS courses (
+    course_id     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    mentor_id     UUID NOT NULL,
+    career_id     UUID,
+    title         VARCHAR(255) NOT NULL,
+    description   TEXT,
+    level         VARCHAR(20) NOT NULL DEFAULT 'BEGINNER',
+    status        VARCHAR(20) NOT NULL DEFAULT 'DRAFT',
+    created_at    TIMESTAMP NOT NULL DEFAULT now(),
+    updated_at    TIMESTAMP NOT NULL DEFAULT now(),
+    CONSTRAINT fk_course_mentor FOREIGN KEY (mentor_id) REFERENCES industry_mentor (user_id) ON DELETE CASCADE,
+    CONSTRAINT fk_course_career FOREIGN KEY (career_id) REFERENCES career_roles (career_id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_courses_mentor ON courses (mentor_id);
+CREATE INDEX IF NOT EXISTS idx_courses_status ON courses (status);
+
+CREATE TABLE IF NOT EXISTS course_lessons (
+    lesson_id     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    course_id     UUID NOT NULL,
+    title         VARCHAR(255) NOT NULL,
+    content       TEXT,
+    resource_url  VARCHAR(1000),
+    order_index   INT NOT NULL DEFAULT 0,
+    CONSTRAINT fk_lesson_course FOREIGN KEY (course_id) REFERENCES courses (course_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_lessons_course ON course_lessons (course_id);
+
+CREATE TABLE IF NOT EXISTS course_enrollments (
+    enrollment_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    course_id     UUID NOT NULL,
+    student_id    UUID NOT NULL,
+    status        VARCHAR(20) NOT NULL DEFAULT 'ENROLLED',
+    progress      INT NOT NULL DEFAULT 0,
+    enrolled_at   TIMESTAMP NOT NULL DEFAULT now(),
+    CONSTRAINT uq_enrollment UNIQUE (course_id, student_id),
+    CONSTRAINT fk_enroll_course FOREIGN KEY (course_id) REFERENCES courses (course_id) ON DELETE CASCADE,
+    CONSTRAINT fk_enroll_student FOREIGN KEY (student_id) REFERENCES students (user_id) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_enroll_student ON course_enrollments (student_id);
