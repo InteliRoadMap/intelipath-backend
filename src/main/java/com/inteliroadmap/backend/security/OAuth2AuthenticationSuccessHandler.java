@@ -83,7 +83,7 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         User user = userRepository.findByEmail(email);
         if (user != null) {
             RefreshToken token = RefreshToken.builder()
-                    .token(refreshToken)
+                    .token(TokenHashUtil.sha256Hex(refreshToken))
                     .user(User.builder().userId(user.getUserId()).build())
                     .expiredAt(LocalDateTime.now().plus(Duration.ofMillis(jwtService.getRefreshExpiration())))
                     .build();

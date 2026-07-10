@@ -7,6 +7,7 @@ import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.repositories.RefreshTokenRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.security.JwtService;
+import com.inteliroadmap.backend.security.TokenHashUtil;
 import com.inteliroadmap.backend.services.AuthService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -58,9 +59,9 @@ public class AuthServiceImpl implements AuthService {
             throw invalidRefreshToken();
         }
 
-        // Step 4: Find and lock refresh token from database
+        // Step 4: Find and lock refresh token from database (stored as a SHA-256 digest)
         Optional<RefreshToken> storedTokenOptional =
-                refreshTokenRepository.findByTokenForUpdate(refreshToken);
+                refreshTokenRepository.findByTokenForUpdate(TokenHashUtil.sha256Hex(refreshToken));
 
         if (storedTokenOptional.isEmpty()) {
             log.warn("AuthServiceImpl: Refresh token was not found for user: {}", email);
@@ -97,7 +98,7 @@ public class AuthServiceImpl implements AuthService {
         refreshTokenRepository.delete(storedToken);
 
         RefreshToken newStoredToken = RefreshToken.builder()
-                .token(newRefreshToken)
+                .token(TokenHashUtil.sha256Hex(newRefreshToken))
                 .user(User.builder().userId(user.getUserId()).build())
                 .expiredAt(LocalDateTime.now().plus(Duration.ofMillis(jwtService.getRefreshExpiration())))
                 .build();
@@ -115,7 +116,7 @@ public class AuthServiceImpl implements AuthService {
         if (refreshToken == null || refreshToken.isBlank()) {
             return;
         }
-        refreshTokenRepository.deleteByToken(refreshToken);
+        refreshTokenRepository.deleteByToken(TokenHashUtil.sha256Hex(refreshToken));
     }
 
     /**

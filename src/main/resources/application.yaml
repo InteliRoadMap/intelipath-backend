@@ -82,10 +82,6 @@ spring:
               # Spring's Streamable-HTTP client appends its MCP endpoint path (/mcp).
               url: ${MCP_DOCUMENT_SERVICE_URL:http://localhost:8000}
 
-jwt:
-  secret: ${JWT_SECRET}
-  expiration: ${JWT_EXPIRATION:86400000}
-
 supabase:
   url: ${SUPABASE_URL}
   key: ${SUPABASE_KEY}
@@ -107,3 +103,9 @@ mentor:
   # latency. Set false to skip it and make chat noticeably faster when you are
   # not using ingested knowledge. Tune here.
   rag-enabled: ${MENTOR_RAG_ENABLED:true}
+
+roadmap:
+  # A topic (spine) node auto-completes once this fraction of its child sub-skills'
+  # weight is COMPLETED (0.6 = 60%). Children unlock as soon as the topic is reached,
+  # and the student never marks a topic manually. Tune here.
+  parent-completion-threshold: ${ROADMAP_PARENT_COMPLETION_THRESHOLD:0.6}
