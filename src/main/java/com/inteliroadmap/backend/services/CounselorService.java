@@ -7,7 +7,7 @@ import com.inteliroadmap.backend.domain.dto.response.student.UpdateProfileRespon
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.mappers.CounselorMapper;
 import com.inteliroadmap.backend.services.CounselorService;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;

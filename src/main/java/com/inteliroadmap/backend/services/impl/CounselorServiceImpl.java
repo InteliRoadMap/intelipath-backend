@@ -12,6 +12,7 @@ import com.inteliroadmap.backend.domain.entity.Student;
 import com.inteliroadmap.backend.domain.entity.University;
 import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
+import com.inteliroadmap.backend.exceptions.UnauthorizedException;
 import com.inteliroadmap.backend.mappers.CounselorMapper;
 import com.inteliroadmap.backend.repositories.AcademicCounselorRepository;
 import com.inteliroadmap.backend.repositories.CareerRoleRepository;
@@ -23,7 +24,7 @@ import com.inteliroadmap.backend.repositories.StudentSkillRepository;
 import com.inteliroadmap.backend.repositories.UniversityRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.services.CounselorService;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -75,7 +76,7 @@ public class CounselorServiceImpl implements CounselorService {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByEmail(email);
         if (user == null) {
-            throw new ResourceNotFoundException("User not found from token");
+            throw new UnauthorizedException("User not found from token");
         }
         return user;
     }

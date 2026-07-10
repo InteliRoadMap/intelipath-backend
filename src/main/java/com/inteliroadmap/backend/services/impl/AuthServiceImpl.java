@@ -4,12 +4,13 @@ import com.inteliroadmap.backend.domain.dto.response.auth.RefreshResponse;
 import com.inteliroadmap.backend.domain.entity.RefreshToken;
 import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
+import com.inteliroadmap.backend.exceptions.UnauthorizedException;
 import com.inteliroadmap.backend.repositories.RefreshTokenRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.security.JwtService;
 import com.inteliroadmap.backend.security.TokenHashUtil;
 import com.inteliroadmap.backend.services.AuthService;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -65,7 +66,7 @@ public class AuthServiceImpl implements AuthService {
 
         if (storedTokenOptional.isEmpty()) {
             log.warn("AuthServiceImpl: Refresh token was not found for user: {}", email);
-            throw new ResourceNotFoundException("Refresh token or user not found");
+            throw new UnauthorizedException("Refresh token or user not found");
         }
 
         RefreshToken storedToken = storedTokenOptional.get();
@@ -78,7 +79,7 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByEmail(email);
         if (user == null) {
             log.warn("AuthServiceImpl: Refresh token user was not found: {}", email);
-            throw new ResourceNotFoundException("Refresh token or user not found");
+            throw new UnauthorizedException("Refresh token or user not found");
         }
 
         if (!storedToken.getUser().getUserId().equals(user.getUserId())) {

@@ -10,7 +10,7 @@ import com.inteliroadmap.backend.repositories.CareerRequiredSkillRepository;
 import com.inteliroadmap.backend.repositories.SkillRepository;
 import com.inteliroadmap.backend.repositories.StudentSkillEvidenceRepository;
 import com.inteliroadmap.backend.services.SkillEvidenceService;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

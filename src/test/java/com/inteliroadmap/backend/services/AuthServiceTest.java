@@ -1,11 +1,12 @@
 package com.inteliroadmap.backend.services;
 
-import com.inteliroadmap.backend.domain.dto.response.RefreshResponse;
+import com.inteliroadmap.backend.domain.dto.response.auth.RefreshResponse;
 import com.inteliroadmap.backend.services.impl.AuthServiceImpl;
 import com.inteliroadmap.backend.domain.entity.RefreshToken;
 import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.domain.enums.UserRole;
-import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
+import com.inteliroadmap.backend.exceptions.UnauthorizedException;
+import com.inteliroadmap.backend.security.TokenHashUtil;
 import com.inteliroadmap.backend.repositories.RefreshTokenRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.security.JwtService;
@@ -56,7 +57,7 @@ class AuthServiceTest {
 
         ArgumentCaptor<RefreshToken> tokenCaptor = ArgumentCaptor.forClass(RefreshToken.class);
         verify(refreshTokenRepository).save(tokenCaptor.capture());
-        assertEquals("new-refresh", tokenCaptor.getValue().getToken());
+        assertEquals(TokenHashUtil.sha256Hex("new-refresh"), tokenCaptor.getValue().getToken());
         assertEquals(user.getUserId(), tokenCaptor.getValue().getUser().getUserId());
     }
 
@@ -81,9 +82,9 @@ class AuthServiceTest {
     void rejectsRefreshTokenMissingFromDatabase() {
         when(jwtService.isTokenValid("old-refresh")).thenReturn(true);
         when(jwtService.extractEmail("old-refresh")).thenReturn("student@example.com");
-        when(refreshTokenRepository.findByTokenForUpdate("old-refresh")).thenReturn(Optional.empty());
+        when(refreshTokenRepository.findByTokenForUpdate(TokenHashUtil.sha256Hex("old-refresh"))).thenReturn(Optional.empty());
 
-        assertThrows(ResourceNotFoundException.class, () -> authService.refreshAccount("old-refresh"));
+        assertThrows(UnauthorizedException.class, () -> authService.refreshAccount("old-refresh"));
     }
 
     @Test
@@ -92,10 +93,10 @@ class AuthServiceTest {
         RefreshToken storedToken = storedToken(user, LocalDateTime.now().plusHours(1));
         when(jwtService.isTokenValid("old-refresh")).thenReturn(true);
         when(jwtService.extractEmail("old-refresh")).thenReturn(user.getEmail());
-        when(refreshTokenRepository.findByTokenForUpdate("old-refresh")).thenReturn(Optional.of(storedToken));
+        when(refreshTokenRepository.findByTokenForUpdate(TokenHashUtil.sha256Hex("old-refresh"))).thenReturn(Optional.of(storedToken));
         when(userRepository.findByEmail(user.getEmail())).thenReturn(null);
 
-        assertThrows(ResourceNotFoundException.class, () -> authService.refreshAccount("old-refresh"));
+        assertThrows(UnauthorizedException.class, () -> authService.refreshAccount("old-refresh"));
     }
 
     @Test
@@ -104,7 +105,7 @@ class AuthServiceTest {
         RefreshToken storedToken = storedToken(user, LocalDateTime.now().minusMinutes(1));
         when(jwtService.isTokenValid("old-refresh")).thenReturn(true);
         when(jwtService.extractEmail("old-refresh")).thenReturn(user.getEmail());
-        when(refreshTokenRepository.findByTokenForUpdate("old-refresh")).thenReturn(Optional.of(storedToken));
+        when(refreshTokenRepository.findByTokenForUpdate(TokenHashUtil.sha256Hex("old-refresh"))).thenReturn(Optional.of(storedToken));
 
         assertThrows(ResponseStatusException.class, () -> authService.refreshAccount("old-refresh"));
     }
@@ -112,7 +113,7 @@ class AuthServiceTest {
     private void stubValidToken(RefreshToken storedToken, User user) {
         when(jwtService.isTokenValid("old-refresh")).thenReturn(true);
         when(jwtService.extractEmail("old-refresh")).thenReturn(user.getEmail());
-        when(refreshTokenRepository.findByTokenForUpdate("old-refresh")).thenReturn(Optional.of(storedToken));
+        when(refreshTokenRepository.findByTokenForUpdate(TokenHashUtil.sha256Hex("old-refresh"))).thenReturn(Optional.of(storedToken));
         when(userRepository.findByEmail(user.getEmail())).thenReturn(user);
     }
 

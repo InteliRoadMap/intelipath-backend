@@ -41,7 +41,7 @@ import java.util.Optional;
 @Slf4j
 public class PortfolioServiceImpl implements PortfolioService {
 
-    private final AuthenticatedStudentService AuthenticatedStudentService;
+    private final AuthenticatedStudentService authenticatedStudentService;
     private final PortfolioMapper portfolioMapper;
     private final PortfolioConfigRepository portfolioConfigRepository;
     private final PortfolioProjectRepository portfolioProjectRepository;
@@ -61,7 +61,7 @@ public class PortfolioServiceImpl implements PortfolioService {
     @Override
     public PortfolioResponse getPortfolio() {
         // Retrieve the currently authenticated student
-        Student student = AuthenticatedStudentService.getRequiredStudent();
+        Student student = authenticatedStudentService.getRequiredStudent();
         // Fetch the associated user entity using the student's user ID
         Optional<User> userOpt = userRepository.findById(student.getUserId());
         if (userOpt.isEmpty()) {
@@ -139,7 +139,7 @@ public class PortfolioServiceImpl implements PortfolioService {
     @Override
     public PortfolioResponse upsertPortfolio(PortfolioUpsertRequest request) {
         // Get or create the authenticated student for updates
-        Student student = AuthenticatedStudentService.getOrCreateStudentForUpdate();
+        Student student = authenticatedStudentService.getOrCreateStudentForUpdate();
         // Fetch the corresponding user entity
         Optional<User> userOpt = userRepository.findById(student.getUserId());
         if (userOpt.isEmpty()) {
@@ -160,7 +160,7 @@ public class PortfolioServiceImpl implements PortfolioService {
     @Transactional
     @Override
     public void requestReview(RequestReviewRequest request) {
-        Student student = AuthenticatedStudentService.getRequiredStudent();
+        Student student = authenticatedStudentService.getRequiredStudent();
         User mentor = userRepository.findByEmail(request.getEmail());
         if (mentor == null || mentor.getRole() != UserRole.MENTOR) {
             throw new ResourceNotFoundException("Mentor not found");

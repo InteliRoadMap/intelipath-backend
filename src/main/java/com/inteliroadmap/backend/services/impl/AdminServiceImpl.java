@@ -9,15 +9,16 @@ import com.inteliroadmap.backend.domain.dto.response.admin.AdminUserListItemResp
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminUserMetricResponse;
 import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
+import com.inteliroadmap.backend.exceptions.BadRequestException;
+import com.inteliroadmap.backend.exceptions.ForbiddenException;
 import com.inteliroadmap.backend.mappers.AdminMapper;
 import com.inteliroadmap.backend.repositories.CareerRoleRepository;
 import com.inteliroadmap.backend.repositories.SkillNodeRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
-import com.inteliroadmap.backend.security.JwtService;
+import com.inteliroadmap.backend.security.SecurityUtils;
 import com.inteliroadmap.backend.ai.client.AiServiceClient;
 import com.inteliroadmap.backend.services.AdminService;
-import com.inteliroadmap.backend.utils.BearerTokenUtil;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import com.zaxxer.hikari.HikariDataSource;
@@ -44,7 +45,6 @@ public class AdminServiceImpl implements AdminService {
     private final UserRepository userRepository;
     private final CareerRoleRepository careerRoleRepository;
     private final SkillNodeRepository skillNodeRepository;
-    private final JwtService  jwtService;
     private final AdminMapper adminMapper;
     private final DataSource dataSource;
     private final AiServiceClient aiServiceClient;
@@ -52,13 +52,12 @@ public class AdminServiceImpl implements AdminService {
     /**
      * Retrieves the total users metric for the admin dashboard.
      *
-     * @param authorizationHeader the authorization header containing the admin's JWT token
      * @return the user metric data containing total user count and growth percentage
      */
     @Transactional
     @Override
-    public AdminUserMetricResponse getUserMetrics(String authorizationHeader) {
-        validateAdmin(authorizationHeader);
+    public AdminUserMetricResponse getUserMetrics() {
+
 
         log.info("AdminServiceImpl: Get user metric data");
 
@@ -76,13 +75,12 @@ public class AdminServiceImpl implements AdminService {
     /**
      * Retrieves the total learning paths and courses metric for the admin dashboard.
      *
-     * @param authorizationHeader the authorization header containing the admin's JWT token
      * @return the course metric data containing total active courses
      */
     @Transactional
     @Override
-    public AdminCourseMetricResponse getCourseMetrics(String authorizationHeader) {
-        validateAdmin(authorizationHeader);
+    public AdminCourseMetricResponse getCourseMetrics() {
+
 
         log.info("AdminServiceImpl: Get course metric data");
 
@@ -99,12 +97,11 @@ public class AdminServiceImpl implements AdminService {
     /**
      * Retrieves the system health status for the admin dashboard.
      *
-     * @param authorizationHeader the authorization header containing the admin's JWT token
      * @return the system health response containing uptime and status
      */
     @Override
-    public AdminSystemHealthResponse getSystemHealth(String authorizationHeader) {
-        validateAdmin(authorizationHeader);
+    public AdminSystemHealthResponse getSystemHealth() {
+
 
         log.info("AdminServiceImpl: Get system health");
 
@@ -171,13 +168,12 @@ public class AdminServiceImpl implements AdminService {
     /**
      * Retrieves a list of all users for the admin dashboard user table.
      *
-     * @param authorizationHeader the authorization header containing the admin's JWT token
      * @return a list of user details including roles and emails
      */
     @Transactional
     @Override
-    public List<AdminUserListItemResponse> getUsers(String authorizationHeader) {
-        validateAdmin(authorizationHeader);
+    public List<AdminUserListItemResponse> getUsers() {
+
 
         log.info("AdminServiceImpl: Get users list");
 
@@ -191,16 +187,15 @@ public class AdminServiceImpl implements AdminService {
     /**
      * Updates the role of a specific user.
      *
-     * @param authorizationHeader the authorization header containing the admin's JWT token
      * @param userId the unique identifier of the user to update
      * @param request the request object containing the new role
      * @return the updated user's details
      */
     @Transactional
     @Override
-    public AdminUserListItemResponse updateUserRole(String authorizationHeader, String userId, UpdateUserRoleRequest request) {
+    public AdminUserListItemResponse updateUserRole(String userId, UpdateUserRoleRequest request) {
 
-        validateAdmin(authorizationHeader);
+
 
         log.info("AdminServiceImpl: Update user role. userId: {}, role: {}", userId, request.getRole());
 
@@ -221,26 +216,25 @@ public class AdminServiceImpl implements AdminService {
      * Updates the account status of a user (e.g. suspend / reactivate). An admin
      * cannot suspend or deactivate their own account.
      *
-     * @param authorizationHeader the authorization header containing the admin's JWT token
      * @param userId the unique identifier of the user to update
      * @param request the request object containing the new {@link com.inteliroadmap.backend.domain.enums.UserStatus}
      * @return the updated user's details
      */
     @Transactional
     @Override
-    public AdminUserListItemResponse updateUserStatus(String authorizationHeader, String userId, UpdateUserStatusRequest request) {
+    public AdminUserListItemResponse updateUserStatus(String userId, UpdateUserStatusRequest request) {
 
-        validateAdmin(authorizationHeader);
+
 
         log.info("AdminServiceImpl: Update user status. userId: {}, status: {}", userId, request.getStatus());
 
-        String currentEmail = jwtService.extractEmail(BearerTokenUtil.extractToken(authorizationHeader));
+        String currentEmail = SecurityUtils.getCurrentUserEmail();
         User user = findUserById(userId);
 
         // An admin must not lock themselves out by suspending/deactivating their own account.
         if (user.getEmail().equals(currentEmail)
                 && request.getStatus() != UserStatus.ACTIVE) {
-            throw new ResourceNotFoundException("Admin cannot suspend own account");
+            throw new ForbiddenException("Admin cannot suspend own account");
         }
 
         user.setUserStatus(request.getStatus());
@@ -254,23 +248,22 @@ public class AdminServiceImpl implements AdminService {
     /**
      * Deletes a user by their ID. An admin cannot delete their own account.
      *
-     * @param authorizationHeader the authorization header containing the admin's JWT token
      * @param userId the unique identifier of the user to delete
      * @throws ResourceNotFoundException if the user attempts to delete their own account
      */
     @Transactional
     @Override
-    public void deleteUser(String authorizationHeader, String userId) {validateAdmin(authorizationHeader);
+    public void deleteUser(String userId) {
 
         log.info("AdminServiceImpl: Delete user. userId: {}", userId);
 
         // Extract the email of the admin performing the request to prevent self-deletion
-        String currentEmail = jwtService.extractEmail(BearerTokenUtil.extractToken(authorizationHeader));
+        String currentEmail = SecurityUtils.getCurrentUserEmail();
         User user = findUserById(userId);
 
         // Ensure the admin is not trying to delete their own account
         if (user.getEmail().equals(currentEmail)) {
-            throw new ResourceNotFoundException("Admin cannot delete own account");
+            throw new ForbiddenException("Admin cannot delete own account");
         }
 
         // Proceed to delete the user from the database
@@ -301,25 +294,7 @@ public class AdminServiceImpl implements AdminService {
             return userOptional.get();
         } catch (IllegalArgumentException e) {
             // Handle cases where the provided ID string is not a valid UUID format
-            throw new ResourceNotFoundException("Invalid user id");
-        }
-    }
-
-    /**
-     * Validates that the provided authorization header contains a valid admin token.
-     *
-     * @param authorizationHeader the HTTP authorization header
-     * @throws ResourceNotFoundException if the token is invalid or the user is not an admin
-     */
-    private void validateAdmin(String authorizationHeader) {
-        // Extract the token and role from the authorization header
-        String token = BearerTokenUtil.extractToken(authorizationHeader);
-        String role = jwtService.extractRole(token);
-
-        // Verify the token is valid and the user holds the ADMIN role
-        if (!jwtService.isTokenValid(token) || !"ADMIN".equals(role)) {
-            log.warn("AdminServiceImpl: Access denied. role: {}", role);
-            throw new ResourceNotFoundException("Access denied");
+            throw new BadRequestException("Invalid user id");
         }
     }
 

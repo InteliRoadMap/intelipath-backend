@@ -12,7 +12,6 @@ import com.inteliroadmap.backend.repositories.StudentRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.security.JwtService;
 import com.inteliroadmap.backend.services.VirtualMentorService;
-import com.inteliroadmap.backend.utils.BearerTokenUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.vectorstore.VectorStore;
@@ -25,15 +24,15 @@ import java.util.UUID;
 
 public interface VirtualMentorService {
 
-    public ChatSession createSession(String authorizationHeader, String sessionName) ;
+    public ChatSession createSession(String sessionName) ;
 
-    public List<ChatSession> getUserSessions(String authorizationHeader) ;
+    public List<ChatSession> getUserSessions() ;
 
-    public List<ChatMessage> getSessionMessages(String authorizationHeader, UUID sessionId) ;
+    public List<ChatMessage> getSessionMessages(UUID sessionId) ;
 
-    public ChatSession renameSession(String authorizationHeader, UUID sessionId, String newName) ;
+    public ChatSession renameSession(UUID sessionId, String newName) ;
 
-    public void deleteSession(String authorizationHeader, UUID sessionId) ;
+    public void deleteSession(UUID sessionId) ;
 
-    public Flux<String> streamChat(String authorizationHeader, UUID sessionId, VirtualMentorChatRequest request) ;
+    public Flux<String> streamChat(UUID sessionId, VirtualMentorChatRequest request) ;
 }

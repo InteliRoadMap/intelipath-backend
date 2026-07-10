@@ -12,6 +12,7 @@ import com.inteliroadmap.backend.domain.enums.CourseLevel;
 import com.inteliroadmap.backend.domain.enums.CourseStatus;
 import com.inteliroadmap.backend.domain.enums.EnrollmentStatus;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
+import com.inteliroadmap.backend.exceptions.ForbiddenException;
 import com.inteliroadmap.backend.repositories.CareerRoleRepository;
 import com.inteliroadmap.backend.repositories.CourseEnrollmentRepository;
 import com.inteliroadmap.backend.repositories.CourseLessonRepository;
@@ -174,7 +175,7 @@ public class CourseServiceImpl implements CourseService {
     public CourseResponse updateProgress(UUID courseId, int progress) {
         UUID studentId = currentUserId();
         CourseEnrollment enrollment = enrollmentRepository.findByCourseIdAndStudentId(courseId, studentId)
-                .orElseThrow(() -> new ResourceNotFoundException("You are not enrolled in this course"));
+                .orElseThrow(() -> new ForbiddenException("You are not enrolled in this course"));
         int clamped = Math.max(0, Math.min(100, progress));
         enrollment.setProgress(clamped);
         enrollment.setStatus(clamped >= 100 ? EnrollmentStatus.COMPLETED : EnrollmentStatus.ENROLLED);

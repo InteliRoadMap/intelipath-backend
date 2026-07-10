@@ -27,7 +27,6 @@ import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -91,7 +90,6 @@ public class AdminController {
     /**
      * GET /admin/dashboard/metrics/users - Get total users metric.
      *
-     * @param authorizationHeader Authorization header containing Bearer access token
      * @return ResponseEntity containing AdminUserMetricResponse
      */
     @GetMapping("/metrics/users")
@@ -118,18 +116,16 @@ public class AdminController {
             )
     })
     public ResponseEntity<AdminUserMetricResponse> getUserMetric(
-            @RequestHeader("Authorization") String authorizationHeader
     ) {
         log.info("AdminController: User metric request received");
         return ResponseEntity.ok(
-                adminService.getUserMetrics(authorizationHeader)
+                adminService.getUserMetrics()
         );
     }
 
     /**
      * GET /admin/dashboard/metrics/courses - Get total courses metric.
      *
-     * @param authorizationHeader Authorization header containing Bearer access token
      * @return ResponseEntity containing AdminCourseMetricResponse
      */
     @GetMapping("/metrics/courses")
@@ -156,18 +152,16 @@ public class AdminController {
             )
     })
     public ResponseEntity<AdminCourseMetricResponse> getCourseMetric(
-            @RequestHeader("Authorization") String authorizationHeader
     ) {
         log.info("AdminController: Course metric request received");
         return ResponseEntity.ok(
-                adminService.getCourseMetrics(authorizationHeader)
+                adminService.getCourseMetrics()
         );
     }
 
     /**
      * GET /admin/dashboard/metrics/health - Get system health metric.
      *
-     * @param authorizationHeader Authorization header containing Bearer access token
      * @return ResponseEntity containing AdminSystemHealthResponse
      */
     @GetMapping("/metrics/health")
@@ -194,18 +188,16 @@ public class AdminController {
             )
     })
     public ResponseEntity<AdminSystemHealthResponse> getSystemHealth(
-            @RequestHeader("Authorization") String authorizationHeader
     ) {
         log.info("AdminController: System health request received");
         return ResponseEntity.ok(
-                adminService.getSystemHealth(authorizationHeader)
+                adminService.getSystemHealth()
         );
     }
 
     /**
      * GET /admin/dashboard/users - Get latest users list.
      *
-     * @param authorizationHeader Authorization header containing Bearer access token
      * @return ResponseEntity containing list of AdminUserListItemResponse
      */
     @GetMapping("/users")
@@ -232,18 +224,16 @@ public class AdminController {
             )
     })
     public ResponseEntity<List<AdminUserListItemResponse>> getUsers(
-            @RequestHeader("Authorization") String authorizationHeader
     ) {
         log.info("AdminController: Users list request received");
         return ResponseEntity.ok(
-                adminService.getUsers(authorizationHeader)
+                adminService.getUsers()
         );
     }
 
     /**
      * PATCH /admin/dashboard/users/{userId}/role - Update a user's role.
      *
-     * @param authorizationHeader Authorization header containing Bearer access token
      * @param userId              User id to update
      * @param request             Request payload containing the new role
      * @return ResponseEntity containing updated AdminUserListItemResponse
@@ -280,7 +270,6 @@ public class AdminController {
             )
     })
     public ResponseEntity<AdminUserListItemResponse> updateUserRole(
-            @RequestHeader("Authorization") String authorizationHeader,
             @PathVariable String userId,
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     description = "Update user role request payload",
@@ -294,14 +283,13 @@ public class AdminController {
     ) {
         log.info("AdminController: Update user role request received. userId: {}", userId);
         return ResponseEntity.ok(
-                adminService.updateUserRole(authorizationHeader, userId, request)
+                adminService.updateUserRole(userId, request)
         );
     }
 
     /**
      * PATCH /admin/dashboard/users/{userId}/status - Suspend / reactivate a user.
      *
-     * @param authorizationHeader Authorization header containing Bearer access token
      * @param userId              User id to update
      * @param request             Request payload containing the new account status
      * @return ResponseEntity containing updated AdminUserListItemResponse
@@ -326,7 +314,6 @@ public class AdminController {
             @ApiResponse(responseCode = "404", description = "User not found")
     })
     public ResponseEntity<AdminUserListItemResponse> updateUserStatus(
-            @RequestHeader("Authorization") String authorizationHeader,
             @PathVariable String userId,
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     description = "Update user status request payload",
@@ -340,14 +327,13 @@ public class AdminController {
     ) {
         log.info("AdminController: Update user status request received. userId: {}", userId);
         return ResponseEntity.ok(
-                adminService.updateUserStatus(authorizationHeader, userId, request)
+                adminService.updateUserStatus(userId, request)
         );
     }
 
     /**
      * DELETE /admin/dashboard/users/{userId} - Delete a user.
      *
-     * @param authorizationHeader Authorization header containing Bearer access token
      * @param userId              User id to delete
      * @return ResponseEntity with no content
      */
@@ -379,11 +365,10 @@ public class AdminController {
             )
     })
     public ResponseEntity<Void> deleteUser(
-            @RequestHeader("Authorization") String authorizationHeader,
             @PathVariable String userId
     ) {
         log.info("AdminController: Delete user request received. userId: {}", userId);
-        adminService.deleteUser(authorizationHeader, userId);
+        adminService.deleteUser(userId);
         return ResponseEntity.noContent().build();
     }
 }

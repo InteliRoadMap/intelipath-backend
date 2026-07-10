@@ -13,8 +13,7 @@ import com.inteliroadmap.backend.repositories.CareerRoleRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.security.JwtService;
 import com.inteliroadmap.backend.services.AdminService;
-import com.inteliroadmap.backend.utils.BearerTokenUtil;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -24,17 +23,17 @@ import java.util.UUID;
 
 public interface AdminService {
 
-    public AdminUserMetricResponse getUserMetrics(String authorizationHeader) ;
+    AdminUserMetricResponse getUserMetrics();
 
-    public AdminCourseMetricResponse getCourseMetrics(String authorizationHeader) ;
+    AdminCourseMetricResponse getCourseMetrics();
 
-    public AdminSystemHealthResponse getSystemHealth(String authorizationHeader) ;
+    AdminSystemHealthResponse getSystemHealth();
 
-    public List<AdminUserListItemResponse> getUsers(String authorizationHeader) ;
+    List<AdminUserListItemResponse> getUsers();
 
-    public AdminUserListItemResponse updateUserRole(String authorizationHeader, String userId, UpdateUserRoleRequest request) ;
+    AdminUserListItemResponse updateUserRole(String userId, UpdateUserRoleRequest request);
 
-    public AdminUserListItemResponse updateUserStatus(String authorizationHeader, String userId, UpdateUserStatusRequest request) ;
+    AdminUserListItemResponse updateUserStatus(String userId, UpdateUserStatusRequest request);
 
-    public void deleteUser(String authorizationHeader, String userId) ;
+    void deleteUser(String userId);
 }

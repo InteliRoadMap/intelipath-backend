@@ -33,7 +33,7 @@ import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.services.AuthenticatedStudentService;
 import com.inteliroadmap.backend.services.StudentDashboardService;
 import com.inteliroadmap.backend.services.StudentService;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;

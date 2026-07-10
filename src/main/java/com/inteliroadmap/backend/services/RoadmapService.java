@@ -37,15 +37,13 @@ public interface RoadmapService {
 
     public RoadmapResponse updateNodeProgress(UpdateUserProgressRequest request) ;
 
-    public StudentRoadmapResponse getStudentRoadmap(String authHeader) ;
-
     public StudentRoadmapResponse getCareerRoadmapTemplate(UUID careerId) ;
 
-    public Integer getCareerProgress(UUID careerId, String authHeader) ;
+    public Integer getCareerProgress(UUID careerId) ;
 
     public RoadmapNodeDto getNodeDetail(UUID nodeId) ;
 
-    public void updateNodeProgress(UpdateNodeProgressRequest request, String authHeader) ;
+    public void updateNodeProgress(UpdateNodeProgressRequest request) ;
 
-    public SkillGapResponse compareSkills(String authHeader) ;
+    public SkillGapResponse compareSkills() ;
 }

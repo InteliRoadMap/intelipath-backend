@@ -7,12 +7,13 @@ import com.inteliroadmap.backend.domain.entity.OauthAccount;
 import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.domain.enums.UserRole;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
+import com.inteliroadmap.backend.exceptions.BadRequestException;
 import com.inteliroadmap.backend.repositories.OauthAccountRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.security.CustomOAuth2User;
 import com.inteliroadmap.backend.repositories.StudentRepository;
 import com.inteliroadmap.backend.domain.entity.Student;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
@@ -284,7 +285,7 @@ public class OAuth2UserServiceImpl extends DefaultOAuth2UserService {
             case "github" -> new GitHubOauth2UserInfo(attributes);
             default -> {
                 log.warn("OAuth2UserServiceImpl: Unsupported OAuth2 provider: {}", provider);
-                throw new ResourceNotFoundException("Unknown provider: " + provider);
+                throw new BadRequestException("Unknown provider: " + provider);
             }
         };
     }

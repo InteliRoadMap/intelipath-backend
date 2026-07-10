@@ -20,6 +20,7 @@ import com.inteliroadmap.backend.domain.enums.ReviewStatus;
 import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
 import com.inteliroadmap.backend.domain.enums.UserRole;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
+import com.inteliroadmap.backend.exceptions.ForbiddenException;
 import com.inteliroadmap.backend.repositories.FeedbackRepository;
 import com.inteliroadmap.backend.repositories.IndustryMentorRepository;
 import com.inteliroadmap.backend.repositories.PortfolioReviewRequestRepository;
@@ -30,7 +31,7 @@ import com.inteliroadmap.backend.repositories.StudentSkillRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.services.MentorService;
 import com.inteliroadmap.backend.services.RoadmapService;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -71,7 +72,7 @@ public class MentorServiceImpl implements MentorService {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByEmail(email);
         if (user == null || user.getRole() != UserRole.MENTOR) {
-            throw new ResourceNotFoundException("Mentor not found from token or invalid role");
+            throw new ForbiddenException("Mentor not found from token or invalid role");
         }
         return user;
     }

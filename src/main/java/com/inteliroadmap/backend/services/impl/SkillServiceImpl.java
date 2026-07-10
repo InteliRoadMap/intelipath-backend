@@ -16,7 +16,7 @@ import com.inteliroadmap.backend.repositories.CareerRoleRepository;
 import com.inteliroadmap.backend.repositories.SkillRepository;
 import com.inteliroadmap.backend.repositories.StudentSkillRepository;
 import com.inteliroadmap.backend.services.SkillService;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -41,7 +41,7 @@ public class SkillServiceImpl implements SkillService {
     private final StudentSkillRepository studentSkillRepository;
     private final CareerRoleRepository careerRoleRepository;
     private final CareerRequiredSkillRepository careerRequiredSkillRepository;
-    private final AuthenticatedStudentService AuthenticatedStudentService;
+    private final AuthenticatedStudentService authenticatedStudentService;
     private final SkillMapper skillMapper;
 
     /**
@@ -55,7 +55,7 @@ public class SkillServiceImpl implements SkillService {
         log.info("SkillServiceImpl: Student skill retrieval request received");
 
         // Step 1: Get or create the authenticated student
-        Student student = AuthenticatedStudentService.getOrCreateStudent();
+        Student student = authenticatedStudentService.getOrCreateStudent();
 
         // Step 2: Load the student's selected skills and all available skills
         List<StudentSkill> selectedSkills = studentSkillRepository.findByStudent_UserId(student.getUserId());
@@ -118,7 +118,7 @@ public class SkillServiceImpl implements SkillService {
         log.info("SkillServiceImpl: Student skill selection request received");
 
         // Step 1: Get the authenticated student and lock profile data for update
-        Student student = AuthenticatedStudentService.getOrCreateStudentForUpdate();
+        Student student = authenticatedStudentService.getOrCreateStudentForUpdate();
 
         // Step 2: Remove duplicate skill IDs while preserving request order
         Set<UUID> requestedSkillIds = new LinkedHashSet<>(request.getSkillIds());
@@ -186,7 +186,7 @@ public class SkillServiceImpl implements SkillService {
         log.info("SkillServiceImpl: Student skill comparison request received. careerId: {}", request.getCareerId());
 
         // Step 1: Get or create the authenticated student
-        Student student = AuthenticatedStudentService.getOrCreateStudent();
+        Student student = authenticatedStudentService.getOrCreateStudent();
 
         // Step 2: Verify that the requested career exists
         Optional<CareerRole> careerOptional = careerRoleRepository.findById(request.getCareerId());

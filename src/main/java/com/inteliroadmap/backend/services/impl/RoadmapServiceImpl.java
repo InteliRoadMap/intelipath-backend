@@ -27,7 +27,8 @@ import com.inteliroadmap.backend.repositories.StudentRepository;
 import com.inteliroadmap.backend.repositories.StudentSkillRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
-import com.inteliroadmap.backend.security.JwtService;
+import com.inteliroadmap.backend.security.SecurityUtils;
+import com.inteliroadmap.backend.services.AuthenticatedStudentService;
 import com.inteliroadmap.backend.services.RoadmapService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -67,14 +68,13 @@ public class RoadmapServiceImpl implements RoadmapService {
     private final StudentSkillRepository studentSkillRepository;
     private final CareerRequiredSkillRepository careerRequiredSkillRepository;
     private final SkillRepository skillRepository;
-    private final JwtService jwtService;
 
     private static final String COMPLETED_STATUS = "COMPLETED";
     private static final String FRONTEND_COMPLETED_STATUS = "completed";
     private static final String FRONTEND_IN_PROGRESS_STATUS = "in_progress";
     private static final String FRONTEND_CURRENT_STATUS = "current";
     private static final String FRONTEND_LOCKED_STATUS = "locked";
-    private final com.inteliroadmap.backend.services.AuthenticatedStudentService AuthenticatedStudentService;
+    private final AuthenticatedStudentService authenticatedStudentService;
 
     /**
      * Fraction of a topic's child weight that must be COMPLETED before the topic
@@ -93,7 +93,7 @@ public class RoadmapServiceImpl implements RoadmapService {
      * @throws ResourceNotFoundException if the token is invalid or the student profile is missing
      */
     private Student getAuthenticatedStudent() {
-        return AuthenticatedStudentService.getOrCreateStudent();
+        return authenticatedStudentService.getOrCreateStudent();
     }
 
     /**
@@ -284,50 +284,6 @@ public class RoadmapServiceImpl implements RoadmapService {
     }
 
     /**
-     * Retrieves the authenticated student's roadmap using the existing roadmap API contract.
-     *
-     * @param authHeader authorization header containing the Bearer access token
-     * @return flat roadmap response used by the existing roadmap controller
-     */
-    @Transactional(readOnly = true)
-    @Override
-    public StudentRoadmapResponse getStudentRoadmap(String authHeader) {
-        Student student = getStudentFromAuthHeader(authHeader);
-        if (student.getCareerRole() == null) {
-            throw new ResourceNotFoundException("Student has not selected a career path yet.");
-        }
-        CareerRole careerRole = careerRoleRepository.findByCareerId(student.getCareerRole().getCareerId());
-        if (careerRole == null) {
-            throw new ResourceNotFoundException("Student has not selected a career path yet.");
-        }
-
-        List<SkillNode> nodes = skillNodeRepository
-                .findByCareerRole_CareerIdOrderByNodeLevelAscNodeNameAsc(careerRole.getCareerId());
-        List<StudentProgress> progressList = studentProgressRepository.findByStudent_UserId(student.getUserId());
-        Map<UUID, String> progressMap = progressList.stream()
-                .collect(Collectors.toMap(
-                        s -> s.getSkillNode().getNodeId(),
-                        progress -> progress.getStatus() != null ? progress.getStatus().toFrontendValue() : "not_started",
-                        (existing, replacement) -> existing
-                ));
-
-        List<RoadmapNodeDto> nodeDtos = nodes.stream()
-                .map(node -> mapToLegacyNodeDto(node, progressMap.get(node.getNodeId())))
-                .toList();
-
-        int completed = (int) progressList.stream()
-                .filter(progress -> RoadmapStepStatus.COMPLETED == progress.getStatus())
-                .count();
-        int progressPercent = nodes.isEmpty() ? 0 : (completed * 100) / nodes.size();
-
-        return StudentRoadmapResponse.builder()
-                .targetCareerRole(careerRole.getCareerName())
-                .progress(progressPercent)
-                .nodes(nodeDtos)
-                .build();
-    }
-
-    /**
      * Retrieves the roadmap template for a career without student progress.
      *
      * @param careerId career role UUID
@@ -359,13 +315,12 @@ public class RoadmapServiceImpl implements RoadmapService {
      * Calculates the authenticated student's completion percentage for a career.
      *
      * @param careerId career role UUID
-     * @param authHeader authorization header containing the Bearer access token
      * @return completion percentage from 0 to 100
      */
     @Transactional(readOnly = true)
     @Override
-    public Integer getCareerProgress(UUID careerId, String authHeader) {
-        Student student = getStudentFromAuthHeader(authHeader);
+    public Integer getCareerProgress(UUID careerId) {
+        Student student = getStudentFromContext();
         List<SkillNode> nodes = skillNodeRepository.findByCareerRole_CareerId(careerId);
         if (nodes.isEmpty()) {
             return 0;
@@ -407,12 +362,11 @@ public class RoadmapServiceImpl implements RoadmapService {
      * Creates or updates the authenticated student's progress for a roadmap node.
      *
      * @param request request body containing node ID and status
-     * @param authHeader authorization header containing the Bearer access token
      */
     @Transactional
     @Override
-    public void updateNodeProgress(UpdateNodeProgressRequest request, String authHeader) {
-        Student student = getStudentFromAuthHeader(authHeader);
+    public void updateNodeProgress(UpdateNodeProgressRequest request) {
+        Student student = getStudentFromContext();
 
         Optional<SkillNode> nodeOptional = skillNodeRepository.findById(request.getNodeId());
         if (nodeOptional.isEmpty()) {
@@ -549,13 +503,12 @@ public class RoadmapServiceImpl implements RoadmapService {
     /**
      * Compares selected student skills with the target career requirements.
      *
-     * @param authHeader authorization header containing the Bearer access token
      * @return current and missing skill names
      */
     @Transactional(readOnly = true)
     @Override
-    public SkillGapResponse compareSkills(String authHeader) {
-        Student student = getStudentFromAuthHeader(authHeader);
+    public SkillGapResponse compareSkills() {
+        Student student = getStudentFromContext();
         CareerRole careerRole = careerRoleRepository.findByCareerId(student.getCareerRole().getCareerId());
         if (careerRole == null) {
             throw new ResourceNotFoundException("Student has not selected a career path yet.");
@@ -591,18 +544,12 @@ public class RoadmapServiceImpl implements RoadmapService {
     /**
      * Retrieves the student entity from the provided authorization header.
      *
-     * @param authHeader the authorization header containing the Bearer token
      * @return the {@link Student} associated with the token
      * @throws RuntimeException if the authorization header is invalid
      * @throws ResourceNotFoundException if the user or student profile cannot be found
      */
-    private Student getStudentFromAuthHeader(String authHeader) {
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            throw new RuntimeException("Invalid Authorization header");
-        }
-
-        String token = authHeader.substring(7);
-        String email = jwtService.extractEmail(token);
+    private Student getStudentFromContext() {
+        String email = SecurityUtils.getCurrentUserEmail();
         User user = userRepository.findByEmail(email);
         if (user == null) {
             throw new ResourceNotFoundException("User not found");

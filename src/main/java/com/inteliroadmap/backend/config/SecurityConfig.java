@@ -1,6 +1,5 @@
 package com.inteliroadmap.backend.config;
 
-//import com.inteliroadmap.backend.security.JwtAuthenticationFilter;
 import com.inteliroadmap.backend.security.OAuth2AuthenticationFailureHandler;
 import com.inteliroadmap.backend.security.OAuth2AuthenticationSuccessHandler;
 import com.inteliroadmap.backend.security.HttpCookieOAuth2AuthorizationRequestRepository;

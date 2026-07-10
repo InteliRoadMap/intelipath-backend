@@ -7,13 +7,13 @@ import com.inteliroadmap.backend.domain.entity.ChatSession;
 import com.inteliroadmap.backend.domain.entity.Student;
 import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
+import com.inteliroadmap.backend.exceptions.ForbiddenException;
 import com.inteliroadmap.backend.repositories.ChatMessageRepository;
 import com.inteliroadmap.backend.repositories.ChatSessionRepository;
 import com.inteliroadmap.backend.repositories.StudentRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
-import com.inteliroadmap.backend.security.JwtService;
+import com.inteliroadmap.backend.security.SecurityUtils;
 import com.inteliroadmap.backend.services.VirtualMentorService;
-import com.inteliroadmap.backend.utils.BearerTokenUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
@@ -50,7 +50,6 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
     private final ChatMessageRepository chatMessageRepository;
     private final StudentRepository studentRepository;
     private final UserRepository userRepository;
-    private final JwtService jwtService;
     private final ChatClient chatClient;
     private final VectorStore vectorStore;
     private final AiServiceClient aiServiceClient;
@@ -71,7 +70,6 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
      * @param chatMessageRepository repository for chat messages
      * @param studentRepository repository for student profiles
      * @param userRepository repository for user profiles
-     * @param jwtService service for JWT operations
      * @param chatClientBuilder builder for creating the chat client
      * @param vectorStore the vector store for AI search and retrieval
      */
@@ -79,7 +77,6 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
                                 ChatMessageRepository chatMessageRepository,
                                 StudentRepository studentRepository,
                                 UserRepository userRepository,
-                                JwtService jwtService,
                                 ChatClient chatClient,
                                 VectorStore vectorStore,
                                 AiServiceClient aiServiceClient,
@@ -89,7 +86,6 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
         this.chatMessageRepository = chatMessageRepository;
         this.studentRepository = studentRepository;
         this.userRepository = userRepository;
-        this.jwtService = jwtService;
         this.vectorStore = vectorStore;
         this.chatClient = chatClient;
         this.aiServiceClient = aiServiceClient;
@@ -104,14 +100,13 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
     /**
      * Creates a new chat session for the authenticated user.
      *
-     * @param authorizationHeader the authorization header containing the user's JWT token
      * @param sessionName the name for the new session, defaults to "New Chat" if blank or null
      * @return the created ChatSession
      */
     @Override
-    public ChatSession createSession(String authorizationHeader, String sessionName) {
+    public ChatSession createSession(String sessionName) {
         // Retrieve authenticated user from the provided token
-        User user = getAuthenticatedUser(authorizationHeader);
+        User user = getAuthenticatedUser();
         
         // Build the new chat session and handle default naming
         ChatSession chatSession = ChatSession.builder()
@@ -127,31 +122,29 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
     /**
      * Retrieves all chat sessions for the authenticated user.
      *
-     * @param authorizationHeader the authorization header containing the user's JWT token
      * @return a list of chat sessions belonging to the user
      */
     @Override
-    public List<ChatSession> getUserSessions(String authorizationHeader) {
-        User user = getAuthenticatedUser(authorizationHeader);
+    public List<ChatSession> getUserSessions() {
+        User user = getAuthenticatedUser();
         return chatSessionRepository.findByUser_UserIdOrderByCreatedAtDesc(user.getUserId());
     }
 
     /**
      * Retrieves all messages for a specific chat session belonging to the user.
      *
-     * @param authorizationHeader the authorization header containing the user's JWT token
      * @param sessionId the ID of the chat session
      * @return a list of chat messages for the session
      * @throws ResourceNotFoundException if the session is not found or access is denied
      */
     @Override
-    public List<ChatMessage> getSessionMessages(String authorizationHeader, UUID sessionId) {
-        User user = getAuthenticatedUser(authorizationHeader);
+    public List<ChatMessage> getSessionMessages(UUID sessionId) {
+        User user = getAuthenticatedUser();
         ChatSession session = chatSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Chat session not found"));
                 
         if (!session.getUser().getUserId().equals(user.getUserId())) {
-            throw new ResourceNotFoundException("Access denied to this session");
+            throw new ForbiddenException("Access denied to this session");
         }
         
         return chatMessageRepository.findByChatSession_SessionIdOrderByCreatedAtAsc(sessionId);
@@ -160,7 +153,6 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
     /**
      * Renames an existing chat session for the authenticated user.
      *
-     * @param authorizationHeader the authorization header containing the user's JWT token
      * @param sessionId the ID of the chat session to rename
      * @param newName the new name for the chat session
      * @return the updated ChatSession
@@ -168,13 +160,13 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
      */
     @Transactional
     @Override
-    public ChatSession renameSession(String authorizationHeader, UUID sessionId, String newName) {
-        User user = getAuthenticatedUser(authorizationHeader);
+    public ChatSession renameSession(UUID sessionId, String newName) {
+        User user = getAuthenticatedUser();
         ChatSession session = chatSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Chat session not found"));
 
         if (!session.getUser().getUserId().equals(user.getUserId())) {
-            throw new ResourceNotFoundException("Access denied to this session");
+            throw new ForbiddenException("Access denied to this session");
         }
 
         session.setSessionName(newName);
@@ -184,19 +176,18 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
     /**
      * Deletes a specific chat session and all associated messages.
      *
-     * @param authorizationHeader the authorization header containing the user's JWT token
      * @param sessionId the ID of the chat session to delete
      * @throws ResourceNotFoundException if the session is not found or access is denied
      */
     @Transactional
     @Override
-    public void deleteSession(String authorizationHeader, UUID sessionId) {
-        User user = getAuthenticatedUser(authorizationHeader);
+    public void deleteSession(UUID sessionId) {
+        User user = getAuthenticatedUser();
         ChatSession session = chatSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Chat session not found"));
 
         if (!session.getUser().getUserId().equals(user.getUserId())) {
-            throw new ResourceNotFoundException("Access denied to this session");
+            throw new ForbiddenException("Access denied to this session");
         }
 
         // Delete all messages belonging to this session first to prevent foreign key constraint violations
@@ -208,22 +199,21 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
     /**
      * Streams a chat response from the virtual mentor in a specific chat session.
      *
-     * @param authorizationHeader the authorization header containing the user's JWT token
      * @param sessionId the ID of the chat session
      * @param request the request containing the user's message
      * @return a Flux streaming the AI's response content
      * @throws ResourceNotFoundException if the session is not found or access is denied
      */
     @Override
-    public Flux<String> streamChat(String authorizationHeader, UUID sessionId, VirtualMentorChatRequest request) {
+    public Flux<String> streamChat(UUID sessionId, VirtualMentorChatRequest request) {
         // Authenticate user and fetch the targeted chat session
-        User user = getAuthenticatedUser(authorizationHeader);
+        User user = getAuthenticatedUser();
         ChatSession session = chatSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Chat session not found"));
 
         // Ensure the authenticated user owns this chat session
         if (!session.getUser().getUserId().equals(user.getUserId())) {
-            throw new ResourceNotFoundException("Access denied to this session");
+            throw new ForbiddenException("Access denied to this session");
         }
 
         // Save User Message to the database
@@ -343,15 +333,13 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
     }
 
     /**
-     * Helper method to authenticate and retrieve the user from the authorization header.
+     * Resolves the current user from the security context.
      *
-     * @param authorizationHeader the authorization header containing the JWT token
      * @return the authenticated User
      * @throws ResourceNotFoundException if the user is not found
      */
-    private User getAuthenticatedUser(String authorizationHeader) {
-        String token = BearerTokenUtil.extractToken(authorizationHeader);
-        String email = jwtService.extractEmail(token);
+    private User getAuthenticatedUser() {
+        String email = SecurityUtils.getCurrentUserEmail();
         User user = userRepository.findByEmail(email);
         if (user == null) {
             throw new ResourceNotFoundException("User not found");

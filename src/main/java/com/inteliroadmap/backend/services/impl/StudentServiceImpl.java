@@ -38,7 +38,7 @@ import com.inteliroadmap.backend.repositories.StudentSkillRepository;
 import com.inteliroadmap.backend.repositories.UniversityRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.services.StudentService;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -81,7 +81,7 @@ public class StudentServiceImpl implements StudentService {
     private final SupabaseStorageService supabaseStorageService;
     private final RagDocumentService ragDocumentService;
     private final DocumentIngestionService documentIngestionService;
-    private final AuthenticatedStudentService AuthenticatedStudentService;
+    private final AuthenticatedStudentService authenticatedStudentService;
 
     /**
      * Sets up or updates the student's profile information such as university, major, admission year, and target career.
@@ -95,7 +95,7 @@ public class StudentServiceImpl implements StudentService {
     public StudentResponse setupStudentProfile(SetupStudentProfileRequest request) {
         log.info("StudentServiceImpl: Setup Student Profile Request received");
 
-        Student student = AuthenticatedStudentService.getOrCreateStudentForUpdate();
+        Student student = authenticatedStudentService.getOrCreateStudentForUpdate();
         User user = userRepository.findByUserId(student.getUserId());
         if (user == null) {
             throw new ResourceNotFoundException("User not found");
@@ -177,7 +177,7 @@ public class StudentServiceImpl implements StudentService {
     @Override
     public StudentResponse getStudentProfile() {
         log.info("StudentServiceImpl: Student profile retrieval request received");
-        Student student = AuthenticatedStudentService.getRequiredStudent();
+        Student student = authenticatedStudentService.getRequiredStudent();
         return studentMapper.toProfileResponse(student);
     }
 
@@ -192,7 +192,7 @@ public class StudentServiceImpl implements StudentService {
     @Override
     public StudentResponse updateTargetCareer(UUID careerId) {
         log.info("StudentServiceImpl: Student target career update request received. careerId: {}", careerId);
-        Student student = AuthenticatedStudentService.getOrCreateStudentForUpdate();
+        Student student = authenticatedStudentService.getOrCreateStudentForUpdate();
         CareerRole career = careerRoleRepository.findByCareerId(careerId);
         if (career == null) {
             throw new ResourceNotFoundException("Career role not found");
@@ -262,7 +262,7 @@ public class StudentServiceImpl implements StudentService {
      * @return the current {@link Student}
      */
     private Student getCurrentStudent() {
-        return AuthenticatedStudentService.getOrCreateStudent();
+        return authenticatedStudentService.getOrCreateStudent();
     }
 
     /**
@@ -331,7 +331,7 @@ public class StudentServiceImpl implements StudentService {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("Transcript file is required");
         }
-        Student student = AuthenticatedStudentService.getOrCreateStudentForUpdate();
+        Student student = authenticatedStudentService.getOrCreateStudentForUpdate();
         User user = userRepository.findByUserId(student.getUserId());
         if (user == null) {
             throw new ResourceNotFoundException("User not found");

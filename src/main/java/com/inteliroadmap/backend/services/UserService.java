@@ -9,7 +9,7 @@ import com.inteliroadmap.backend.mappers.UserMapper;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.services.SupabaseStorageService;
 import com.inteliroadmap.backend.services.UserService;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.context.SecurityContextHolder;
