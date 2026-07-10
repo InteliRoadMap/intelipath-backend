@@ -21,6 +21,10 @@ public class RoadmapNodeDto {
     private String completionPolicy;
     private Integer weight;
     private Integer requiredProficiency;
+    // Topic (spine) node that owns child sub-skills and auto-completes from them.
+    private Boolean parentTopic;
+    private Integer childTotal;
+    private Integer childCompleted;
     // Layout metadata (presentation only, sourced from roadmap_node_layouts).
     private Double positionX;
     private Double positionY;

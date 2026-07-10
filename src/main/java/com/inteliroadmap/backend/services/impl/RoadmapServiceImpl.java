@@ -31,6 +31,7 @@ import com.inteliroadmap.backend.security.JwtService;
 import com.inteliroadmap.backend.services.RoadmapService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -74,6 +75,15 @@ public class RoadmapServiceImpl implements RoadmapService {
     private static final String FRONTEND_CURRENT_STATUS = "current";
     private static final String FRONTEND_LOCKED_STATUS = "locked";
     private final com.inteliroadmap.backend.services.AuthenticatedStudentService AuthenticatedStudentService;
+
+    /**
+     * Fraction of a topic's child weight that must be COMPLETED before the topic
+     * (spine) node itself auto-completes. A topic like "Internet" finishes once
+     * its sub-skills (HTTP, DNS, Hosting...) cross this threshold — the student
+     * never marks the topic manually. Configurable via {@code roadmap.parent-completion-threshold}.
+     */
+    @Value("${roadmap.parent-completion-threshold:0.6}")
+    private double parentCompletionThreshold;
 
     /**
      * Securely identifies the currently authenticated student.
@@ -169,7 +179,7 @@ public class RoadmapServiceImpl implements RoadmapService {
         return StudentRoadmapResponse.builder()
                 .targetCareerRole(careerRole.getCareerName())
                 .progress(progress)
-                .nodes(buildRoadmapTree(nodes, statusByNodeId))
+                .nodes(buildRoadmapTree(nodes, statusByNodeId, progressByNodeId))
                 .build();
     }
 
@@ -473,6 +483,67 @@ public class RoadmapServiceImpl implements RoadmapService {
             }
         }
         studentProgressRepository.save(progress);
+
+        // A topic (spine) node auto-completes from its children, so whenever a child's
+        // status changes, re-evaluate every ancestor topic and complete/revert it.
+        syncTopicAutoCompletion(student, node);
+    }
+
+    /**
+     * Walks up the parent chain of {@code changedNode} and keeps each topic node's
+     * stored progress in sync with the auto-completion rule: a topic is COMPLETED once
+     * its child weight crosses {@link #parentCompletionThreshold}, and reverted back to
+     * IN_PROGRESS if a child is later un-completed and drags it below the threshold.
+     */
+    private void syncTopicAutoCompletion(Student student, SkillNode changedNode) {
+        SkillNode topic = changedNode.getParentNode();
+        while (topic != null) {
+            final SkillNode currentTopic = topic;
+            List<SkillNode> children = skillNodeRepository.findByParentNode_NodeId(currentTopic.getNodeId());
+            long totalWeight = 0;
+            long doneWeight = 0;
+            for (SkillNode child : children) {
+                int weight = nodeWeight(child);
+                totalWeight += weight;
+                StudentProgress childProgress = studentProgressRepository
+                        .findByStudent_UserIdAndSkillNode_NodeId(student.getUserId(), child.getNodeId())
+                        .orElse(null);
+                if (childProgress != null && RoadmapStepStatus.COMPLETED == childProgress.getStatus()) {
+                    doneWeight += weight;
+                }
+            }
+            boolean reachedThreshold = totalWeight > 0
+                    && (double) doneWeight / totalWeight >= parentCompletionThreshold;
+
+            StudentProgress topicProgress = studentProgressRepository
+                    .findByStudent_UserIdAndSkillNode_NodeId(student.getUserId(), currentTopic.getNodeId())
+                    .orElse(null);
+
+            if (reachedThreshold) {
+                if (topicProgress == null) {
+                    topicProgress = StudentProgress.builder()
+                            .student(Student.builder().userId(student.getUserId()).build())
+                            .skillNode(currentTopic)
+                            .createdAt(LocalDateTime.now())
+                            .build();
+                }
+                if (RoadmapStepStatus.COMPLETED != topicProgress.getStatus()) {
+                    topicProgress.setStatus(RoadmapStepStatus.COMPLETED);
+                    topicProgress.setCompletedAt(LocalDateTime.now());
+                    studentProgressRepository.save(topicProgress);
+                    log.info("RoadmapServiceImpl: Topic {} auto-completed for student {} ({}/{} child weight)",
+                            currentTopic.getNodeName(), student.getUserId(), doneWeight, totalWeight);
+                }
+            } else if (topicProgress != null && RoadmapStepStatus.COMPLETED == topicProgress.getStatus()) {
+                // Dropped below the threshold: remove the auto-completion so the read
+                // path recomputes the topic's real status (locked/current) from scratch.
+                studentProgressRepository.delete(topicProgress);
+                log.info("RoadmapServiceImpl: Topic {} auto-completion cleared for student {} ({}/{} child weight)",
+                        currentTopic.getNodeName(), student.getUserId(), doneWeight, totalWeight);
+            }
+
+            topic = topic.getParentNode();
+        }
     }
 
     /**
@@ -598,6 +669,8 @@ public class RoadmapServiceImpl implements RoadmapService {
     ) {
         Map<UUID, String> statusByNodeId = new HashMap<>();
         Set<String> passedStages = findPassedStages(nodes, progressByNodeId);
+        Set<UUID> topicIds = topicParentIds(nodes);
+        Map<UUID, List<SkillNode>> childrenByParent = childrenByParent(nodes);
 
         // Parents/previous nodes must be classified before their dependants,
         // regardless of the level/name order the nodes were fetched in.
@@ -612,21 +685,84 @@ public class RoadmapServiceImpl implements RoadmapService {
                 continue;
             }
 
+            if (topicIds.contains(node.getNodeId())) {
+                // A topic (spine) node is gated only by its own sequential order
+                // (previousNode) and stage — never by its own children. Once
+                // reachable it auto-completes as soon as enough child weight is done,
+                // otherwise it stays the current focus while its sub-skills are learned.
+                boolean gateLocked = isStageLocked(node, passedStages)
+                        || isSequentialGateLocked(node.getPreviousNode(), statusByNodeId);
+                if (gateLocked) {
+                    statusByNodeId.put(node.getNodeId(), FRONTEND_LOCKED_STATUS);
+                } else if (childCompletionRatio(node, childrenByParent, progressByNodeId) >= parentCompletionThreshold) {
+                    statusByNodeId.put(node.getNodeId(), FRONTEND_COMPLETED_STATUS);
+                } else {
+                    statusByNodeId.put(node.getNodeId(), FRONTEND_CURRENT_STATUS);
+                }
+                continue;
+            }
+
+            // Leaf / child node: unlocks as soon as its parent topic is REACHED
+            // (i.e. no longer locked) rather than fully completed, plus any
+            // sequential previousNode ordering among siblings/spine leaves.
             boolean locked = isStageLocked(node, passedStages)
-                    || isGateLocked(node.getParentNode(), statusByNodeId)
-                    || isGateLocked(node.getPreviousNode(), statusByNodeId);
+                    || isParentReachedGateLocked(node.getParentNode(), statusByNodeId)
+                    || isSequentialGateLocked(node.getPreviousNode(), statusByNodeId);
             statusByNodeId.put(node.getNodeId(), locked ? FRONTEND_LOCKED_STATUS : FRONTEND_CURRENT_STATUS);
         }
 
         return statusByNodeId;
     }
 
+    /** Node ids that are referenced as a {@code parentNode} by at least one other node (i.e. topics). */
+    private Set<UUID> topicParentIds(List<SkillNode> nodes) {
+        return nodes.stream()
+                .map(SkillNode::getParentNode)
+                .filter(Objects::nonNull)
+                .map(SkillNode::getNodeId)
+                .collect(Collectors.toSet());
+    }
+
+    /** Children grouped by their parent topic id. */
+    private Map<UUID, List<SkillNode>> childrenByParent(List<SkillNode> nodes) {
+        return nodes.stream()
+                .filter(n -> n.getParentNode() != null)
+                .collect(Collectors.groupingBy(n -> n.getParentNode().getNodeId()));
+    }
+
+    /** Completed-child weight over total-child weight for a topic (0.0 when it has no children). */
+    private double childCompletionRatio(
+            SkillNode topic,
+            Map<UUID, List<SkillNode>> childrenByParent,
+            Map<UUID, StudentProgress> progressByNodeId
+    ) {
+        List<SkillNode> children = childrenByParent.getOrDefault(topic.getNodeId(), List.of());
+        long totalWeight = 0;
+        long doneWeight = 0;
+        for (SkillNode child : children) {
+            int weight = nodeWeight(child);
+            totalWeight += weight;
+            StudentProgress p = progressByNodeId.get(child.getNodeId());
+            if (p != null && RoadmapStepStatus.COMPLETED == p.getStatus()) {
+                doneWeight += weight;
+            }
+        }
+        return totalWeight == 0 ? 0.0 : (double) doneWeight / totalWeight;
+    }
+
+    private int nodeWeight(SkillNode node) {
+        if (node.getType() != null && node.getType().getWeight() != null && node.getType().getWeight() > 0) {
+            return node.getType().getWeight();
+        }
+        return 1;
+    }
+
     /**
-     * A dependant is locked until its gate node is COMPLETED — except when the
-     * gate is a NEVER_COMPLETE group header, which can never be completed:
-     * there the dependant only stays locked while the header itself is locked.
+     * Sequential gate (spine order / sibling chaining): the dependant is locked
+     * until its gate node is COMPLETED. A NEVER_COMPLETE group header can never be
+     * completed, so there the dependant only stays locked while the header is locked.
      */
-    private boolean isGateLocked(SkillNode gate, Map<UUID, String> statusByNodeId) {
+    private boolean isSequentialGateLocked(SkillNode gate, Map<UUID, String> statusByNodeId) {
         if (gate == null) {
             return false;
         }
@@ -638,6 +774,23 @@ public class RoadmapServiceImpl implements RoadmapService {
             return FRONTEND_LOCKED_STATUS.equals(gateStatus);
         }
         return !FRONTEND_COMPLETED_STATUS.equals(gateStatus);
+    }
+
+    /**
+     * Hierarchy gate (topic -> its children): a child unlocks the moment its parent
+     * topic is reached, so it is locked only while the parent itself is still locked
+     * (or unknown). This lets a student start learning sub-skills as soon as the topic
+     * is the current focus, instead of forcing the topic to be completed first.
+     */
+    private boolean isParentReachedGateLocked(SkillNode parent, Map<UUID, String> statusByNodeId) {
+        if (parent == null) {
+            return false;
+        }
+        String parentStatus = statusByNodeId.get(parent.getNodeId());
+        if (parentStatus == null) {
+            return true;
+        }
+        return FRONTEND_LOCKED_STATUS.equals(parentStatus);
     }
 
     /**
@@ -727,7 +880,8 @@ public class RoadmapServiceImpl implements RoadmapService {
 
     private List<RoadmapNodeDto> buildRoadmapTree(
             List<SkillNode> nodes,
-            Map<UUID, String> statusByNodeId
+            Map<UUID, String> statusByNodeId,
+            Map<UUID, StudentProgress> progressByNodeId
     ) {
         // Presentation-only placement, joined in from the layout table.
         Map<UUID, RoadmapNodeLayout> layoutsByNodeId = new HashMap<>();
@@ -736,9 +890,20 @@ public class RoadmapServiceImpl implements RoadmapService {
             layoutsByNodeId.put(layout.getNodeId(), layout);
         }
 
+        Set<UUID> topicIds = topicParentIds(nodes);
+        Map<UUID, List<SkillNode>> childrenByParent = childrenByParent(nodes);
+
         return nodes.stream()
                 .map(node -> {
                     RoadmapNodeLayout layout = layoutsByNodeId.get(node.getNodeId());
+                    boolean isTopic = topicIds.contains(node.getNodeId());
+                    List<SkillNode> children = isTopic
+                            ? childrenByParent.getOrDefault(node.getNodeId(), List.of())
+                            : List.of();
+                    int childCompleted = (int) children.stream()
+                            .map(c -> progressByNodeId.get(c.getNodeId()))
+                            .filter(p -> p != null && RoadmapStepStatus.COMPLETED == p.getStatus())
+                            .count();
                     return RoadmapNodeDto.builder()
                             .nodeId(node.getNodeId())
                             .nodeName(node.getNodeName())
@@ -750,6 +915,9 @@ public class RoadmapServiceImpl implements RoadmapService {
                             .completionPolicy(node.getCompletionPolicy())
                             .weight(node.getType() != null ? node.getType().getWeight() : null)
                             .requiredProficiency(node.getRequiredProficiency())
+                            .parentTopic(isTopic)
+                            .childTotal(children.size())
+                            .childCompleted(childCompleted)
                             .positionX(layout != null ? layout.getPositionX() : null)
                             .positionY(layout != null ? layout.getPositionY() : null)
                             .lane(layout != null ? layout.getLane() : null)
