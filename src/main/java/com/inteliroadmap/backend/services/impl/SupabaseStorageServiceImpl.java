@@ -24,6 +24,8 @@ import java.io.IOException;
 @Slf4j
 public class SupabaseStorageServiceImpl implements SupabaseStorageService {
 
+    private final RestTemplate externalApiRestTemplate;
+
     @Value("${supabase.url}")
     private String supabaseUrl;
 
@@ -46,9 +48,9 @@ public class SupabaseStorageServiceImpl implements SupabaseStorageService {
     public String uploadAvatar(MultipartFile file, String userId) {
         log.info("SupabaseStorageServiceImpl: Uploading avatar for user ID: {}", userId);
         try {
-            // Initialize RestTemplate to make HTTP requests
-            RestTemplate restTemplate = new RestTemplate();
-            
+            // Shared RestTemplate carries connect/read timeouts (see HttpClientConfig).
+            RestTemplate restTemplate = externalApiRestTemplate;
+
             // Construct the unique file name using user ID and file extension
             String fileExtension = getFileExtension(file.getOriginalFilename());
             String fileName = userId + (fileExtension.isEmpty() ? ".jpg" : fileExtension);
@@ -130,7 +132,7 @@ public class SupabaseStorageServiceImpl implements SupabaseStorageService {
             String label
     ) {
         try {
-            RestTemplate restTemplate = new RestTemplate();
+            RestTemplate restTemplate = externalApiRestTemplate;
             String url = supabaseUrl + "/storage/v1/object/" + bucket + "/" + fileName;
 
             HttpHeaders headers = new HttpHeaders();
