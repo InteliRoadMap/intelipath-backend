@@ -4,6 +4,9 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import com.inteliroadmap.backend.domain.entity.User;
+import com.inteliroadmap.backend.domain.enums.UserStatus;
+import com.inteliroadmap.backend.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -24,6 +27,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
 
     private final JwtService jwtService;
+    private final UserRepository userRepository;
 
     /**
      * Refresh requests validate their token in the authentication service.
@@ -94,6 +98,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 return;
             }
             log.debug("JwtAuthenticationFilter: Role extracted: {}", role);
+
+            // Suspended / deactivated accounts keep valid tokens but must be blocked
+            // from every authenticated endpoint until an admin reactivates them.
+            User user = userRepository.findByEmail(email);
+            if (user != null && user.getUserStatus() != null && user.getUserStatus() != UserStatus.ACTIVE) {
+                log.warn("JwtAuthenticationFilter: Rejecting request from {} account: {}", user.getUserStatus(), email);
+                filterChain.doFilter(request, response);
+                return;
+            }
 
             List<GrantedAuthority> authorityList
                     = List.of(new SimpleGrantedAuthority("ROLE_" + role));

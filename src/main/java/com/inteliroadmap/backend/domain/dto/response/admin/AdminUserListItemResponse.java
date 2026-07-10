@@ -13,5 +13,6 @@ public class AdminUserListItemResponse {
     private String email;
     private String name;
     private String role;
+    private String status;
     private String joinedDate;
 }

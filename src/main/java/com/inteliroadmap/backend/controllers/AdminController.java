@@ -3,6 +3,7 @@ package com.inteliroadmap.backend.controllers;
 import com.inteliroadmap.backend.services.SkillExtractionService;
 import com.inteliroadmap.backend.scheduler.JobScrapingScheduler;
 import com.inteliroadmap.backend.domain.dto.request.UpdateUserRoleRequest;
+import com.inteliroadmap.backend.domain.dto.request.UpdateUserStatusRequest;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminCourseMetricResponse;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminSystemHealthResponse;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminUserListItemResponse;
@@ -294,6 +295,52 @@ public class AdminController {
         log.info("AdminController: Update user role request received. userId: {}", userId);
         return ResponseEntity.ok(
                 adminService.updateUserRole(authorizationHeader, userId, request)
+        );
+    }
+
+    /**
+     * PATCH /admin/dashboard/users/{userId}/status - Suspend / reactivate a user.
+     *
+     * @param authorizationHeader Authorization header containing Bearer access token
+     * @param userId              User id to update
+     * @param request             Request payload containing the new account status
+     * @return ResponseEntity containing updated AdminUserListItemResponse
+     */
+    @PatchMapping("/users/{userId}/status")
+    @Operation(
+            summary = "Update user account status",
+            description = "Suspend, deactivate or reactivate a user's account (soft account control)"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "User status updated successfully",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = AdminUserListItemResponse.class)
+                    )
+            ),
+            @ApiResponse(responseCode = "400", description = "Invalid user id or admin cannot suspend own account"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized or invalid token"),
+            @ApiResponse(responseCode = "403", description = "Admin access required"),
+            @ApiResponse(responseCode = "404", description = "User not found")
+    })
+    public ResponseEntity<AdminUserListItemResponse> updateUserStatus(
+            @RequestHeader("Authorization") String authorizationHeader,
+            @PathVariable String userId,
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Update user status request payload",
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = UpdateUserStatusRequest.class)
+                    )
+            )
+            @RequestBody @Valid UpdateUserStatusRequest request
+    ) {
+        log.info("AdminController: Update user status request received. userId: {}", userId);
+        return ResponseEntity.ok(
+                adminService.updateUserStatus(authorizationHeader, userId, request)
         );
     }
 

@@ -1,6 +1,8 @@
 package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.domain.dto.request.UpdateUserRoleRequest;
+import com.inteliroadmap.backend.domain.dto.request.UpdateUserStatusRequest;
+import com.inteliroadmap.backend.domain.enums.UserStatus;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminCourseMetricResponse;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminSystemHealthResponse;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminUserListItemResponse;
@@ -212,6 +214,40 @@ public class AdminServiceImpl implements AdminService {
                 updatedUser.getEmail(), updatedUser.getRole());
 
         // Return the updated user information mapped to a list item response
+        return adminMapper.toUserListItem(updatedUser);
+    }
+
+    /**
+     * Updates the account status of a user (e.g. suspend / reactivate). An admin
+     * cannot suspend or deactivate their own account.
+     *
+     * @param authorizationHeader the authorization header containing the admin's JWT token
+     * @param userId the unique identifier of the user to update
+     * @param request the request object containing the new {@link com.inteliroadmap.backend.domain.enums.UserStatus}
+     * @return the updated user's details
+     */
+    @Transactional
+    @Override
+    public AdminUserListItemResponse updateUserStatus(String authorizationHeader, String userId, UpdateUserStatusRequest request) {
+
+        validateAdmin(authorizationHeader);
+
+        log.info("AdminServiceImpl: Update user status. userId: {}, status: {}", userId, request.getStatus());
+
+        String currentEmail = jwtService.extractEmail(BearerTokenUtil.extractToken(authorizationHeader));
+        User user = findUserById(userId);
+
+        // An admin must not lock themselves out by suspending/deactivating their own account.
+        if (user.getEmail().equals(currentEmail)
+                && request.getStatus() != UserStatus.ACTIVE) {
+            throw new ResourceNotFoundException("Admin cannot suspend own account");
+        }
+
+        user.setUserStatus(request.getStatus());
+        User updatedUser = userRepository.save(user);
+        log.info("AdminServiceImpl: User status updated successfully. email: {}, status: {}",
+                updatedUser.getEmail(), updatedUser.getUserStatus());
+
         return adminMapper.toUserListItem(updatedUser);
     }
 

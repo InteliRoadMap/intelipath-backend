@@ -1,6 +1,7 @@
 package com.inteliroadmap.backend.services;
 
 import com.inteliroadmap.backend.domain.dto.request.UpdateUserRoleRequest;
+import com.inteliroadmap.backend.domain.dto.request.UpdateUserStatusRequest;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminCourseMetricResponse;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminSystemHealthResponse;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminUserListItemResponse;
@@ -32,6 +33,8 @@ public interface AdminService {
     public List<AdminUserListItemResponse> getUsers(String authorizationHeader) ;
 
     public AdminUserListItemResponse updateUserRole(String authorizationHeader, String userId, UpdateUserRoleRequest request) ;
+
+    public AdminUserListItemResponse updateUserStatus(String authorizationHeader, String userId, UpdateUserStatusRequest request) ;
 
     public void deleteUser(String authorizationHeader, String userId) ;
 }

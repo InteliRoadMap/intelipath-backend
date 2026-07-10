@@ -4,6 +4,7 @@ import com.inteliroadmap.backend.domain.dto.response.admin.AdminCourseMetricResp
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminUserListItemResponse;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminUserMetricResponse;
 import com.inteliroadmap.backend.domain.entity.User;
+import com.inteliroadmap.backend.domain.enums.UserStatus;
 import org.springframework.stereotype.Component;
 
 import java.time.format.DateTimeFormatter;
@@ -33,6 +34,7 @@ public class AdminMapper {
                 .id(user.getUserId().toString())
                 .name(user.getFullName())
                 .role(user.getRole().name())
+                .status(user.getUserStatus() != null ? user.getUserStatus().name() : UserStatus.ACTIVE.name())
                 .joinedDate(user.getCreatedAt().format(DATE_FORMATTER))
                 .build();
     }
