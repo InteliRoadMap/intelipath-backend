@@ -51,7 +51,7 @@ public class VirtualMentorController {
     @PostMapping("/sessions")
     @Operation(summary = "Create a new chat session")
     public ResponseEntity<VirtualMentorSessionResponse> createSession(
-            @RequestBody(required = false) VirtualMentorSessionRequest request) {
+            @RequestBody(required = false) @jakarta.validation.Valid VirtualMentorSessionRequest request) {
         log.info("VirtualMentorController: Creating new AI chat session");
         String sessionName = (request != null && request.getSessionName() != null) ? request.getSessionName() : "New Chat";
         ChatSession session = virtualMentorService.createSession(sessionName);
@@ -125,6 +125,7 @@ public class VirtualMentorController {
             @RequestParam("file") MultipartFile file) {
         try {
             log.info("VirtualMentorController: Ingesting knowledge file: {}", file.getOriginalFilename());
+            com.inteliroadmap.backend.utils.FileValidationUtil.validatePdf(file);
             documentIngestionService.ingestPdfDocument(file);
             return ResponseEntity.ok(Map.of("message", "Successfully ingested document into Vector Database."));
         } catch (Exception e) {

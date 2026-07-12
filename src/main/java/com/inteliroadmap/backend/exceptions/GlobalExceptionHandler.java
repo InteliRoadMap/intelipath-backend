@@ -133,6 +133,66 @@ public class GlobalExceptionHandler {
     }
 
     /**
+     * Handle constraint violations on path/query parameters (e.g. {@code @Min},
+     * {@code @Max} on a {@code @RequestParam} in a {@code @Validated} controller).
+     *
+     * @param exception constraint violation exception
+     * @param request current request
+     * @return JSON error response with HTTP 400
+     */
+    @ExceptionHandler(jakarta.validation.ConstraintViolationException.class)
+    public ResponseEntity<ErrorResponse> handleConstraintViolationException(
+            jakarta.validation.ConstraintViolationException exception, WebRequest request) {
+        String message = exception.getConstraintViolations().stream()
+                .map(jakarta.validation.ConstraintViolation::getMessage)
+                .findFirst()
+                .orElse("Request parameter is invalid");
+        return build(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", message, request);
+    }
+
+    /**
+     * Handle method-parameter validation failures raised by Spring 6.1+ for
+     * constrained controller-method arguments.
+     *
+     * @param exception handler-method validation exception
+     * @param request current request
+     * @return JSON error response with HTTP 400
+     */
+    @ExceptionHandler(org.springframework.web.method.annotation.HandlerMethodValidationException.class)
+    public ResponseEntity<ErrorResponse> handleHandlerMethodValidationException(
+            org.springframework.web.method.annotation.HandlerMethodValidationException exception, WebRequest request) {
+        return build(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Request parameter is invalid", request);
+    }
+
+    /**
+     * Handle uploads that exceed the configured multipart size limit.
+     *
+     * @param exception max upload size exception
+     * @param request current request
+     * @return JSON error response with HTTP 413
+     */
+    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> handleMaxUploadSizeExceededException(
+            org.springframework.web.multipart.MaxUploadSizeExceededException exception, WebRequest request) {
+        return build(HttpStatus.PAYLOAD_TOO_LARGE, "PAYLOAD_TOO_LARGE",
+                "Uploaded file is too large.", request);
+    }
+
+    /**
+     * Handle bad client input surfaced as IllegalArgumentException (e.g. a
+     * negative page index, or a required file that was missing).
+     *
+     * @param exception illegal argument exception
+     * @param request current request
+     * @return JSON error response with HTTP 400
+     */
+    @ExceptionHandler(IllegalArgumentException.class)
+    public ResponseEntity<ErrorResponse> handleIllegalArgumentException(
+            IllegalArgumentException exception, WebRequest request) {
+        return build(HttpStatus.BAD_REQUEST, "BAD_REQUEST", exception.getMessage(), request);
+    }
+
+    /**
      * Handle invalid path/query parameter types such as non-UUID IDs.
      *
      * @param exception type mismatch exception

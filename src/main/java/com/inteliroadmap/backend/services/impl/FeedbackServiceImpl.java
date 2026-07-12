@@ -6,6 +6,7 @@ import com.inteliroadmap.backend.domain.dto.response.FeedbackAttachmentResponse;
 import com.inteliroadmap.backend.domain.dto.response.counselor.FeedbackResponse;
 import com.inteliroadmap.backend.domain.entity.Feedback;
 import com.inteliroadmap.backend.domain.entity.FeedbackAttachment;
+import com.inteliroadmap.backend.utils.FileValidationUtil;
 import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.domain.enums.FeedbackStatus;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
@@ -81,6 +82,7 @@ public class FeedbackServiceImpl implements FeedbackService {
         if (files != null && !files.isEmpty()) {
             for (MultipartFile file : files) {
                 if (!file.isEmpty()) {
+                    FileValidationUtil.validateAttachment(file);
                     try {
                         FeedbackAttachment attachment = FeedbackAttachment.builder()
                                 .feedback(feedback)
@@ -145,6 +147,7 @@ public class FeedbackServiceImpl implements FeedbackService {
             }
             for (MultipartFile file : files) {
                 if (!file.isEmpty()) {
+                    FileValidationUtil.validateAttachment(file);
                     try {
                         FeedbackAttachment attachment = FeedbackAttachment.builder()
                                 .feedback(feedback)

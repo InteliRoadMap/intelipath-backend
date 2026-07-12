@@ -16,6 +16,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/market-trends")
 @RequiredArgsConstructor
+@org.springframework.validation.annotation.Validated
 @Tag(name = "Market Trends", description = "APIs for IT Market Trend Analytics and Dashboards")
 public class MarketTrendController {
 
@@ -24,7 +25,7 @@ public class MarketTrendController {
     @GetMapping("/companies/top-hiring")
     @Operation(summary = "Get top hiring companies", description = "Returns companies with the most recruitment posts.")
     public ResponseEntity<List<MarketTrendResponse.CompanyTrendResponse>> getTopHiringCompanies(
-            @RequestParam(defaultValue = "10") int limit) {
+            @RequestParam(defaultValue = "10") @jakarta.validation.constraints.Min(value = 1, message = "Limit must be at least 1") @jakarta.validation.constraints.Max(value = 100, message = "Limit must not exceed 100") int limit) {
         return ResponseEntity.ok(marketTrendService.getTopHiringCompanies(limit));
     }
 

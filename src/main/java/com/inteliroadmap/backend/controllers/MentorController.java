@@ -33,6 +33,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/mentor")
 @RequiredArgsConstructor
 @Slf4j
+@org.springframework.validation.annotation.Validated
 @Tag(name = "Mentor Dashboard", description = "Industry Mentor APIs")
 @SecurityRequirement(name = "Bearer Authentication")
 @PreAuthorize("hasRole('MENTOR')")
@@ -62,8 +63,8 @@ public class MentorController {
     @GetMapping("/dashboard/pending-reviews")
     @Operation(summary = "Get Pending Reviews", description = "Get list of pending review requests with pagination")
     public ResponseEntity<Page<MentorPendingReviewResponse>> getPendingReviews(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "0") @jakarta.validation.constraints.Min(value = 0, message = "Page index must not be negative") int page,
+            @RequestParam(defaultValue = "10") @jakarta.validation.constraints.Min(value = 1, message = "Page size must be at least 1") @jakarta.validation.constraints.Max(value = 100, message = "Page size must not exceed 100") int size) {
         Pageable pageable = PageRequest.of(page, size);
         return ResponseEntity.ok(mentorService.getPendingReviews(pageable));
     }
@@ -77,8 +78,8 @@ public class MentorController {
     @GetMapping("/feedback/students")
     @Operation(summary = "Get Student List", description = "Get list of students with pagination")
     public ResponseEntity<Page<MentorStudentDto>> getStudentInfos(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "0") @jakarta.validation.constraints.Min(value = 0, message = "Page index must not be negative") int page,
+            @RequestParam(defaultValue = "10") @jakarta.validation.constraints.Min(value = 1, message = "Page size must be at least 1") @jakarta.validation.constraints.Max(value = 100, message = "Page size must not exceed 100") int size) {
         Pageable pageable = PageRequest.of(page, size);
         return ResponseEntity.ok(mentorService.getStudentInfos(pageable));
     }
@@ -86,8 +87,8 @@ public class MentorController {
     @GetMapping("/feedback/history")
     @Operation(summary = "Get Feedback History", description = "Get list of feedbacks sent by mentor")
     public ResponseEntity<Page<MentorFeedbackHistoryDto>> getFeedbackHistory(
-            @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "0") @jakarta.validation.constraints.Min(value = 0, message = "Page index must not be negative") int page,
+            @RequestParam(defaultValue = "10") @jakarta.validation.constraints.Min(value = 1, message = "Page size must be at least 1") @jakarta.validation.constraints.Max(value = 100, message = "Page size must not exceed 100") int size) {
         Pageable pageable = PageRequest.of(page, size);
         return ResponseEntity.ok(mentorService.getFeedbackHistory(pageable));
     }

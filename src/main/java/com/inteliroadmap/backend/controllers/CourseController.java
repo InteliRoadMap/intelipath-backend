@@ -25,6 +25,7 @@ import java.util.UUID;
 @PreAuthorize("hasRole('STUDENT')")
 @RequiredArgsConstructor
 @Tag(name = "Courses", description = "Students browse and enroll in mentor courses")
+@org.springframework.validation.annotation.Validated
 public class CourseController {
 
     private final CourseService courseService;
@@ -64,7 +65,7 @@ public class CourseController {
     @PatchMapping("/{courseId}/progress")
     @Operation(summary = "Update the student's progress (0-100)")
     public ResponseEntity<CourseResponse> updateProgress(@PathVariable UUID courseId,
-                                                         @RequestParam int value) {
+                                                         @RequestParam @jakarta.validation.constraints.Min(value = 0, message = "Progress must be between 0 and 100") @jakarta.validation.constraints.Max(value = 100, message = "Progress must be between 0 and 100") int value) {
         return ResponseEntity.ok(courseService.updateProgress(courseId, value));
     }
 }

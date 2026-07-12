@@ -1,6 +1,7 @@
 package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.services.SupabaseStorageService;
+import com.inteliroadmap.backend.utils.FileValidationUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -47,6 +48,7 @@ public class SupabaseStorageServiceImpl implements SupabaseStorageService {
     @Override
     public String uploadAvatar(MultipartFile file, String userId) {
         log.info("SupabaseStorageServiceImpl: Uploading avatar for user ID: {}", userId);
+        FileValidationUtil.validateImage(file);
         try {
             // Shared RestTemplate carries connect/read timeouts (see HttpClientConfig).
             RestTemplate restTemplate = externalApiRestTemplate;
@@ -109,6 +111,7 @@ public class SupabaseStorageServiceImpl implements SupabaseStorageService {
     @Override
     public String uploadChatFile(MultipartFile file) {
         log.info("SupabaseStorageServiceImpl: Uploading chat file: {}", file.getOriginalFilename());
+        FileValidationUtil.validateAttachment(file);
         String fileExtension = getFileExtension(file.getOriginalFilename());
         String fileName = java.util.UUID.randomUUID() + fileExtension;
         return uploadFile(CHAT_BUCKET, fileName, file, "application/pdf", true, "chat file");
@@ -117,6 +120,7 @@ public class SupabaseStorageServiceImpl implements SupabaseStorageService {
     @Override
     public String uploadTranscript(MultipartFile file, String userId) {
         log.info("SupabaseStorageServiceImpl: Uploading transcript for user ID: {}", userId);
+        FileValidationUtil.validatePdf(file);
         String fileExtension = getFileExtension(file.getOriginalFilename());
         String normalizedExtension = fileExtension.isEmpty() ? ".pdf" : fileExtension;
         String fileName = userId + "/" + java.util.UUID.randomUUID() + normalizedExtension;
