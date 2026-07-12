@@ -260,19 +260,26 @@ CREATE TABLE IF NOT EXISTS feedback (
     sender_name VARCHAR(255),
     content     TEXT,
     type        VARCHAR(30) DEFAULT 'GENERAL',
-    -- status doubles as the recipient's notification state:
-    --   NEW = unread, READ = read, DELETED = dismissed/soft-deleted
     status      VARCHAR(30) DEFAULT 'NEW',
     created_at  TIMESTAMP NOT NULL DEFAULT NOW(),
     updated_at  TIMESTAMP NOT NULL DEFAULT NOW(),
     CONSTRAINT ck_feedback_type
         CHECK (type IS NULL OR type IN ('GENERAL', 'SKILL', 'CAREER', 'PORTFOLIO')),
     CONSTRAINT ck_feedback_status
-        CHECK (status IS NULL OR status IN ('NEW', 'READ', 'DELETED')),
+        CHECK (status IS NULL OR status IN ('NEW', 'READ', 'UPDATED', 'DELETED')),
     CONSTRAINT fk_fb_sender
         FOREIGN KEY (sender_id) REFERENCES users (user_id) ON DELETE CASCADE,
     CONSTRAINT fk_fb_receiver
         FOREIGN KEY (receiver_id) REFERENCES users (user_id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS feedback_attachment (
+    attachment_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    feedback_id   UUID         NOT NULL REFERENCES feedback(feedback_id) ON DELETE CASCADE,
+    file_name     VARCHAR(255) NOT NULL,
+    file_type     VARCHAR(100),
+    file_size     BIGINT,
+    data          BYTEA        NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS portfolio_review_requests (
@@ -391,28 +398,33 @@ CREATE TABLE IF NOT EXISTS rag_documents (
 -- Recruitment processed cache
 -- ============================================================
 
-CREATE TABLE IF NOT EXISTS companies (
-    company_id  VARCHAR(255) PRIMARY KEY,
-    signatures  JSONB,
-    infos       JSONB
+CREATE TABLE IF NOT EXISTS processed_companies (
+    company_id   VARCHAR(255) PRIMARY KEY,
+    company_link TEXT,
+    logo         TEXT,
+    name         TEXT,
+    info         JSONB,
+    contact      JSONB
 );
 
-CREATE TABLE IF NOT EXISTS recruitments (
+CREATE TABLE IF NOT EXISTS processed_recruitments (
     recruitment_id       VARCHAR(255) PRIMARY KEY,
-    recruitment_infos    JSONB,
+    recruitment_link     TEXT,
+    basic_info           JSONB,
     descriptions         JSONB,
     application_deadline DATE
 );
 
-CREATE TABLE IF NOT EXISTS recruitment_posts (
+CREATE TABLE IF NOT EXISTS processed_recruitment_posts (
     post_id        UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     company_id     VARCHAR(255) NOT NULL,
     recruitment_id VARCHAR(255) NOT NULL,
     expired_at     DATE,
+    CONSTRAINT uq_processed_recruitment_post UNIQUE (company_id, recruitment_id),
     CONSTRAINT fk_rp_company
-        FOREIGN KEY (company_id) REFERENCES companies (company_id) ON DELETE CASCADE,
+        FOREIGN KEY (company_id) REFERENCES processed_companies (company_id) ON DELETE CASCADE,
     CONSTRAINT fk_rp_recruitment
-        FOREIGN KEY (recruitment_id) REFERENCES recruitments (recruitment_id) ON DELETE CASCADE
+        FOREIGN KEY (recruitment_id) REFERENCES processed_recruitments (recruitment_id) ON DELETE CASCADE
 );
 
 -- ============================================================
@@ -470,7 +482,7 @@ CREATE INDEX IF NOT EXISTS idx_skill_nodes_career_id             ON skill_nodes 
 CREATE INDEX IF NOT EXISTS idx_skill_nodes_skill_id              ON skill_nodes (skill_id);
 CREATE INDEX IF NOT EXISTS idx_skill_nodes_type_id               ON skill_nodes (type_id);
 CREATE INDEX IF NOT EXISTS idx_skill_nodes_previous_node         ON skill_nodes (previous_node);
-CREATE INDEX IF NOT EXISTS idx_roadmap_node_layouts_node_id       ON roadmap_node_layouts (node_id);
+CREATE INDEX IF NOT EXISTS idx_roadmap_node_layouts_node_id      ON roadmap_node_layouts (node_id);
 CREATE INDEX IF NOT EXISTS idx_skill_nodes_parent_node           ON skill_nodes (parent_node);
 CREATE INDEX IF NOT EXISTS idx_student_skills_user_id            ON student_skills (user_id);
 CREATE INDEX IF NOT EXISTS idx_student_skills_skill_id           ON student_skills (skill_id);
@@ -481,7 +493,7 @@ CREATE INDEX IF NOT EXISTS idx_portfolio_configs_user_id         ON portfolio_co
 CREATE INDEX IF NOT EXISTS idx_student_education_user_id         ON student_education (user_id);
 CREATE INDEX IF NOT EXISTS idx_feedback_sender_id                ON feedback (sender_id);
 CREATE INDEX IF NOT EXISTS idx_feedback_receiver_id              ON feedback (receiver_id);
-CREATE INDEX IF NOT EXISTS idx_feedback_receiver_status          ON feedback (receiver_id, status);
+CREATE INDEX IF NOT EXISTS idx_feedback_attachment_feedback_id   ON feedback_attachment(feedback_id);
 CREATE INDEX IF NOT EXISTS idx_prr_student_id                    ON portfolio_review_requests (student_id);
 CREATE INDEX IF NOT EXISTS idx_skill_trends_skill_id             ON skill_trends (skill_id);
 CREATE INDEX IF NOT EXISTS idx_sse_user_id                       ON student_skill_evidence (user_id);
@@ -493,55 +505,10 @@ CREATE INDEX IF NOT EXISTS idx_rr_recommend_career_id            ON roadmap_reco
 CREATE INDEX IF NOT EXISTS idx_rri_recommendation_id             ON roadmap_recommendation_items (recommendation_id);
 CREATE INDEX IF NOT EXISTS idx_rri_node_id                       ON roadmap_recommendation_items (node_id);
 CREATE INDEX IF NOT EXISTS idx_rag_documents_owner_source        ON rag_documents (owner_user_id, source_type);
-CREATE INDEX IF NOT EXISTS idx_recruitment_posts_company_id      ON recruitment_posts (company_id);
-CREATE INDEX IF NOT EXISTS idx_recruitment_posts_recruitment_id  ON recruitment_posts (recruitment_id);
+CREATE INDEX IF NOT EXISTS idx_recruitment_posts_company_id      ON processed_recruitment_posts (company_id);
+CREATE INDEX IF NOT EXISTS idx_recruitment_posts_recruitment_id  ON processed_recruitment_posts (recruitment_id);
 CREATE INDEX IF NOT EXISTS idx_oauth_accounts_user_id            ON oauth_accounts (user_id);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id            ON refresh_tokens (user_id);
 CREATE INDEX IF NOT EXISTS idx_chat_sessions_user_id             ON chat_sessions (user_id);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_session_id          ON chat_messages (session_id);
 
--- ============================================================
--- COURSES: mentor-authored learning courses students can opt into
--- ============================================================
-CREATE TABLE IF NOT EXISTS courses (
-    course_id     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    mentor_id     UUID NOT NULL,
-    career_id     UUID NOT NULL,
-    title         VARCHAR(255) NOT NULL,
-    description   TEXT,
-    level         VARCHAR(20) NOT NULL DEFAULT 'BEGINNER',
-    status        VARCHAR(20) NOT NULL DEFAULT 'DRAFT',
-    created_at    TIMESTAMP NOT NULL DEFAULT now(),
-    updated_at    TIMESTAMP NOT NULL DEFAULT now(),
-    node_id       UUID,
-    CONSTRAINT fk_course_mentor FOREIGN KEY (mentor_id) REFERENCES industry_mentor (user_id) ON DELETE CASCADE,
-    CONSTRAINT fk_course_career FOREIGN KEY (career_id) REFERENCES career_roles (career_id) ON DELETE CASCADE,
-    CONSTRAINT fk_course_node FOREIGN KEY (node_id) REFERENCES skill_nodes (node_id) ON DELETE SET NULL
-);
-CREATE INDEX IF NOT EXISTS idx_courses_mentor ON courses (mentor_id);
-CREATE INDEX IF NOT EXISTS idx_courses_status ON courses (status);
-CREATE INDEX IF NOT EXISTS idx_courses_node ON courses (node_id);
-
-CREATE TABLE IF NOT EXISTS course_lessons (
-    lesson_id     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    course_id     UUID NOT NULL,
-    title         VARCHAR(255) NOT NULL,
-    content       TEXT,
-    resource_url  VARCHAR(1000),
-    order_index   INT NOT NULL DEFAULT 0,
-    CONSTRAINT fk_lesson_course FOREIGN KEY (course_id) REFERENCES courses (course_id) ON DELETE CASCADE
-);
-CREATE INDEX IF NOT EXISTS idx_lessons_course ON course_lessons (course_id);
-
-CREATE TABLE IF NOT EXISTS course_enrollments (
-    enrollment_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    course_id     UUID NOT NULL,
-    student_id    UUID NOT NULL,
-    status        VARCHAR(20) NOT NULL DEFAULT 'ENROLLED',
-    progress      INT NOT NULL DEFAULT 0,
-    enrolled_at   TIMESTAMP NOT NULL DEFAULT now(),
-    CONSTRAINT uq_enrollment UNIQUE (course_id, student_id),
-    CONSTRAINT fk_enroll_course FOREIGN KEY (course_id) REFERENCES courses (course_id) ON DELETE CASCADE,
-    CONSTRAINT fk_enroll_student FOREIGN KEY (student_id) REFERENCES students (user_id) ON DELETE CASCADE
-);
-CREATE INDEX IF NOT EXISTS idx_enroll_student ON course_enrollments (student_id);
