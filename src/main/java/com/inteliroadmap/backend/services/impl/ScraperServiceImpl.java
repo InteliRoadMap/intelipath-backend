@@ -54,7 +54,7 @@ public class ScraperServiceImpl implements ScraperService {
             Recruitment recruitment = recruitmentRepository.findByTopCvRecruitmentId(post.getRecruitment().getTopCvRecruitmentId());
 
             // Build company DTO
-            RecruitmentPostResponse.CompanyDto companyDto = RecruitmentPostResponse.CompanyDto.builder()
+            RecruitmentPostResponse.Company companyDto = RecruitmentPostResponse.Company.builder()
                     .name(str(company.getSignatures(), "name"))
                     .logo(str(company.getSignatures(), "logo"))
                     .companyLink(str(company.getSignatures(), "link"))
@@ -72,7 +72,7 @@ public class ScraperServiceImpl implements ScraperService {
             }
 
             // Build recruitment DTO
-            RecruitmentPostResponse.RecruitmentDto recruitmentDto = RecruitmentPostResponse.RecruitmentDto.builder()
+            RecruitmentPostResponse.Recruitment recruitmentDto = RecruitmentPostResponse.Recruitment.builder()
                     .title(str(recruitment.getRecruitmentInfos(), "title"))
                     .salary(str(recruitment.getRecruitmentInfos(), "salary"))
                     .location(str(recruitment.getRecruitmentInfos(), "location"))

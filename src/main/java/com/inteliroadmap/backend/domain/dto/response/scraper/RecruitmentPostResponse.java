@@ -19,14 +19,14 @@ public class RecruitmentPostResponse {
     @JsonProperty("post_id")
     private UUID postId;
 
-    private CompanyDto company;
-    private RecruitmentDto recruitment;
+    private Company company;
+    private Recruitment recruitment;
 
     @Data
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class CompanyDto {
+    public static class Company {
         private String name;
         private String logo;
         @JsonProperty("company_link")
@@ -37,7 +37,7 @@ public class RecruitmentPostResponse {
     @Builder
     @NoArgsConstructor
     @AllArgsConstructor
-    public static class RecruitmentDto {
+    public static class Recruitment {
         private String title;
         private String salary;
         private String location;
