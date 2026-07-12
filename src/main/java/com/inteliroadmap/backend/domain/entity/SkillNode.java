@@ -1,6 +1,7 @@
 package com.inteliroadmap.backend.domain.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import com.fasterxml.jackson.databind.JsonNode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -17,7 +18,6 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.hibernate.annotations.JdbcTypeCode;
 
-import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -65,7 +65,7 @@ public class SkillNode {
 
     @JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "resource", columnDefinition = "jsonb")
-    private com.fasterxml.jackson.databind.JsonNode resource;
+    private JsonNode resource;
 
     @Column(name = "completion_policy", length = 50)
     private String completionPolicy;
@@ -75,6 +75,6 @@ public class SkillNode {
 
     @JdbcTypeCode(org.hibernate.type.SqlTypes.JSON)
     @Column(name = "evidence_keywords", columnDefinition = "jsonb")
-    private com.fasterxml.jackson.databind.JsonNode evidenceKeywords;
+    private JsonNode evidenceKeywords;
 }
 

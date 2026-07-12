@@ -6,20 +6,8 @@ import com.inteliroadmap.backend.domain.dto.response.admin.AdminCourseMetricResp
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminSystemHealthResponse;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminUserListItemResponse;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminUserMetricResponse;
-import com.inteliroadmap.backend.domain.entity.User;
-import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
-import com.inteliroadmap.backend.mappers.AdminMapper;
-import com.inteliroadmap.backend.repositories.CareerRoleRepository;
-import com.inteliroadmap.backend.repositories.UserRepository;
-import com.inteliroadmap.backend.security.JwtService;
-import com.inteliroadmap.backend.services.AdminService;
-import org.springframework.transaction.annotation.Transactional;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.stereotype.Service;
+
 import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
 
 public interface AdminService {
 

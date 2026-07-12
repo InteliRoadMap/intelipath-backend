@@ -1,6 +1,11 @@
 package com.inteliroadmap.backend.controllers;
 
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import java.util.List;
+
 import com.inteliroadmap.backend.domain.dto.request.CreateFeedbackRequest;
+import com.inteliroadmap.backend.domain.dto.request.ExportStudentListRequest;
 import com.inteliroadmap.backend.domain.dto.request.ModifyFeedbackRequest;
 import com.inteliroadmap.backend.domain.dto.request.UpdateProfileRequest;
 import com.inteliroadmap.backend.domain.dto.response.counselor.CounselorResponse;
@@ -17,16 +22,11 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PatchMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
 
 import java.util.UUID;
 
@@ -55,12 +55,7 @@ public class CounselorController {
     @GetMapping("/dashboard")
     @Operation(summary = "Get careers statistic", description = "Get number of students following a career")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Careers statistic retrieved successfully",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = CounselorResponse.class)
-                    )
-            ),
+            @ApiResponse(responseCode = "200", description = "Careers statistic retrieved successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = CounselorResponse.class))),
             @ApiResponse(responseCode = "401", description = "Unauthorized or invalid token")
     })
     public ResponseEntity<CounselorResponse> getCareerStatistics() {
@@ -78,12 +73,7 @@ public class CounselorController {
     @GetMapping("/dashboard/missing-skills/{careerName}")
     @Operation(summary = "Get students skill gap of a career", description = "Get total of students missing skills by career or all careers if omitted")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Skill gap retrieved successfully",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = CounselorResponse.class)
-                    )
-            ),
+            @ApiResponse(responseCode = "200", description = "Skill gap retrieved successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = CounselorResponse.class))),
             @ApiResponse(responseCode = "400", description = "Multiple careers found. Please type a more specific search."),
             @ApiResponse(responseCode = "401", description = "Unauthorized or invalid token"),
             @ApiResponse(responseCode = "404", description = "No career found matching your search.")
@@ -99,20 +89,15 @@ public class CounselorController {
      * @return ResponseEntity containing a CounselorResponse with the feedback list.
      */
     @GetMapping("/dashboard/feedback/me")
-    @Operation(summary = "Get feedback created", description = "Get feedback created to a student by fullname of email")
+    @Operation(summary = "Get feedback created", description = "Get feedback created to a student")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Feedback retrieved successfully",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = CounselorResponse.class)
-                    )
-            ),
+            @ApiResponse(responseCode = "200", description = "Feedbacks retrieved successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = CounselorResponse.class))),
             @ApiResponse(responseCode = "401", description = "Unauthorized or invalid token"),
             @ApiResponse(responseCode = "404", description = "Students not found")
     })
-    public ResponseEntity<CounselorResponse> getFeedbackSentToMe() {
+    public ResponseEntity<CounselorResponse> getFeedbackSentByMe() {
         log.info("CounselorController: Feedback retrieval request received");
-        return ResponseEntity.ok(counselorService.getAllFeedbacksSentToMe());
+        return ResponseEntity.ok(counselorService.getAllFeedbacksSentByMe());
     }
 
     /**
@@ -127,12 +112,7 @@ public class CounselorController {
     @GetMapping({"/feedback/students/page={page}/size={size}/search={search}"})
     @Operation(summary = "Get students info", description = "Get all students info")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Students retrieved successfully",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = CounselorResponse.class)
-                    )
-            ),
+            @ApiResponse(responseCode = "200", description = "Students retrieved successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = CounselorResponse.class))),
             @ApiResponse(responseCode = "401", description = "Unauthorized or invalid token")
     })
     public ResponseEntity<CounselorResponse> getStudentInfos(@PathVariable int page, @PathVariable int size, @PathVariable(required = false) String search) {
@@ -149,12 +129,7 @@ public class CounselorController {
     @GetMapping("/feedback/student/info/{studentId}")
     @Operation(summary = "Get stats and feedbacks info", description = "Get student statistic and feedbacks info")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Statistic And Feedback retrieved successfully",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = CounselorResponse.class)
-                    )
-            ),
+            @ApiResponse(responseCode = "200", description = "Statistic And Feedback retrieved successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = CounselorResponse.class))),
             @ApiResponse(responseCode = "401", description = "Unauthorized or invalid token")
     })
     public ResponseEntity<CounselorResponse> getStudentStatisticAndFeedback(@PathVariable UUID studentId) {
@@ -168,17 +143,9 @@ public class CounselorController {
      * @return ResponseEntity containing the counselor's UpdateProfileResponse.
      */
     @GetMapping("/me/profile")
-    @Operation(
-            summary = "Get Counselor profile",
-            description = "Get Counselor profile with new info"
-    )
+    @Operation(summary = "Get Counselor profile", description = "Get Counselor profile with new info")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Counselor profile package",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = CounselorResponse.class)
-                    )
-            ),
+            @ApiResponse(responseCode = "200", description = "Counselor profile package", content = @Content(mediaType = "application/json", schema = @Schema(implementation = UpdateProfileResponse.class))),
             @ApiResponse(responseCode = "401", description = "Unauthorized or invalid token")
     })
     public ResponseEntity<UpdateProfileResponse> getProfile() {
@@ -193,17 +160,10 @@ public class CounselorController {
      * @return ResponseEntity containing the updated UpdateProfileResponse.
      */
     @PatchMapping("/me/profile")
-    @Operation(
-            summary = "Update Counselor profile",
-            description = "Update Counselor profile with new info"
+    @Operation(summary = "Update Counselor profile", description = "Update Counselor profile with new info"
     )
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "User profile package",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = CounselorResponse.class)
-                    )
-            ),
+            @ApiResponse(responseCode = "200", description = "User profile package", content = @Content(mediaType = "application/json", schema = @Schema(implementation = UpdateProfileResponse.class))),
             @ApiResponse(responseCode = "401", description = "Unauthorized or invalid token")
     })
     public ResponseEntity<UpdateProfileResponse> updateProfile(
@@ -228,12 +188,7 @@ public class CounselorController {
     @PostMapping("/feedback/create")
     @Operation(summary = "Create feedback", description = "Create a feedback to a student")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Feedback package",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = FeedbackResponse.class)
-                    )
-            ),
+            @ApiResponse(responseCode = "200", description = "Feedback package", content = @Content(mediaType = "application/json", schema = @Schema(implementation = FeedbackResponse.class))),
             @ApiResponse(responseCode = "401", description = "Unauthorized or invalid token")
     })
     public ResponseEntity<FeedbackResponse> createFeedback(
@@ -243,10 +198,11 @@ public class CounselorController {
                             schema = @Schema(implementation = CreateFeedbackRequest.class)
                     )
             )
-            @RequestBody @Valid CreateFeedbackRequest request
+            @RequestPart("request") @Valid CreateFeedbackRequest request,
+            @RequestPart(value = "files", required = false) List<MultipartFile> files
     ) {
         log.info("CounselorController: Create feedback request received");
-        return ResponseEntity.ok(feedbackService.createFeedback(request));
+        return ResponseEntity.ok(feedbackService.createFeedback(request, files));
     }
 
     /**
@@ -255,15 +211,10 @@ public class CounselorController {
      * @param request the payload containing the feedback ID and the modified content
      * @return ResponseEntity containing the updated FeedbackResponse.
      */
-    @PatchMapping("/dashboard/modify")
+    @PatchMapping("/feedback/modify")
     @Operation(summary = "Modify feedback", description = "Modify a feedback to a student")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Feedback package",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = FeedbackResponse.class)
-                    )
-            ),
+            @ApiResponse(responseCode = "200", description = "Feedback package", content = @Content(mediaType = "application/json", schema = @Schema(implementation = FeedbackResponse.class))),
             @ApiResponse(responseCode = "401", description = "Unauthorized or invalid token"),
             @ApiResponse(responseCode = "404", description = "Feedback not found")
     })
@@ -274,10 +225,11 @@ public class CounselorController {
                             schema = @Schema(implementation = ModifyFeedbackRequest.class)
                     )
             )
-            @RequestBody @Valid ModifyFeedbackRequest request
+            @RequestPart("request") @Valid ModifyFeedbackRequest request,
+            @RequestPart(value = "files", required = false) List<MultipartFile> files
     ) {
         log.info("CounselorController: Modify feedback request received");
-        return ResponseEntity.ok(feedbackService.modifyFeedback(request));
+        return ResponseEntity.ok(feedbackService.modifyFeedback(request, files));
     }
 
     /**
@@ -286,15 +238,10 @@ public class CounselorController {
      * @param feedbackId the UUID of the feedback to mark as read
      * @return ResponseEntity containing the updated FeedbackResponse.
      */
-    @PatchMapping("/dashboard/mark-read/{feedbackId}")
+    @PatchMapping("/feedback/mark-read/{feedbackId}")
     @Operation(summary = "Mark feedback as read", description = "Marks a specific feedback sent to a student as READ")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Feedback successfully marked as read",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = FeedbackResponse.class)
-                    )
-            ),
+            @ApiResponse(responseCode = "200", description = "Feedback successfully marked as read", content = @Content(mediaType = "application/json", schema = @Schema(implementation = FeedbackResponse.class))),
             @ApiResponse(responseCode = "401", description = "Unauthorized or invalid token"),
             @ApiResponse(responseCode = "404", description = "Feedback not found")
     })
@@ -309,7 +256,7 @@ public class CounselorController {
      * @param feedbackId the UUID of the feedback to delete
      * @return ResponseEntity with HttpStatus OK if successful.
      */
-    @PatchMapping("/dashboard/delete/{feedbackId}")
+    @PatchMapping("/feedback/delete/{feedbackId}")
     @Operation(summary = "Soft delete feedback", description = "Marks a specific feedback sent to a student as DELETED")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Feedback successfully marked as deleted"),
@@ -321,5 +268,29 @@ public class CounselorController {
         // Soft deletes the feedback by changing its status
         feedbackService.deleteFeedback(feedbackId);
         return ResponseEntity.ok(HttpStatus.OK);
+    }
+
+    @PostMapping("/export-student")
+    @Operation(summary = "Export student list", description = "Export selected students to excel")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Selected student exported to excel successfully"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized or invalid token"),
+            @ApiResponse(responseCode = "404", description = "Student not found")
+    })
+    public ResponseEntity<byte[]> exportStudentList(
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Selected students payload", required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = ExportStudentListRequest.class)
+                    )
+            )
+            @RequestBody @Valid ExportStudentListRequest request
+    ) {
+        log.info("Export student list request received");
+        byte[] excel = counselorService.exportStudentList(request);
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=StudentList.xlsx")
+                .contentType(MediaType.parseMediaType("application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"))
+                .body(excel);
     }
 }

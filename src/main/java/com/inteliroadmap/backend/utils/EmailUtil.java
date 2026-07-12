@@ -125,176 +125,156 @@ public class EmailUtil {
             </head>
 
             <body>
-
                 <div class="container">
-
                     <div class="header">
                         <h1>InteliPath</h1>
                     </div>
 
                     <div class="content">
-
                         <h2>Hello %s</h2>
-
                         <p>
                             We received a request to reset your password.<br/>
                             Use the OTP code below to continue:
                         </p>
-
                         <div class="otp-box">
                             %s
                         </div>
-
                         <div class="info-box">
                             Your verification code is active for the next <strong>2 minutes</strong>.<br/>
                             Enter it on the secure page to finish resetting your password.
                         </div>
-
                         <div class="warning">
                             If you did not request a password reset, you can safely ignore this message.
                         </div>
-
                     </div>
 
                     <div class="footer">
                         © 2026 InteliPath. All rights reserved.
                     </div>
-
                 </div>
-
             </body>
             </html>
             """;
 
     public static final String FEEDBACK_NOTIFICATION_EMAIL = """
             <!doctype html>
-           <html lang="vi">
-             <head>
-               <meta charset="UTF-8" />
-               <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-               <style>
-                 body {
-                   font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
-                   background: #f1f5f9;
-                   margin: 0;
-                   padding: 40px 16px;
-                   color: #1f2937;
-                   -webkit-font-smoothing: antialiased;
-                 }
-    
-                 .wrap {
-                   max-width: 520px;
-                   margin: 0 auto;
-                   background: #ffffff;
-                   border-radius: 20px;
-                   overflow: hidden;
-                   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
-                 }
-    
-                 .header {
-                   background: linear-gradient(135deg, #0ea5e9 0%%, #2563eb 100%%);
-                   padding: 16px;
-                   position: relative;
-                   display: flex;
-                   flex-direction: column;
-                   align-items: center;
-                   font-size: 28px;
-                   font-weight: 800;
-                   color: #fff;
-                   letter-spacing: -0.03em;
-                   line-height: 1;
-                 }
-    
-                 .body {
-                   padding: 32px 32px 28px;
-                 }
-    
-                 .greeting {
-                   font-size: 19px;
-                   font-weight: 600;
-                   color: #111827;
-                   margin: 0 0 8px;
-                 }
-    
-                 .sub {
-                   font-size: 13.5px;
-                   color: #6b7280;
-                   line-height: 1.65;
-                   margin: 0 0 22px;
-                 }
-    
-                 .card {
-                   background: #f8fafc;
-                   border: 1px solid #e2e8f0;
-                   border-radius: 12px;
-                   padding: 18px 22px;
-                   margin-bottom: 18px;
-                 }
-    
-                 .clabel {
-                   font-size: 10.5px;
-                   text-transform: uppercase;
-                   letter-spacing: 0.09em;
-                   font-weight: 700;
-                   color: #1d4ed8;
-                   margin-bottom: 10px;
-                   display: flex;
-                   align-items: center;
-                   gap: 5px;
-                 }
-    
-                 .msg {
-                   font-size: 14.5px;
-                   color: #1e293b;
-                   line-height: 1.65;
-                   margin: 0;
-                 }
-    
-                 .info {
-                   background: #eff6ff;
-                   border-left: 3px solid #3b82f6;
-                   border-radius: 0 8px 8px 0;
-                   padding: 13px 17px;
-                   font-size: 13px;
-                   color: #1e40af;
-                   line-height: 1.55;
-                 }
-    
-                 .foot {
-                   background: #f9fafb;
-                   border-top: 1px solid #f1f5f9;
-                   text-align: center;
-                   padding: 16px;
-                   font-size: 11.5px;
-                   color: #9ca3af;
-                 }
-               </style>
-             </head>
-             <body>
-               <div class="wrap">
-                 <div class="header">
-                   <p>InteliPath</p>
-                 </div>
-    
-                 <div class="body">
-                   <p class="greeting">Hello, %s 👋</p>
-                   <p class="sub">
-                     Your counselor <strong>%s</strong> has just sent you new feedback regarding your current academic progress. Please review the message below carefully.
-                   </p>
-    
-                   <div class="card">
-                     <div class="clabel">💬 Counselor's message</div>
-                     <p class="msg">%s</p>
-                   </div>
-    
-                   <div class="info">
-                     💡 <strong>Next steps:</strong> Review this feedback and take the necessary actions to optimise your learning journey.
-                   </div>
-                 </div>
-    
-                 <div class="foot">© 2026 InteliPath · All rights reserved</div>
-               </div>
-             </body>
-           </html>
+            <html lang="vi">
+              <head>
+                <meta charset="UTF-8" />
+                <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+                <style>
+                  body {
+                    font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+                    background: #f1f5f9;
+                    margin: 0;
+                    padding: 40px 16px;
+                    color: #1f2937;
+                    -webkit-font-smoothing: antialiased;
+                  }
+            
+                  .wrap {
+                    max-width: 520px;
+                    margin: 0 auto;
+                    background: #ffffff;
+                    border-radius: 20px;
+                    overflow: hidden;
+                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
+                  }
+            
+                  .header {
+                    background: linear-gradient(135deg, #0ea5e9 0%%, #2563eb 100%%);
+                    position: relative;
+                    text-align: center;
+                    padding: 32px 24px;
+                    font-size: 28px;
+                    font-weight: 800;
+                    color: #fff;
+                    letter-spacing: -0.03em;
+                    line-height: 1;
+                  }
+            
+                  .body {
+                    padding: 32px 32px 28px;
+                  }
+            
+                  .greeting {
+                    font-size: 19px;
+                    font-weight: 600;
+                    color: #111827;
+                    margin: 0 0 8px;
+                  }
+            
+                  .sub {
+                    font-size: 13.5px;
+                    color: #6b7280;
+                    line-height: 1.65;
+                    margin: 0 0 22px;
+                  }
+            
+                  .counselor {
+                    color: #0284c7; 
+                    background: #e0f2fe; 
+                    padding: 2px 8px; 
+                    border-radius: 6px; 
+                    white-space: nowrap;
+                  }
+            
+                  .card {
+                    background: #f8fafc;
+                    border: 1px solid #e2e8f0;
+                    border-radius: 12px;
+                    padding: 18px 22px;
+                    margin-bottom: 18px;
+                  }
+            
+                  .clabel {
+                    font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+                    font-size: 11px;
+                    text-transform: uppercase;
+                    letter-spacing: 0.09em;
+                    font-weight: 700;
+                    color: #1d4ed8;
+                    margin-bottom: 10px;
+                  }
+            
+                  .msg {
+                    font-size: 14.5px;
+                    color: #1e293b;
+                    line-height: 1.65;
+                    margin: 0;
+                  }
+            
+                  .foot {
+                    background: #f9fafb;
+                    border-top: 1px solid #f1f5f9;
+                    text-align: center;
+                    padding: 16px;
+                    font-size: 11.5px;
+                    color: #9ca3af;
+                  }
+                </style>
+              </head>
+              <body>
+                <div class="wrap">
+                  <div class="header">
+                    InteliPath
+                  </div>
+            
+                  <div class="body">
+                    <p class="greeting">Hello, %s 👋</p>
+                    <p class="sub">
+                      Your counselor <strong class="counselor">%s</strong> has just sent you new feedback !!
+                    </p>
+            
+                    <div class="card">
+                      <div class="clabel">💬 Counselor's message</div>
+                      <p class="msg">%s</p>
+                    </div>
+                  </div>
+            
+                  <div class="foot">© 2026 InteliPath · All rights reserved</div>
+                </div>
+              </body>
+            </html>
             """;
 }

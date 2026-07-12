@@ -1,6 +1,7 @@
 package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.components.RoadmapProgressCalculator;
+import com.inteliroadmap.backend.domain.dto.request.ExportStudentListRequest;
 import com.inteliroadmap.backend.domain.dto.request.UpdateProfileRequest;
 import com.inteliroadmap.backend.domain.dto.response.counselor.CounselorResponse;
 import com.inteliroadmap.backend.domain.projection.StudentInfoProjection;
@@ -27,20 +28,23 @@ import com.inteliroadmap.backend.services.CounselorService;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.apache.poi.ss.usermodel.Row;
+import org.apache.poi.ss.usermodel.Sheet;
+import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
-
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
-
-import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
+
+import java.io.ByteArrayOutputStream;
+import java.io.IOException;
+import java.util.*;
+
+import static java.util.Collections.emptyList;
+import static java.util.stream.Collectors.toMap;
 
 /**
  * Implementation of CounselorService for academic counselors.
@@ -186,13 +190,13 @@ public class CounselorServiceImpl implements CounselorService {
      */
     @Transactional
     @Override
-    public CounselorResponse getAllFeedbacksSentToMe() {
+    public CounselorResponse getAllFeedbacksSentByMe() {
         log.info("CounselorServiceImpl: Get feedback request received");
         // Identify the counselor and fetch all feedbacks where they are the receiver
         AcademicCounselor counselor = getAuthenticatedCounselor();
         User me = userRepository.findByUserId(counselor.getUserId());
 
-        List<Feedback> feedbacks = feedbackRepository.findByReceiver(me);
+        List<Feedback> feedbacks = feedbackRepository.findBySender_UserIdOrderByCreatedAtDesc(me.getUserId());
 
         log.info("CounselorServiceImpl: Get feedback successfully");
         return counselorMapper.toGetFeedbacksResponse(feedbacks, feedbacks.size());
@@ -331,5 +335,80 @@ public class CounselorServiceImpl implements CounselorService {
 
         log.info("CounselorServiceImpl: Update profile successfully");
         return counselorMapper.toCrudProfileResponse(user, counselor);
+    }
+
+    @Transactional
+    @Override
+    public byte[] exportStudentList(ExportStudentListRequest request) {
+        log.info("CounselorServiceImpl: Export student list request received");
+        getAuthenticatedCounselor();
+
+        List<UUID> studentIds = request.getStudentIds();
+
+        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Student List");
+
+            // Header
+            Row header = sheet.createRow(0);
+            header.createCell(0).setCellValue("Name");
+            header.createCell(1).setCellValue("Email");
+            header.createCell(2).setCellValue("University");
+            header.createCell(3).setCellValue("Major");
+            header.createCell(4).setCellValue("Target Career");
+            header.createCell(5).setCellValue("Learning Progress");
+            header.createCell(6).setCellValue("Skills");
+            header.createCell(7).setCellValue("Github Profile");
+
+            // Fetch all users and students at once
+            Map<UUID, User> userMap = userRepository.findAllById(studentIds)
+                    .stream().collect(toMap(User::getUserId, u -> u));
+            Map<UUID, Student> studentMap = studentRepository.findAllById(studentIds)
+                    .stream().collect(toMap(Student::getUserId, s -> s));
+
+            // Fetch all skills at once
+            List<Object[]> allSkills = studentSkillRepository.findSkillNamesByStudentIds(studentIds);
+            Map<UUID, List<String>> skillMap = new HashMap<>();
+            for (Object[] obj : allSkills) {
+                UUID stId = (UUID) obj[0];
+                String skillName = (String) obj[1];
+                skillMap.computeIfAbsent(stId, k -> new ArrayList<>()).add(skillName);
+            }
+
+            // Body
+            int rowNum = 1;
+            for(UUID studentId: studentIds){
+                User user = userMap.get(studentId);
+                Student student = studentMap.get(studentId);
+                List<String> skillNames = skillMap.getOrDefault(studentId, emptyList());
+
+                if (user == null || student == null) continue;
+
+                int progress = roadmapProgressCalculator.calculateProgress(
+                        skillNodeRepository.findByCareerRole_CareerId(student.getCareerRole().getCareerId()),
+                        studentProgressRepository.findByStudent_UserId(student.getUserId()));
+
+                Row row = sheet.createRow(rowNum++);
+                row.createCell(0).setCellValue(user.getFullName());
+                row.createCell(1).setCellValue(user.getEmail());
+                row.createCell(2).setCellValue(student.getUniversity() != null ? student.getUniversity().getName() : "");
+                row.createCell(3).setCellValue(student.getMajor());
+                row.createCell(4).setCellValue(student.getCareerRole().getCareerName());
+                row.createCell(5).setCellValue(progress + "%");
+                row.createCell(6).setCellValue(skillNames.toString());
+                row.createCell(7).setCellValue(student.getGithubProfile());
+            }
+
+            // Auto size columns
+            for (int i = 0; i < 6; i++) sheet.autoSizeColumn(i);
+
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            workbook.write(output);
+
+            return output.toByteArray();
+
+        } catch (IOException e) {
+            log.error("CounselorServiceImpl: Error while exporting student list", e);
+        }
+        return null;
     }
 }
