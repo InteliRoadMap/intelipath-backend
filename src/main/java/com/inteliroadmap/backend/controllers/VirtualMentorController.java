@@ -1,13 +1,16 @@
 package com.inteliroadmap.backend.controllers;
 
 import com.inteliroadmap.backend.domain.dto.request.VirtualMentorChatRequest;
+import com.inteliroadmap.backend.domain.dto.request.VirtualMentorRenameSessionRequest;
 import com.inteliroadmap.backend.domain.dto.request.VirtualMentorSessionRequest;
 import com.inteliroadmap.backend.domain.dto.response.mentor.VirtualMentorMessageResponse;
 import com.inteliroadmap.backend.domain.dto.response.mentor.VirtualMentorSessionResponse;
 import com.inteliroadmap.backend.domain.entity.ChatMessage;
 import com.inteliroadmap.backend.domain.entity.ChatSession;
+import com.inteliroadmap.backend.services.DocumentIngestionService;
 import com.inteliroadmap.backend.services.SupabaseStorageService;
 import com.inteliroadmap.backend.services.VirtualMentorService;
+import com.inteliroadmap.backend.utils.FileValidationUtil;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -46,12 +49,12 @@ public class VirtualMentorController {
 
     private final VirtualMentorService virtualMentorService;
     private final SupabaseStorageService supabaseStorageService;
-    private final com.inteliroadmap.backend.services.DocumentIngestionService documentIngestionService;
+    private final DocumentIngestionService documentIngestionService;
 
     @PostMapping("/sessions")
     @Operation(summary = "Create a new chat session")
     public ResponseEntity<VirtualMentorSessionResponse> createSession(
-            @RequestBody(required = false) @jakarta.validation.Valid VirtualMentorSessionRequest request) {
+            @RequestBody(required = false) @Valid VirtualMentorSessionRequest request) {
         log.info("VirtualMentorController: Creating new AI chat session");
         String sessionName = (request != null && request.getSessionName() != null) ? request.getSessionName() : "New Chat";
         ChatSession session = virtualMentorService.createSession(sessionName);
@@ -73,7 +76,7 @@ public class VirtualMentorController {
     @Operation(summary = "Rename a chat session")
     public ResponseEntity<VirtualMentorSessionResponse> renameSession(
             @PathVariable UUID sessionId,
-            @RequestBody @Valid com.inteliroadmap.backend.domain.dto.request.VirtualMentorRenameSessionRequest request) {
+            @RequestBody @Valid VirtualMentorRenameSessionRequest request) {
         log.info("VirtualMentorController: Renaming chat session: {}", sessionId);
         ChatSession updatedSession = virtualMentorService.renameSession(sessionId, request.getSessionName());
         return ResponseEntity.ok(mapToSessionResponse(updatedSession));
@@ -123,9 +126,9 @@ public class VirtualMentorController {
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, String>> ingestKnowledge(
             @RequestParam("file") MultipartFile file) {
+        FileValidationUtil.validatePdf(file);
         try {
             log.info("VirtualMentorController: Ingesting knowledge file: {}", file.getOriginalFilename());
-            com.inteliroadmap.backend.utils.FileValidationUtil.validatePdf(file);
             documentIngestionService.ingestPdfDocument(file);
             return ResponseEntity.ok(Map.of("message", "Successfully ingested document into Vector Database."));
         } catch (Exception e) {

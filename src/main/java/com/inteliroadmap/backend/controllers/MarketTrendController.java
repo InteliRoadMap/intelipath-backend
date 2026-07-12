@@ -4,8 +4,11 @@ import com.inteliroadmap.backend.domain.dto.response.market.MarketTrendResponse;
 import com.inteliroadmap.backend.services.MarketTrendService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -16,7 +19,7 @@ import java.util.List;
 @RestController
 @RequestMapping("/api/v1/market-trends")
 @RequiredArgsConstructor
-@org.springframework.validation.annotation.Validated
+@Validated
 @Tag(name = "Market Trends", description = "APIs for IT Market Trend Analytics and Dashboards")
 public class MarketTrendController {
 
@@ -25,7 +28,7 @@ public class MarketTrendController {
     @GetMapping("/companies/top-hiring")
     @Operation(summary = "Get top hiring companies", description = "Returns companies with the most recruitment posts.")
     public ResponseEntity<List<MarketTrendResponse.CompanyTrendResponse>> getTopHiringCompanies(
-            @RequestParam(defaultValue = "10") @jakarta.validation.constraints.Min(value = 1, message = "Limit must be at least 1") @jakarta.validation.constraints.Max(value = 100, message = "Limit must not exceed 100") int limit) {
+            @RequestParam(defaultValue = "10") @Min(value = 1, message = "Limit must be at least 1") @Max(value = 100, message = "Limit must not exceed 100") int limit) {
         return ResponseEntity.ok(marketTrendService.getTopHiringCompanies(limit));
     }
 

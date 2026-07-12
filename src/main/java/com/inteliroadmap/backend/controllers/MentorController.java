@@ -9,11 +9,14 @@ import com.inteliroadmap.backend.domain.dto.response.mentor.MentorPendingReviewR
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorProfileResponse;
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorProgressReportDto;
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorStudentDto;
+import com.inteliroadmap.backend.domain.dto.request.UpdateMentorProfileRequest;
 import com.inteliroadmap.backend.services.MentorService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -21,6 +24,7 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -29,11 +33,13 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/mentor")
 @RequiredArgsConstructor
 @Slf4j
-@org.springframework.validation.annotation.Validated
+@Validated
 @Tag(name = "Mentor Dashboard", description = "Industry Mentor APIs")
 @SecurityRequirement(name = "Bearer Authentication")
 @PreAuthorize("hasRole('MENTOR')")
@@ -63,23 +69,23 @@ public class MentorController {
     @GetMapping("/dashboard/pending-reviews")
     @Operation(summary = "Get Pending Reviews", description = "Get list of pending review requests with pagination")
     public ResponseEntity<Page<MentorPendingReviewResponse>> getPendingReviews(
-            @RequestParam(defaultValue = "0") @jakarta.validation.constraints.Min(value = 0, message = "Page index must not be negative") int page,
-            @RequestParam(defaultValue = "10") @jakarta.validation.constraints.Min(value = 1, message = "Page size must be at least 1") @jakarta.validation.constraints.Max(value = 100, message = "Page size must not exceed 100") int size) {
+            @RequestParam(defaultValue = "0") @Min(value = 0, message = "Page index must not be negative") int page,
+            @RequestParam(defaultValue = "10") @Min(value = 1, message = "Page size must be at least 1") @Max(value = 100, message = "Page size must not exceed 100") int size) {
         Pageable pageable = PageRequest.of(page, size);
         return ResponseEntity.ok(mentorService.getPendingReviews(pageable));
     }
 
     @GetMapping("/dashboard/career-distribution")
     @Operation(summary = "Get Career Distribution", description = "Get data for career distribution chart of mentees")
-    public ResponseEntity<java.util.List<MentorCareerDistributionResponse>> getCareerDistribution() {
+    public ResponseEntity<List<MentorCareerDistributionResponse>> getCareerDistribution() {
         return ResponseEntity.ok(mentorService.getCareerDistribution());
     }
 
     @GetMapping("/feedback/students")
     @Operation(summary = "Get Student List", description = "Get list of students with pagination")
     public ResponseEntity<Page<MentorStudentDto>> getStudentInfos(
-            @RequestParam(defaultValue = "0") @jakarta.validation.constraints.Min(value = 0, message = "Page index must not be negative") int page,
-            @RequestParam(defaultValue = "10") @jakarta.validation.constraints.Min(value = 1, message = "Page size must be at least 1") @jakarta.validation.constraints.Max(value = 100, message = "Page size must not exceed 100") int size) {
+            @RequestParam(defaultValue = "0") @Min(value = 0, message = "Page index must not be negative") int page,
+            @RequestParam(defaultValue = "10") @Min(value = 1, message = "Page size must be at least 1") @Max(value = 100, message = "Page size must not exceed 100") int size) {
         Pageable pageable = PageRequest.of(page, size);
         return ResponseEntity.ok(mentorService.getStudentInfos(pageable));
     }
@@ -87,8 +93,8 @@ public class MentorController {
     @GetMapping("/feedback/history")
     @Operation(summary = "Get Feedback History", description = "Get list of feedbacks sent by mentor")
     public ResponseEntity<Page<MentorFeedbackHistoryDto>> getFeedbackHistory(
-            @RequestParam(defaultValue = "0") @jakarta.validation.constraints.Min(value = 0, message = "Page index must not be negative") int page,
-            @RequestParam(defaultValue = "10") @jakarta.validation.constraints.Min(value = 1, message = "Page size must be at least 1") @jakarta.validation.constraints.Max(value = 100, message = "Page size must not exceed 100") int size) {
+            @RequestParam(defaultValue = "0") @Min(value = 0, message = "Page index must not be negative") int page,
+            @RequestParam(defaultValue = "10") @Min(value = 1, message = "Page size must be at least 1") @Max(value = 100, message = "Page size must not exceed 100") int size) {
         Pageable pageable = PageRequest.of(page, size);
         return ResponseEntity.ok(mentorService.getFeedbackHistory(pageable));
     }
@@ -114,7 +120,7 @@ public class MentorController {
 
     @PatchMapping("/profile")
     @Operation(summary = "Update Mentor Profile", description = "Update professional information (company, industry focus) of the authenticated mentor")
-    public ResponseEntity<MentorProfileResponse> updateMentorProfile(@RequestBody @Valid com.inteliroadmap.backend.domain.dto.request.UpdateMentorProfileRequest request) {
+    public ResponseEntity<MentorProfileResponse> updateMentorProfile(@RequestBody @Valid UpdateMentorProfileRequest request) {
         return ResponseEntity.ok(mentorService.updateMentorProfile(request));
     }
 }

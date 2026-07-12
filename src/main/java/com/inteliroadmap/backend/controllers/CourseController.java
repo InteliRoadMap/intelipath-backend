@@ -4,9 +4,12 @@ import com.inteliroadmap.backend.domain.dto.response.course.CourseResponse;
 import com.inteliroadmap.backend.services.CourseService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -25,7 +28,7 @@ import java.util.UUID;
 @PreAuthorize("hasRole('STUDENT')")
 @RequiredArgsConstructor
 @Tag(name = "Courses", description = "Students browse and enroll in mentor courses")
-@org.springframework.validation.annotation.Validated
+@Validated
 public class CourseController {
 
     private final CourseService courseService;
@@ -65,7 +68,7 @@ public class CourseController {
     @PatchMapping("/{courseId}/progress")
     @Operation(summary = "Update the student's progress (0-100)")
     public ResponseEntity<CourseResponse> updateProgress(@PathVariable UUID courseId,
-                                                         @RequestParam @jakarta.validation.constraints.Min(value = 0, message = "Progress must be between 0 and 100") @jakarta.validation.constraints.Max(value = 100, message = "Progress must be between 0 and 100") int value) {
+                                                         @RequestParam @Min(value = 0, message = "Progress must be between 0 and 100") @Max(value = 100, message = "Progress must be between 0 and 100") int value) {
         return ResponseEntity.ok(courseService.updateProgress(courseId, value));
     }
 }

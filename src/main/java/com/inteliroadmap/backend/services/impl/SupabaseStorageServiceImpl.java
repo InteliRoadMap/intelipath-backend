@@ -11,10 +11,12 @@ import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.HttpStatusCodeException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.IOException;
+import java.util.UUID;
 
 /**
  * Implementation of the {@link SupabaseStorageService}.
@@ -113,7 +115,7 @@ public class SupabaseStorageServiceImpl implements SupabaseStorageService {
         log.info("SupabaseStorageServiceImpl: Uploading chat file: {}", file.getOriginalFilename());
         FileValidationUtil.validateAttachment(file);
         String fileExtension = getFileExtension(file.getOriginalFilename());
-        String fileName = java.util.UUID.randomUUID() + fileExtension;
+        String fileName = UUID.randomUUID() + fileExtension;
         return uploadFile(CHAT_BUCKET, fileName, file, "application/pdf", true, "chat file");
     }
 
@@ -123,7 +125,7 @@ public class SupabaseStorageServiceImpl implements SupabaseStorageService {
         FileValidationUtil.validatePdf(file);
         String fileExtension = getFileExtension(file.getOriginalFilename());
         String normalizedExtension = fileExtension.isEmpty() ? ".pdf" : fileExtension;
-        String fileName = userId + "/" + java.util.UUID.randomUUID() + normalizedExtension;
+        String fileName = userId + "/" + UUID.randomUUID() + normalizedExtension;
         return uploadFile(TRANSCRIPT_BUCKET, fileName, file, "application/pdf", true, "transcript");
     }
 
@@ -153,7 +155,7 @@ public class SupabaseStorageServiceImpl implements SupabaseStorageService {
 
             log.error("SupabaseStorageServiceImpl: Supabase API Error: {}", response.getBody());
             throw new RuntimeException("Failed to upload " + label + " to Supabase");
-        } catch (org.springframework.web.client.HttpStatusCodeException e) {
+        } catch (HttpStatusCodeException e) {
             String responseBody = e.getResponseBodyAsString();
             log.error("SupabaseStorageServiceImpl: Supabase API Error HTTP {}: {}", e.getStatusCode(), responseBody);
             throw new RuntimeException("Supabase API Error: " + responseBody, e);

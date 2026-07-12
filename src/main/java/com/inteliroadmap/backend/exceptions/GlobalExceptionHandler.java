@@ -4,6 +4,8 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import jakarta.validation.ConstraintViolation;
+import jakarta.validation.ConstraintViolationException;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -14,7 +16,9 @@ import org.springframework.validation.ObjectError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.HandlerMethodValidationException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -140,11 +144,11 @@ public class GlobalExceptionHandler {
      * @param request current request
      * @return JSON error response with HTTP 400
      */
-    @ExceptionHandler(jakarta.validation.ConstraintViolationException.class)
+    @ExceptionHandler(ConstraintViolationException.class)
     public ResponseEntity<ErrorResponse> handleConstraintViolationException(
-            jakarta.validation.ConstraintViolationException exception, WebRequest request) {
+            ConstraintViolationException exception, WebRequest request) {
         String message = exception.getConstraintViolations().stream()
-                .map(jakarta.validation.ConstraintViolation::getMessage)
+                .map(ConstraintViolation::getMessage)
                 .findFirst()
                 .orElse("Request parameter is invalid");
         return build(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", message, request);
@@ -158,9 +162,9 @@ public class GlobalExceptionHandler {
      * @param request current request
      * @return JSON error response with HTTP 400
      */
-    @ExceptionHandler(org.springframework.web.method.annotation.HandlerMethodValidationException.class)
+    @ExceptionHandler(HandlerMethodValidationException.class)
     public ResponseEntity<ErrorResponse> handleHandlerMethodValidationException(
-            org.springframework.web.method.annotation.HandlerMethodValidationException exception, WebRequest request) {
+            HandlerMethodValidationException exception, WebRequest request) {
         return build(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "Request parameter is invalid", request);
     }
 
@@ -171,9 +175,9 @@ public class GlobalExceptionHandler {
      * @param request current request
      * @return JSON error response with HTTP 413
      */
-    @ExceptionHandler(org.springframework.web.multipart.MaxUploadSizeExceededException.class)
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
     public ResponseEntity<ErrorResponse> handleMaxUploadSizeExceededException(
-            org.springframework.web.multipart.MaxUploadSizeExceededException exception, WebRequest request) {
+            MaxUploadSizeExceededException exception, WebRequest request) {
         return build(HttpStatus.PAYLOAD_TOO_LARGE, "PAYLOAD_TOO_LARGE",
                 "Uploaded file is too large.", request);
     }
