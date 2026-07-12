@@ -19,7 +19,9 @@ public class AuthenticationCookieService {
 
     public static final String ACCESS_TOKEN_COOKIE_NAME = "access_token";
     public static final String REFRESH_TOKEN_COOKIE_NAME = "refreshToken";
-    public static final String REFRESH_TOKEN_COOKIE_PATH = "/api/v1/auth/refresh";
+    // Scope covers both /api/v1/auth/refresh (rotation) and /api/v1/auth/logout (revocation)
+    // so the browser sends the refresh cookie to both — otherwise logout cannot revoke it.
+    public static final String REFRESH_TOKEN_COOKIE_PATH = "/api/v1/auth";
 
     private final JwtService jwtService;
 
