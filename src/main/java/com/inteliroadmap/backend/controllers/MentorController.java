@@ -50,13 +50,13 @@ public class MentorController {
     @GetMapping("/dashboard/welcome-alert")
     @Operation(summary = "Get Welcome Alert", description = "Get dynamic welcome alert for mentor")
     public ResponseEntity<MentorResponse> getWelcomeAlert() {
-        return ResponseEntity.ok(MentorResponse.builder().welcomeAlert("Chào ngày mới! Bạn có một số Portfolio đang chờ duyệt.").build());
+        return ResponseEntity.ok(mentorService.getWelcomeAlert());
     }
 
     @GetMapping("/dashboard/insight")
-    @Operation(summary = "Get Mentor Insight", description = "Get AI-driven insight")
+    @Operation(summary = "Get Mentor Insight", description = "Get dynamic insight based on pending reviews")
     public ResponseEntity<MentorResponse> getInsight() {
-        return ResponseEntity.ok(MentorResponse.builder().insight("Có 3 sinh viên đang chờ feedback Portfolio từ bạn.").build());
+        return ResponseEntity.ok(mentorService.getInsight());
     }
 
     @GetMapping("/dashboard/pending-reviews")

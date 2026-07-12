@@ -101,6 +101,26 @@ public class MentorServiceImpl implements MentorService {
                 .build();
     }
 
+    @Override
+    public MentorResponse getWelcomeAlert() {
+        User mentor = getAuthenticatedMentor();
+        long pending = reviewRequestRepository.countByMentor_UserIdAndStatus(mentor.getUserId(), ReviewStatus.PENDING);
+        String message = pending > 0
+                ? "Chào ngày mới! Bạn có " + pending + " portfolio đang chờ duyệt."
+                : "Chào ngày mới! Hiện không có portfolio nào đang chờ duyệt.";
+        return MentorResponse.builder().welcomeAlert(message).build();
+    }
+
+    @Override
+    public MentorResponse getInsight() {
+        User mentor = getAuthenticatedMentor();
+        long pending = reviewRequestRepository.countByMentor_UserIdAndStatus(mentor.getUserId(), ReviewStatus.PENDING);
+        String insight = pending > 0
+                ? "Có " + pending + " sinh viên đang chờ feedback portfolio từ bạn."
+                : "Bạn đã xử lý hết các yêu cầu feedback. Làm tốt lắm!";
+        return MentorResponse.builder().insight(insight).build();
+    }
+
     private String formatResponseTime(Double seconds) {
         if (seconds == null || seconds == 0) return "< 1h";
         int totalMinutes = (int) (seconds / 60);

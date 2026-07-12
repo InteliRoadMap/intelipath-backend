@@ -17,7 +17,7 @@ import com.inteliroadmap.backend.domain.entity.RecruitmentPost;
 import com.inteliroadmap.backend.repositories.CompanyRepository;
 import com.inteliroadmap.backend.repositories.RecruitmentRepository;
 import com.inteliroadmap.backend.repositories.RecruitmentPostRepository;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.UUID;
@@ -35,16 +35,17 @@ public class JobScrapingScheduler {
     private final CompanyRepository companyRepository;
     private final RecruitmentRepository recruitmentRepository;
     private final RecruitmentPostRepository recruitmentPostRepository;
+    private final TransactionTemplate transactionTemplate;
 
-    // Runs every Monday at 9:00 AM
-    @Scheduled(cron = "0 0 9 * * Mon")
-//    @EventListener(org.springframework.boot.context.event.ApplicationReadyEvent.class)
-    @Transactional
+    // Runs daily at 9:00 AM
+    @Scheduled(cron = "0 0 9 * * *")
     public void fetchJobsFromPython() {
         int limit = scraperLimit;
         log.info("JobScrapingScheduler: Triggering TopCV scrape via AI service (limit={})", limit);
 
         try {
+            // Network I/O (can take minutes) runs OUTSIDE any transaction so a DB
+            // connection is not held from the pool during the whole scrape.
             ScraperResponseDto response = aiServiceClient.triggerTopCvScrape(limit);
             if (response == null) {
                 log.warn("JobScrapingScheduler: Received empty response from Scraper API");
@@ -54,6 +55,16 @@ public class JobScrapingScheduler {
             log.info("JobScrapingScheduler: Received {} companies, {} recruitments, {} posts",
                 response.getCompanies().size(), response.getRecruitments().size(), response.getRecruitmentPosts().size());
 
+            // Persist the fetched data in a single short transaction.
+            transactionTemplate.executeWithoutResult(status -> persistScrapedData(response));
+            log.info("JobScrapingScheduler: Successfully persisted scraped data into the database.");
+
+        } catch (Exception e) {
+            log.error("JobScrapingScheduler: Failed to scrape jobs from Python API: ", e);
+        }
+    }
+
+    private void persistScrapedData(ScraperResponseDto response) {
             // 1. Save Companies (processed shape: signatures + infos)
             for (ScrapedCompanyDto cDto : response.getCompanies()) {
                 Company company = companyRepository.findById(cDto.getCompanyId()).orElse(new Company());
@@ -102,10 +113,5 @@ public class JobScrapingScheduler {
                     }
                 }
             }
-            log.info("JobScrapingScheduler: Successfully persisted scraped data into the database.");
-
-        } catch (Exception e) {
-            log.error("JobScrapingScheduler: Failed to scrape jobs from Python API: ", e);
-        }
     }
 }

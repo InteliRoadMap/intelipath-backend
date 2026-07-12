@@ -19,6 +19,10 @@ public interface MentorService {
 
     MentorDashboardMetrics getDashboardMetrics();
 
+    MentorResponse getWelcomeAlert();
+
+    MentorResponse getInsight();
+
     Page<MentorPendingReviewResponse> getPendingReviews(Pageable pageable);
 
     Page<MentorStudentDto> getStudentInfos(Pageable pageable);
