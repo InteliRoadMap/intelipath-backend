@@ -1,11 +1,8 @@
 package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.components.RoadmapProgressCalculator;
-import com.inteliroadmap.backend.domain.dto.request.UpdateUserProgressRequest;
 import com.inteliroadmap.backend.domain.dto.request.UpdateNodeProgressRequest;
-import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapNodeDto;
-import com.inteliroadmap.backend.domain.dto.response.roadmap.SkillGapResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.StudentRoadmapResponse;
 import com.inteliroadmap.backend.domain.entity.CareerRequiredSkill;
 import com.inteliroadmap.backend.domain.entity.CareerRole;
@@ -27,6 +24,7 @@ import com.inteliroadmap.backend.repositories.StudentRepository;
 import com.inteliroadmap.backend.repositories.StudentSkillRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
+import com.inteliroadmap.backend.exceptions.ForbiddenException;
 import com.inteliroadmap.backend.security.SecurityUtils;
 import com.inteliroadmap.backend.services.AuthenticatedStudentService;
 import com.inteliroadmap.backend.services.RoadmapService;
@@ -97,35 +95,6 @@ public class RoadmapServiceImpl implements RoadmapService {
     }
 
     /**
-     * Retrieves the full learning roadmap for a specific career role.
-     * Includes all required skill nodes and the authenticated student's progress for those nodes.
-     *
-     * @param careerId The UUID of the target career role
-     * @return RoadmapResponse containing the skill nodes and the student's progress
-     */
-    @Transactional(readOnly = true)
-    @Override
-    public RoadmapResponse getRoadmap(UUID careerId) {
-        log.info("RoadmapServiceImpl: Fetching roadmap for career ID: {}", careerId);
-
-        Student student = getAuthenticatedStudent();
-        Optional<CareerRole> careerRoleOptional = careerRoleRepository.findById(careerId);
-        if (careerRoleOptional.isEmpty()) {
-            throw new ResourceNotFoundException("Career role not found");
-        }
-
-        CareerRole careerRole = careerRoleOptional.get();
-
-        List<SkillNode> nodes = skillNodeRepository.findByCareerRole_CareerId(careerId);
-        List<StudentProgress> progresses = studentProgressRepository.findByStudent_UserId(student.getUserId());
-
-        return RoadmapResponse.builder()
-                .skillNodes(nodes)
-                .progresses(progresses)
-                .build();
-    }
-
-    /**
      * Builds the authenticated student's target roadmap for the frontend contract.
      * Business rules:
      * - Student is resolved from JWT, never from request parameters.
@@ -143,7 +112,7 @@ public class RoadmapServiceImpl implements RoadmapService {
         // Fetch authenticated student
         Student student = getAuthenticatedStudent();
         // If the student hasn't selected a career, return an empty roadmap
-        if (student.getCareerRole().getCareerId() == null) {
+        if (student.getCareerRole() == null || student.getCareerRole().getCareerId() == null) {
             return StudentRoadmapResponse.builder()
                     .progress(0)
                     .nodes(List.of())
@@ -180,106 +149,6 @@ public class RoadmapServiceImpl implements RoadmapService {
                 .targetCareerRole(careerRole.getCareerName())
                 .progress(progress)
                 .nodes(buildRoadmapTree(nodes, statusByNodeId, progressByNodeId))
-                .build();
-    }
-
-    /**
-     * Calculates the authenticated student's overall completion progress for a specific career roadmap.
-     * Computes the percentage of completed skill nodes out of the total required nodes for the career.
-     *
-     * @param careerId The UUID of the target career role
-     * @return RoadmapResponse containing the calculated totalProgress percentage (0.0 to 100.0)
-     */
-    @Transactional(readOnly = true)
-    @Override
-    public RoadmapResponse getRoadmapProgress(UUID careerId) {
-        log.info("RoadmapServiceImpl: Calculating total progress for career ID: {}", careerId);
-
-        Student student = getAuthenticatedStudent();
-
-        List<SkillNode> allNodes = skillNodeRepository.findByCareerRole_CareerId(careerId);
-        if (allNodes.isEmpty()) {
-            return RoadmapResponse.builder().totalProgress(0.0).build();
-        }
-
-        List<StudentProgress> progresses = studentProgressRepository.findByStudent_UserId(student.getUserId());
-        Set<UUID> careerNodeIds = allNodes.stream().map(SkillNode::getNodeId).collect(Collectors.toSet());
-
-        long completedCount = progresses.stream()
-                .filter(p -> RoadmapStepStatus.COMPLETED == p.getStatus())
-                .filter(p -> p.getSkillNode().getNodeId() != null && careerNodeIds.contains(p.getSkillNode().getNodeId()))
-                .count();
-
-        double percentage = ((double) completedCount / allNodes.size()) * 100.0;
-
-        return RoadmapResponse.builder()
-                .totalProgress(percentage)
-                .build();
-    }
-
-    /**
-     * Fetches detailed information about a single specific skill node.
-     *
-     * @param nodeId The UUID of the skill node to fetch
-     * @return RoadmapResponse containing the detailed skill node information
-     */
-    @Override
-    public RoadmapResponse getNode(UUID nodeId) {
-        log.info("RoadmapServiceImpl: Fetching Node information");
-
-        Optional<SkillNode> nodeOptional = skillNodeRepository.findById(nodeId);
-        if (nodeOptional.isEmpty()) {
-            throw new ResourceNotFoundException("Node not found");
-        }
-
-        SkillNode node = nodeOptional.get();
-
-        return RoadmapResponse.builder()
-                .skillNode(node)
-                .build();
-    }
-
-    /**
-     * Updates the authenticated student's progress for a specific skill node, marking it as COMPLETED.
-     * Securely identifies the student via JWT, ignoring any client-provided student IDs.
-     *
-     * @param request The payload containing the target node ID
-     * @return RoadmapResponse confirming the successful status update
-     */
-    @Transactional
-    @Override
-    public RoadmapResponse updateNodeProgress(UpdateUserProgressRequest request) {
-        log.info("RoadmapServiceImpl: Updating Node progress");
-
-        // Identify the current student
-        Student student = getAuthenticatedStudent();
-
-        // Verify the requested node exists
-        Optional<SkillNode> nodeOptional = skillNodeRepository.findById(request.getNodeId());
-        if (nodeOptional.isEmpty()) {
-            throw new ResourceNotFoundException("Node not found");
-        }
-
-        SkillNode node = nodeOptional.get();
-
-        // Check if the student has progress recorded for this node
-        Optional<StudentProgress> progressOptional =
-                studentProgressRepository.findByStudent_UserIdAndSkillNode_NodeId(student.getUserId(), node.getNodeId());
-        if (progressOptional.isEmpty()) {
-            throw new ResourceNotFoundException("Student progress not found for this node");
-        }
-
-        StudentProgress progress = progressOptional.get();
-
-        // If the node is currently in progress, mark it completed and record the time
-        if(RoadmapStepStatus.IN_PROGRESS == progress.getStatus()){
-            progress.setStatus(RoadmapStepStatus.COMPLETED);
-            progress.setCompletedAt(LocalDateTime.now());
-            studentProgressRepository.save(progress);
-        }
-        
-        return RoadmapResponse.builder()
-                .updateStatus("Update Node status successfully")
                 .build();
     }
 
@@ -335,10 +204,9 @@ public class RoadmapServiceImpl implements RoadmapService {
                         nodeIds
                 );
 
-        int completed = (int) progressList.stream()
-                .filter(progress -> RoadmapStepStatus.COMPLETED == progress.getStatus())
-                .count();
-        return (completed * 100) / nodes.size();
+        // Delegate to the shared weight-based calculator so this endpoint reports the
+        // same percentage as /roadmaps/student and the dashboard (single source of truth).
+        return roadmapProgressCalculator.calculateProgress(nodes, progressList);
     }
 
     /**
@@ -394,14 +262,33 @@ public class RoadmapServiceImpl implements RoadmapService {
         } catch (IllegalArgumentException e) {
             newStatus = RoadmapStepStatus.IN_PROGRESS;
         }
-        
+
+        // Enforce the same unlock gating the read path computes: a node that is still
+        // locked (prerequisite/stage/parent not satisfied) cannot be advanced. This keeps
+        // the write path from completing nodes out of order and feeding bad auto-completion.
+        if ((newStatus == RoadmapStepStatus.IN_PROGRESS || newStatus == RoadmapStepStatus.COMPLETED)
+                && node.getCareerRole() != null && node.getCareerRole().getCareerId() != null) {
+            List<SkillNode> careerNodes = skillNodeRepository
+                    .findByCareerRole_CareerIdOrderByNodeLevelAscNodeNameAsc(node.getCareerRole().getCareerId());
+            Map<UUID, StudentProgress> progressByNode = mapProgressByNodeId(
+                    studentProgressRepository.findByStudent_UserIdAndSkillNode_NodeIdIn(
+                            student.getUserId(),
+                            careerNodes.stream().map(SkillNode::getNodeId).toList()));
+            String computedStatus = buildFrontendStatusMap(careerNodes, progressByNode).get(node.getNodeId());
+            if (FRONTEND_LOCKED_STATUS.equals(computedStatus)) {
+                throw new ForbiddenException("This node is locked; complete its prerequisites first.");
+            }
+        }
+
         progress.setStatus(newStatus);
         if (RoadmapStepStatus.COMPLETED == newStatus
                 && progress.getCompletedAt() == null) {
             progress.setCompletedAt(java.time.LocalDateTime.now());
             
-            // Auto-sync skill to profile
-            if (node.getSkill() != null) {
+            // Auto-sync skill to profile (only when the student has a target career)
+            if (node.getSkill() != null
+                    && student.getCareerRole() != null
+                    && student.getCareerRole().getCareerId() != null) {
                 Skill skill = skillRepository.findById(node.getSkill().getSkillId()).orElse(null);
                 if (skill != null) {
                     boolean hasSkill = studentSkillRepository.existsByStudent_UserIdAndSkill_SkillId(student.getUserId(), skill.getSkillId());
@@ -498,47 +385,6 @@ public class RoadmapServiceImpl implements RoadmapService {
 
             topic = topic.getParentNode();
         }
-    }
-
-    /**
-     * Compares selected student skills with the target career requirements.
-     *
-     * @return current and missing skill names
-     */
-    @Transactional(readOnly = true)
-    @Override
-    public SkillGapResponse compareSkills() {
-        Student student = getStudentFromContext();
-        CareerRole careerRole = careerRoleRepository.findByCareerId(student.getCareerRole().getCareerId());
-        if (careerRole == null) {
-            throw new ResourceNotFoundException("Student has not selected a career path yet.");
-        }
-
-        List<StudentSkill> currentStudentSkills = studentSkillRepository.findByStudent_UserId(student.getUserId());
-        List<UUID> currentSkillIds = currentStudentSkills.stream()
-                .map(s -> s.getSkill().getSkillId())
-                .collect(Collectors.toList());
-        List<Skill> currentSkills = skillRepository.findAllById(currentSkillIds);
-        Set<String> currentSkillNames = currentSkills.stream()
-                .map(Skill::getSkillName)
-                .collect(Collectors.toSet());
-
-        List<CareerRequiredSkill> requiredSkills =
-                careerRequiredSkillRepository.findByCareerRole_CareerId(careerRole.getCareerId());
-        List<UUID> reqSkillIds = requiredSkills.stream()
-                .map(s -> s.getSkill().getSkillId())
-                .collect(Collectors.toList());
-        List<Skill> reqSkills = skillRepository.findAllById(reqSkillIds);
-        
-        List<String> missingSkills = reqSkills.stream()
-                .map(Skill::getSkillName)
-                .filter(skillName -> !currentSkillNames.contains(skillName))
-                .toList();
-
-        return SkillGapResponse.builder()
-                .currentSkills(new ArrayList<>(currentSkillNames))
-                .missingSkills(missingSkills)
-                .build();
     }
 
     /**
@@ -875,19 +721,5 @@ public class RoadmapServiceImpl implements RoadmapService {
                             .build();
                 })
                 .toList();
-    }
-
-    /**
-     * Returns the first non-null object from the given arguments.
-     *
-     * @param first the first object to check
-     * @param second the second object to check
-     * @return the first non-null object, or null if both are null
-     */
-    private Object firstNonNull(Object first, Object second) {
-        if (first != null) {
-            return first;
-        }
-        return second;
     }
 }

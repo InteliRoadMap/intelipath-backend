@@ -2,7 +2,6 @@ package com.inteliroadmap.backend.controllers;
 
 import com.inteliroadmap.backend.domain.dto.request.UpdateNodeProgressRequest;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapNodeDto;
-import com.inteliroadmap.backend.domain.dto.response.roadmap.SkillGapResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.StudentRoadmapResponse;
 import com.inteliroadmap.backend.services.RoadmapService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -110,17 +109,5 @@ public class RoadmapController {
             @Valid @RequestBody UpdateNodeProgressRequest request) {
         roadmapService.updateNodeProgress(request);
         return ResponseEntity.ok().build();
-    }
-
-    @PostMapping("/skills/compare")
-    @Operation(summary = "Compare skills", description = "Compare the student's current skills with the skills required by the Career to find Skill Gaps.")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Successful",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = SkillGapResponse.class))),
-            @ApiResponse(responseCode = "401", description = "Unauthorized"),
-            @ApiResponse(responseCode = "404", description = "Not Found - Student has not selected a Career")
-    })
-    public ResponseEntity<SkillGapResponse> compareSkills() {
-        return ResponseEntity.ok(roadmapService.compareSkills());
     }
 }

@@ -5,7 +5,6 @@ import com.inteliroadmap.backend.domain.dto.request.UpdateNodeProgressRequest;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.StudentRoadmapResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapNodeDto;
-import com.inteliroadmap.backend.domain.dto.response.roadmap.SkillGapResponse;
 import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.security.JwtService;
@@ -27,23 +26,13 @@ import java.util.stream.Collectors;
 
 public interface RoadmapService {
 
-    public RoadmapResponse getRoadmap(UUID careerId) ;
+    StudentRoadmapResponse getStudentRoadmap();
 
-    public StudentRoadmapResponse getStudentRoadmap() ;
+    StudentRoadmapResponse getCareerRoadmapTemplate(UUID careerId);
 
-    public RoadmapResponse getRoadmapProgress(UUID careerId) ;
+    Integer getCareerProgress(UUID careerId);
 
-    public RoadmapResponse getNode(UUID nodeId) ;
+    RoadmapNodeDto getNodeDetail(UUID nodeId);
 
-    public RoadmapResponse updateNodeProgress(UpdateUserProgressRequest request) ;
-
-    public StudentRoadmapResponse getCareerRoadmapTemplate(UUID careerId) ;
-
-    public Integer getCareerProgress(UUID careerId) ;
-
-    public RoadmapNodeDto getNodeDetail(UUID nodeId) ;
-
-    public void updateNodeProgress(UpdateNodeProgressRequest request) ;
-
-    public SkillGapResponse compareSkills() ;
+    void updateNodeProgress(UpdateNodeProgressRequest request);
 }

@@ -259,17 +259,23 @@ public class CounselorServiceImpl implements CounselorService {
         User me = userRepository.findByUserId(counselor.getUserId());
         User st = userRepository.findByUserId(studentId);
         Student student = studentRepository.findByUserId(studentId);
+        if (student == null) {
+            throw new ResourceNotFoundException("Student not found");
+        }
+
+        // A student who has not selected a career yet has no roadmap/skill data to report.
+        UUID careerId = student.getCareerRole() != null ? student.getCareerRole().getCareerId() : null;
 
         // Weighted roadmap progress, shared formula with the student-facing views
-        int progress = roadmapProgressCalculator.calculateProgress(
-                skillNodeRepository.findByCareerRole_CareerId(student.getCareerRole().getCareerId()),
+        int progress = careerId == null ? 0 : roadmapProgressCalculator.calculateProgress(
+                skillNodeRepository.findByCareerRole_CareerId(careerId),
                 studentProgressRepository.findByStudent_UserId(student.getUserId()));
 
         // Fetch the list of skills the student has yet to acquire for their current career
-        List<String> missingSkillNames = studentSkillRepository
+        List<String> missingSkillNames = careerId == null ? List.of() : studentSkillRepository
                 .findMissingSkillsByStudentIdAndCareerId(
                         student.getUserId(),
-                        student.getCareerRole().getCareerId()
+                        careerId
                 );
 
         List<Feedback> feedbacks = feedbackRepository

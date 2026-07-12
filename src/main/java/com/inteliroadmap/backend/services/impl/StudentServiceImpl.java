@@ -221,7 +221,7 @@ public class StudentServiceImpl implements StudentService {
 
         // Fetch the list of skills the student has explicitly selected
         List<StudentSkill> selectedSkills = studentSkillRepository.findByStudent_UserId(student.getUserId());
-        if (student.getCareerRole().getCareerId() == null) {
+        if (student.getCareerRole() == null || student.getCareerRole().getCareerId() == null) {
             // Return early if no career is selected, showing only what the student selected
             return SkillResponse.builder()
                     .selectedSkills(skillMapper.toSelectedSkillResponses(selectedSkills))
@@ -273,6 +273,9 @@ public class StudentServiceImpl implements StudentService {
      */
     @Override
     public List<CareerRequiredSkill> findMissingRequiredSkills(Student student) {
+        if (student.getCareerRole() == null || student.getCareerRole().getCareerId() == null) {
+            return List.of();
+        }
         List<CareerRequiredSkill> requiredSkills = careerRequiredSkillRepository
                 .findByCareerRole_CareerId(student.getCareerRole().getCareerId());
         List<StudentSkill> selectedSkills = studentSkillRepository.findByStudent_UserId(student.getUserId());
@@ -314,6 +317,9 @@ public class StudentServiceImpl implements StudentService {
     public Integer calculateSkillProgress(Student student, UUID skillId) {
         if (studentSkillRepository.existsByStudent_UserIdAndSkill_SkillId(student.getUserId(), skillId)) {
             return 100;
+        }
+        if (student.getCareerRole() == null || student.getCareerRole().getCareerId() == null) {
+            return 0;
         }
         List<SkillNode> allNodesForSkill = skillNodeRepository.findBySkill_SkillIdAndCareerRole_CareerId(skillId, student.getCareerRole().getCareerId());
         if (allNodesForSkill.isEmpty()) {

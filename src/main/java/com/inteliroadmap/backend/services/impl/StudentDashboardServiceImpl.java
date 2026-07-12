@@ -91,7 +91,7 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
     @Transactional
     @Override
     public DashboardRoadmapProgressResponse getRoadmapProgress(Student student) {
-        if (student == null || student.getCareerRole().getCareerId() == null) {
+        if (student == null || student.getCareerRole() == null || student.getCareerRole().getCareerId() == null) {
             return DashboardRoadmapProgressResponse.builder().build();
         }
 
@@ -147,7 +147,7 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
     @Transactional
     @Override
     public List<SkillGapItemResponse> getSkillGaps(Student student) {
-        if (student == null || student.getCareerRole().getCareerId() == null) {
+        if (student == null || student.getCareerRole() == null || student.getCareerRole().getCareerId() == null) {
             return List.of();
         }
 
@@ -259,7 +259,7 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
         log.info("StudentDashboardServiceImpl: Fetching market demand");
 
         Student student = getCurrentStudent();
-        if (student == null || student.getCareerRole().getCareerId() == null) {
+        if (student == null || student.getCareerRole() == null || student.getCareerRole().getCareerId() == null) {
             return MarketDemandResponse.builder().build();
         }
 
@@ -310,7 +310,7 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
         log.info("StudentDashboardServiceImpl: Fetching recommendations");
 
         Student student = getCurrentStudent();
-        if (student == null || student.getCareerRole().getCareerId() == null) {
+        if (student == null || student.getCareerRole() == null || student.getCareerRole().getCareerId() == null) {
             return List.of();
         }
 

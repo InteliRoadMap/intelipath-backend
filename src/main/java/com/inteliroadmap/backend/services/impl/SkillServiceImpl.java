@@ -62,7 +62,7 @@ public class SkillServiceImpl implements SkillService {
         List<Skill> allSkills = skillRepository.findAll();
 
         // Step 3: Return selected and available skills when no target career is set
-        if (student.getCareerRole().getCareerId() == null) {
+        if (student.getCareerRole() == null || student.getCareerRole().getCareerId() == null) {
             return SkillResponse.builder()
                     .selectedSkills(skillMapper.toSelectedSkillResponses(selectedSkills))
                     .skills(skillMapper.toSkillItemResponses(allSkills))
