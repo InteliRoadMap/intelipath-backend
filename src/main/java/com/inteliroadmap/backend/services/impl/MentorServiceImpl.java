@@ -4,12 +4,12 @@ import com.inteliroadmap.backend.domain.dto.request.CreateFeedbackRequest;
 import com.inteliroadmap.backend.domain.dto.request.UpdateMentorProfileRequest;
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorResponse;
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorCareerDistributionResponse;
-import com.inteliroadmap.backend.domain.dto.response.mentor.MentorDashboardMetrics;
-import com.inteliroadmap.backend.domain.dto.response.mentor.MentorFeedbackHistoryDto;
+import com.inteliroadmap.backend.domain.dto.response.mentor.MentorDashboardMetricsResponse;
+import com.inteliroadmap.backend.domain.dto.response.mentor.MentorFeedbackHistoryResponse;
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorPendingReviewResponse;
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorProfileResponse;
-import com.inteliroadmap.backend.domain.dto.response.mentor.MentorProgressReportDto;
-import com.inteliroadmap.backend.domain.dto.response.mentor.MentorStudentDto;
+import com.inteliroadmap.backend.domain.dto.response.mentor.MentorProgressReportResponse;
+import com.inteliroadmap.backend.domain.dto.response.mentor.MentorStudentResponse;
 import com.inteliroadmap.backend.domain.entity.Feedback;
 import com.inteliroadmap.backend.domain.entity.IndustryMentor;
 import com.inteliroadmap.backend.domain.entity.PortfolioReviewRequest;
@@ -79,7 +79,7 @@ public class MentorServiceImpl implements MentorService {
 
     @Transactional
     @Override
-    public MentorDashboardMetrics getDashboardMetrics() {
+    public MentorDashboardMetricsResponse getDashboardMetrics() {
         log.info("MentorServiceImpl: Get mentor dashboard metrics request received");
         User mentor = getAuthenticatedMentor();
 
@@ -93,7 +93,7 @@ public class MentorServiceImpl implements MentorService {
 
         long menteesCount = reviewRequestRepository.countDistinctStudentsByMentorId(mentor.getUserId());
 
-        return MentorDashboardMetrics.builder()
+        return MentorDashboardMetricsResponse.builder()
                 .responseTime(responseTime)
                 .mentees(menteesCount)
                 .pendingReviews(pendingReviews)
@@ -179,7 +179,7 @@ public class MentorServiceImpl implements MentorService {
 
     @Transactional
     @Override
-    public Page<MentorStudentDto> getStudentInfos(Pageable pageable) {
+    public Page<MentorStudentResponse> getStudentInfos(Pageable pageable) {
         User mentor = getAuthenticatedMentor();
         Page<User> studentUsersPage = reviewRequestRepository.findDistinctStudentsByMentorId(mentor.getUserId(), pageable);
         
@@ -187,7 +187,7 @@ public class MentorServiceImpl implements MentorService {
         List<Student> students = studentRepository.findAllById(userIds);
         Map<UUID, Student> studentMap = students.stream().collect(Collectors.toMap(Student::getUserId, s -> s));
 
-        List<MentorStudentDto> dtos = new ArrayList<>();
+        List<MentorStudentResponse> dtos = new ArrayList<>();
 
         for(User userSt: studentUsersPage.getContent()) {
             if (userSt.getRole() != UserRole.STUDENT) continue;
@@ -197,7 +197,7 @@ public class MentorServiceImpl implements MentorService {
             String university = student.getUniversity() != null ? student.getUniversity().getName() : "Unknown";
             String career = student.getCareerRole() != null ? student.getCareerRole().getCareerName() : "Unknown";
 
-            dtos.add(MentorStudentDto.builder()
+            dtos.add(MentorStudentResponse.builder()
                     .id(userSt.getUserId().toString())
                     .fullName(userSt.getFullName())
                     .email(userSt.getEmail())
@@ -279,7 +279,7 @@ public class MentorServiceImpl implements MentorService {
 
     @Transactional
     @Override
-    public Page<MentorFeedbackHistoryDto> getFeedbackHistory(Pageable pageable) {
+    public Page<MentorFeedbackHistoryResponse> getFeedbackHistory(Pageable pageable) {
         User mentor = getAuthenticatedMentor();
         // Since FeedbackRepository doesn't have pagination by Sender yet, we'll fetch all and sublist, or just return top elements.
         List<Feedback> sentFeedbacks = feedbackRepository.findBySender_UserIdOrderByCreatedAtDesc(mentor.getUserId());
@@ -288,10 +288,10 @@ public class MentorServiceImpl implements MentorService {
         int end = Math.min((start + pageable.getPageSize()), sentFeedbacks.size());
         List<Feedback> pageContent = start > sentFeedbacks.size() ? new ArrayList<>() : sentFeedbacks.subList(start, end);
 
-        List<MentorFeedbackHistoryDto> dtos = pageContent.stream().map(f -> {
+        List<MentorFeedbackHistoryResponse> dtos = pageContent.stream().map(f -> {
             User receiver = f.getReceiver();
             String name = receiver != null ? receiver.getFullName() : "Unknown";
-            return MentorFeedbackHistoryDto.builder()
+            return MentorFeedbackHistoryResponse.builder()
                     .id(f.getFeedbackId().toString())
                     .initials(getInitials(name))
                     .name(name)
@@ -306,7 +306,7 @@ public class MentorServiceImpl implements MentorService {
 
     @Transactional
     @Override
-    public MentorProgressReportDto getProgressReports() {
+    public MentorProgressReportResponse getProgressReports() {
         log.info("MentorServiceImpl: Get mentor progress reports request received");
         User mentor = getAuthenticatedMentor();
 
@@ -314,8 +314,8 @@ public class MentorServiceImpl implements MentorService {
                 .findDistinctStudentsByMentorId(mentor.getUserId(), Pageable.unpaged())
                 .getContent();
 
-        List<MentorProgressReportDto.StudentProgress> studentsProgress = new ArrayList<>();
-        List<MentorProgressReportDto.NeedsAttention> needsAttention = new ArrayList<>();
+        List<MentorProgressReportResponse.StudentProgress> studentsProgress = new ArrayList<>();
+        List<MentorProgressReportResponse.NeedsAttention> needsAttention = new ArrayList<>();
         Map<String, Integer> missingSkillCounts = new HashMap<>();
         int totalCompletedNodes = 0;
         int totalInProgressNodes = 0;
@@ -341,7 +341,7 @@ public class MentorServiceImpl implements MentorService {
             totalCompletedNodes += completed;
             totalInProgressNodes += inProgress;
 
-            studentsProgress.add(MentorProgressReportDto.StudentProgress.builder()
+            studentsProgress.add(MentorProgressReportResponse.StudentProgress.builder()
                     .name(studentUser.getFullName())
                     .role(student.getCareerRole().getCareerName())
                     .completed(completed)
@@ -355,7 +355,7 @@ public class MentorServiceImpl implements MentorService {
                     .ifPresent(oldest -> {
                         long daysStuck = Duration.between(oldest.getCreatedAt(), LocalDateTime.now()).toDays();
                         if (daysStuck >= STUCK_THRESHOLD_DAYS) {
-                            needsAttention.add(MentorProgressReportDto.NeedsAttention.builder()
+                            needsAttention.add(MentorProgressReportResponse.NeedsAttention.builder()
                                     .name(studentUser.getFullName())
                                     .issue("Stuck on " + oldest.getSkillNode().getNodeName() + " for " + daysStuck + " days")
                                     .days(daysStuck + "d")
@@ -367,21 +367,21 @@ public class MentorServiceImpl implements MentorService {
                     .forEach(skillName -> missingSkillCounts.merge(skillName, 1, Integer::sum));
         }
 
-        List<MentorProgressReportDto.Metric> metrics = List.of(
-                new MentorProgressReportDto.Metric("COMPLETED NODES", String.valueOf(totalCompletedNodes), "text-[#00838f]"),
-                new MentorProgressReportDto.Metric("IN PROGRESS", String.valueOf(totalInProgressNodes), "text-[#0ea5e9]")
+        List<MentorProgressReportResponse.Metric> metrics = List.of(
+                new MentorProgressReportResponse.Metric("COMPLETED NODES", String.valueOf(totalCompletedNodes), "text-[#00838f]"),
+                new MentorProgressReportResponse.Metric("IN PROGRESS", String.valueOf(totalInProgressNodes), "text-[#0ea5e9]")
         );
 
-        List<MentorProgressReportDto.SkillGap> skillGaps = missingSkillCounts.entrySet().stream()
+        List<MentorProgressReportResponse.SkillGap> skillGaps = missingSkillCounts.entrySet().stream()
                 .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
                 .limit(5)
-                .map(entry -> new MentorProgressReportDto.SkillGap(
+                .map(entry -> new MentorProgressReportResponse.SkillGap(
                         entry.getKey(),
                         entry.getValue(),
                         entry.getValue() >= SKILL_GAP_HIGH_THRESHOLD ? "High" : "Medium"))
                 .collect(Collectors.toList());
 
-        return MentorProgressReportDto.builder()
+        return MentorProgressReportResponse.builder()
                 .metrics(metrics)
                 .studentsProgress(studentsProgress)
                 .needsAttention(needsAttention)

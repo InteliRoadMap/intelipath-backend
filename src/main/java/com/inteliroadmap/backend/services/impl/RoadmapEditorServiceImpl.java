@@ -4,7 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.inteliroadmap.backend.domain.dto.request.SaveNodePositionsRequest;
 import com.inteliroadmap.backend.domain.dto.request.UpsertRoadmapNodeRequest;
-import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapNodeDto;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapNodeResponse;
 import com.inteliroadmap.backend.domain.entity.CareerRole;
 import com.inteliroadmap.backend.domain.entity.NodeType;
 import com.inteliroadmap.backend.domain.entity.RoadmapNodeLayout;
@@ -61,7 +61,7 @@ public class RoadmapEditorServiceImpl implements RoadmapEditorService {
 
     @Transactional
     @Override
-    public List<RoadmapNodeDto> getCareerNodes(UUID careerId) {
+    public List<RoadmapNodeResponse> getCareerNodes(UUID careerId) {
         log.info("RoadmapEditorServiceImpl: Editor node list request received. careerId: {}", careerId);
         requireCareer(careerId);
 
@@ -107,7 +107,7 @@ public class RoadmapEditorServiceImpl implements RoadmapEditorService {
 
     @Transactional
     @Override
-    public RoadmapNodeDto createNode(UUID careerId, UpsertRoadmapNodeRequest request) {
+    public RoadmapNodeResponse createNode(UUID careerId, UpsertRoadmapNodeRequest request) {
         log.info("RoadmapEditorServiceImpl: Create node request received. careerId: {}", careerId);
         CareerRole career = requireCareer(careerId);
 
@@ -122,7 +122,7 @@ public class RoadmapEditorServiceImpl implements RoadmapEditorService {
 
     @Transactional
     @Override
-    public RoadmapNodeDto updateNode(UUID nodeId, UpsertRoadmapNodeRequest request) {
+    public RoadmapNodeResponse updateNode(UUID nodeId, UpsertRoadmapNodeRequest request) {
         log.info("RoadmapEditorServiceImpl: Update node request received. nodeId: {}", nodeId);
         SkillNode node = requireNode(nodeId);
         applyLogic(node, request, node.getCareerRole().getCareerId());
@@ -293,8 +293,8 @@ public class RoadmapEditorServiceImpl implements RoadmapEditorService {
         return links;
     }
 
-    private RoadmapNodeDto toEditorDto(SkillNode node, RoadmapNodeLayout layout) {
-        return RoadmapNodeDto.builder()
+    private RoadmapNodeResponse toEditorDto(SkillNode node, RoadmapNodeLayout layout) {
+        return RoadmapNodeResponse.builder()
                 .nodeId(node.getNodeId())
                 .nodeName(node.getNodeName())
                 .parentNode(node.getParentNode() != null ? node.getParentNode().getNodeId().toString() : null)

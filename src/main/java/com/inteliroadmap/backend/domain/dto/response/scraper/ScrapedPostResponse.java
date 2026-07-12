@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
 
 @Data
-public class ScrapedPostDto {
+public class ScrapedPostResponse {
     @JsonProperty("post_id")
     private String postId;
 

@@ -1,7 +1,7 @@
 package com.inteliroadmap.backend.controllers;
 
 import com.inteliroadmap.backend.domain.dto.request.UpdateNodeProgressRequest;
-import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapNodeDto;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapNodeResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.StudentRoadmapResponse;
 import com.inteliroadmap.backend.services.RoadmapService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -80,11 +80,11 @@ public class RoadmapController {
     @Operation(summary = "Get node detail", description = "Fetch details of a single Node in the roadmap.")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Successful",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = RoadmapNodeDto.class))),
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = RoadmapNodeResponse.class))),
             @ApiResponse(responseCode = "401", description = "Unauthorized"),
             @ApiResponse(responseCode = "404", description = "Not Found - Node not found")
     })
-    public ResponseEntity<RoadmapNodeDto> getNodeDetail(
+    public ResponseEntity<RoadmapNodeResponse> getNodeDetail(
             @PathVariable UUID nodeId) {
         return ResponseEntity.ok(roadmapService.getNodeDetail(nodeId));
     }

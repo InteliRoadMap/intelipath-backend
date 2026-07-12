@@ -5,13 +5,13 @@ import lombok.Data;
 import java.util.List;
 
 @Data
-public class ScraperResponseDto {
+public class ScraperResponse {
     @JsonProperty("recruitment_posts")
-    private List<ScrapedPostDto> recruitmentPosts;
+    private List<ScrapedPostResponse> recruitmentPosts;
 
     @JsonProperty("processed_companies")
-    private List<ScrapedCompanyDto> companies;
+    private List<ScrapedCompanyResponse> companies;
 
     @JsonProperty("processed_recruitments")
-    private List<ScrapedRecruitmentDto> recruitments;
+    private List<ScrapedRecruitmentResponse> recruitments;
 }

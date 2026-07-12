@@ -1,7 +1,7 @@
 package com.inteliroadmap.backend.ai.client;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.inteliroadmap.backend.domain.dto.response.scraper.ScraperResponseDto;
+import com.inteliroadmap.backend.domain.dto.response.scraper.ScraperResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
@@ -63,11 +63,11 @@ public class AiServiceClient {
      * Trigger a TopCV scrape and return the processed companies, recruitments
      * and posts.
      */
-    public ScraperResponseDto triggerTopCvScrape(int limit) {
+    public ScraperResponse triggerTopCvScrape(int limit) {
         return restClient.get()
                 .uri("/api/v1/scraper/scrape/topcv/{limit}", limit)
                 .retrieve()
-                .body(ScraperResponseDto.class);
+                .body(ScraperResponse.class);
     }
 
     /** Lightweight liveness probe against the service root (short timeout). */

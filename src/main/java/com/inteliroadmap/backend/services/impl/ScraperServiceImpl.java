@@ -2,7 +2,7 @@ package com.inteliroadmap.backend.services.impl;
 
 import static com.inteliroadmap.backend.mappers.ScraperMapper.str;
 import com.inteliroadmap.backend.domain.dto.response.scraper.CompanyResponse;
-import com.inteliroadmap.backend.domain.dto.response.scraper.RecruitmentPostDto;
+import com.inteliroadmap.backend.domain.dto.response.scraper.RecruitmentPostResponse;
 import com.inteliroadmap.backend.domain.dto.response.scraper.RecruitmentResponse;
 import com.inteliroadmap.backend.domain.entity.Company;
 import com.inteliroadmap.backend.domain.entity.Recruitment;
@@ -36,17 +36,17 @@ public class ScraperServiceImpl implements ScraperService {
     /**
      * Retrieves all recruitment posts along with their associated company and recruitment details.
      * 
-     * @return a list of {@link RecruitmentPostDto} containing recruitment post information
+     * @return a list of {@link RecruitmentPostResponse} containing recruitment post information
      * @throws ResourceNotFoundException if no recruitment posts are found
      */
     @Override
-    public List<RecruitmentPostDto> getRecruitmentPosts() {
+    public List<RecruitmentPostResponse> getRecruitmentPosts() {
         log.info("ScraperServiceImpl: Retrieving Recruitment Posts...");
         // Fetch all recruitment posts from the database. An empty result is a
         // valid state (nothing scraped yet) -> return an empty list, not a 404.
         List<RecruitmentPost> posts = recruitmentPostRepository.findAll();
 
-        List<RecruitmentPostDto> postDtos = new ArrayList<>();
+        List<RecruitmentPostResponse> postDtos = new ArrayList<>();
         // Iterate through each post to build the response DTO
         for (RecruitmentPost post : posts) {
             // Retrieve associated company and recruitment details using their TopCV IDs
@@ -54,7 +54,7 @@ public class ScraperServiceImpl implements ScraperService {
             Recruitment recruitment = recruitmentRepository.findByTopCvRecruitmentId(post.getRecruitment().getTopCvRecruitmentId());
 
             // Build company DTO
-            RecruitmentPostDto.CompanyDto companyDto = RecruitmentPostDto.CompanyDto.builder()
+            RecruitmentPostResponse.CompanyDto companyDto = RecruitmentPostResponse.CompanyDto.builder()
                     .name(str(company.getSignatures(), "name"))
                     .logo(str(company.getSignatures(), "logo"))
                     .companyLink(str(company.getSignatures(), "link"))
@@ -72,7 +72,7 @@ public class ScraperServiceImpl implements ScraperService {
             }
 
             // Build recruitment DTO
-            RecruitmentPostDto.RecruitmentDto recruitmentDto = RecruitmentPostDto.RecruitmentDto.builder()
+            RecruitmentPostResponse.RecruitmentDto recruitmentDto = RecruitmentPostResponse.RecruitmentDto.builder()
                     .title(str(recruitment.getRecruitmentInfos(), "title"))
                     .salary(str(recruitment.getRecruitmentInfos(), "salary"))
                     .location(str(recruitment.getRecruitmentInfos(), "location"))
@@ -82,7 +82,7 @@ public class ScraperServiceImpl implements ScraperService {
                     .build();
 
             // Assemble the final post DTO and add it to the list
-            RecruitmentPostDto dto = RecruitmentPostDto.builder()
+            RecruitmentPostResponse dto = RecruitmentPostResponse.builder()
                     .postId(post.getPostId())
                     .company(companyDto)
                     .recruitment(recruitmentDto)

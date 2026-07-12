@@ -1,7 +1,7 @@
 package com.inteliroadmap.backend.controllers;
 
 import com.inteliroadmap.backend.domain.dto.response.scraper.CompanyResponse;
-import com.inteliroadmap.backend.domain.dto.response.scraper.RecruitmentPostDto;
+import com.inteliroadmap.backend.domain.dto.response.scraper.RecruitmentPostResponse;
 import com.inteliroadmap.backend.domain.dto.response.scraper.RecruitmentResponse;
 import com.inteliroadmap.backend.exceptions.GlobalExceptionHandler.ErrorResponse;
 import java.util.List;
@@ -39,7 +39,7 @@ public class RecruitmentPostsController {
                     description = "Recruitment posts",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = RecruitmentPostDto.class)
+                            schema = @Schema(implementation = RecruitmentPostResponse.class)
                     )
             ),
             @ApiResponse(
@@ -53,7 +53,7 @@ public class RecruitmentPostsController {
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class))
             )
     })
-    public ResponseEntity<List<RecruitmentPostDto>> getRecruitmentPosts() {
+    public ResponseEntity<List<RecruitmentPostResponse>> getRecruitmentPosts() {
         log.info("RecruitmentPostsController: Getting all recruitment posts");
         return ResponseEntity.ok(scraperService.getRecruitmentPosts());
     }

@@ -11,7 +11,7 @@ import java.util.UUID;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class RoadmapNodeDto {
+public class RoadmapNodeResponse {
     private UUID nodeId;
     private String nodeName;
     private String parentNode;

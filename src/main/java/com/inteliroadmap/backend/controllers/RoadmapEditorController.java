@@ -2,7 +2,7 @@ package com.inteliroadmap.backend.controllers;
 
 import com.inteliroadmap.backend.domain.dto.request.SaveNodePositionsRequest;
 import com.inteliroadmap.backend.domain.dto.request.UpsertRoadmapNodeRequest;
-import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapNodeDto;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapNodeResponse;
 import com.inteliroadmap.backend.services.RoadmapEditorService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -59,13 +59,13 @@ public class RoadmapEditorController {
                     responseCode = "200",
                     description = "Nodes retrieved successfully",
                     content = @Content(mediaType = "application/json",
-                            schema = @Schema(implementation = RoadmapNodeDto.class))
+                            schema = @Schema(implementation = RoadmapNodeResponse.class))
             ),
             @ApiResponse(responseCode = "401", description = "Not authenticated"),
             @ApiResponse(responseCode = "403", description = "Caller is not a mentor"),
             @ApiResponse(responseCode = "404", description = "Career not found")
     })
-    public ResponseEntity<List<RoadmapNodeDto>> getCareerNodes(@PathVariable UUID careerId) {
+    public ResponseEntity<List<RoadmapNodeResponse>> getCareerNodes(@PathVariable UUID careerId) {
         log.info("RoadmapEditorController: Editor node list request received. careerId: {}", careerId);
         return ResponseEntity.ok(roadmapEditorService.getCareerNodes(careerId));
     }
@@ -99,14 +99,14 @@ public class RoadmapEditorController {
                     responseCode = "200",
                     description = "Node created",
                     content = @Content(mediaType = "application/json",
-                            schema = @Schema(implementation = RoadmapNodeDto.class))
+                            schema = @Schema(implementation = RoadmapNodeResponse.class))
             ),
             @ApiResponse(responseCode = "400", description = "Invalid stage, policy, or reference"),
             @ApiResponse(responseCode = "401", description = "Not authenticated"),
             @ApiResponse(responseCode = "403", description = "Caller is not a mentor"),
             @ApiResponse(responseCode = "404", description = "Career or referenced node not found")
     })
-    public ResponseEntity<RoadmapNodeDto> createNode(
+    public ResponseEntity<RoadmapNodeResponse> createNode(
             @PathVariable UUID careerId,
             @Valid @RequestBody UpsertRoadmapNodeRequest request
     ) {
@@ -124,14 +124,14 @@ public class RoadmapEditorController {
                     responseCode = "200",
                     description = "Node updated",
                     content = @Content(mediaType = "application/json",
-                            schema = @Schema(implementation = RoadmapNodeDto.class))
+                            schema = @Schema(implementation = RoadmapNodeResponse.class))
             ),
             @ApiResponse(responseCode = "400", description = "Invalid stage, policy, or reference"),
             @ApiResponse(responseCode = "401", description = "Not authenticated"),
             @ApiResponse(responseCode = "403", description = "Caller is not a mentor"),
             @ApiResponse(responseCode = "404", description = "Node not found")
     })
-    public ResponseEntity<RoadmapNodeDto> updateNode(
+    public ResponseEntity<RoadmapNodeResponse> updateNode(
             @PathVariable UUID nodeId,
             @Valid @RequestBody UpsertRoadmapNodeRequest request
     ) {

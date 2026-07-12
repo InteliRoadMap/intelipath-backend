@@ -9,9 +9,10 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class MentorDashboardMetrics {
-    private String responseTime;
-    private long mentees;
-    private long pendingReviews;
-    private long feedbacks;
+public class MentorStudentResponse {
+    private String id;
+    private String fullName;
+    private String email;
+    private String career;
+    private String university;
 }

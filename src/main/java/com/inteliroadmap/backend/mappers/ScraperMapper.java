@@ -1,7 +1,6 @@
 package com.inteliroadmap.backend.mappers;
 
 import com.inteliroadmap.backend.domain.dto.response.scraper.CompanyResponse;
-import com.inteliroadmap.backend.domain.dto.response.scraper.RecruitmentPostResponse;
 import com.inteliroadmap.backend.domain.dto.response.scraper.RecruitmentResponse;
 import com.inteliroadmap.backend.domain.entity.Company;
 import com.inteliroadmap.backend.domain.entity.Recruitment;
@@ -11,15 +10,9 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 
 @Component
 public class ScraperMapper {
-    public RecruitmentPostResponse toRecruitmentPostsResponse(Map<UUID, List<Object>> posts) {
-        return RecruitmentPostResponse.builder()
-                .postDetails(posts)
-                .build();
-    }
 
     /** Safe String read from a JSONB map. */
     public static String str(Map<String, Object> map, String key) {

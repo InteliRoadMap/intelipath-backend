@@ -2,7 +2,7 @@ package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.components.RoadmapProgressCalculator;
 import com.inteliroadmap.backend.domain.dto.request.UpdateNodeProgressRequest;
-import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapNodeDto;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapNodeResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.StudentRoadmapResponse;
 import com.inteliroadmap.backend.domain.entity.CareerRequiredSkill;
 import com.inteliroadmap.backend.domain.entity.CareerRole;
@@ -169,7 +169,7 @@ public class RoadmapServiceImpl implements RoadmapService {
         CareerRole careerRole = careerRoleOptional.get();
         List<SkillNode> nodes = skillNodeRepository
                 .findByCareerRole_CareerIdOrderByNodeLevelAscNodeNameAsc(careerId);
-        List<RoadmapNodeDto> nodeDtos = nodes.stream()
+        List<RoadmapNodeResponse> nodeDtos = nodes.stream()
                 .map(node -> mapToLegacyNodeDto(node, "not_started"))
                 .toList();
 
@@ -217,7 +217,7 @@ public class RoadmapServiceImpl implements RoadmapService {
      */
     @Transactional(readOnly = true)
     @Override
-    public RoadmapNodeDto getNodeDetail(UUID nodeId) {
+    public RoadmapNodeResponse getNodeDetail(UUID nodeId) {
         Optional<SkillNode> nodeOptional = skillNodeRepository.findById(nodeId);
         if (nodeOptional.isEmpty()) {
             throw new ResourceNotFoundException("Node not found");
@@ -409,17 +409,17 @@ public class RoadmapServiceImpl implements RoadmapService {
     }
 
     /**
-     * Maps a {@link SkillNode} to a legacy {@link RoadmapNodeDto}.
+     * Maps a {@link SkillNode} to a legacy {@link RoadmapNodeResponse}.
      *
      * @param node the skill node to map
      * @param status the progress status of the node, defaults to "not_started" if null
-     * @return the mapped {@link RoadmapNodeDto}
+     * @return the mapped {@link RoadmapNodeResponse}
      */
-    private RoadmapNodeDto mapToLegacyNodeDto(SkillNode node, String status) {
+    private RoadmapNodeResponse mapToLegacyNodeDto(SkillNode node, String status) {
         String parentNode = node.getParentNode() != null ?
                 node.getParentNode().getNodeName() : null;
 
-        return RoadmapNodeDto.builder()
+        return RoadmapNodeResponse.builder()
                 .nodeId(node.getNodeId())
                 .nodeName(node.getNodeName())
                 .parentNode(parentNode)
@@ -671,7 +671,7 @@ public class RoadmapServiceImpl implements RoadmapService {
     }
 
 
-    private List<RoadmapNodeDto> buildRoadmapTree(
+    private List<RoadmapNodeResponse> buildRoadmapTree(
             List<SkillNode> nodes,
             Map<UUID, String> statusByNodeId,
             Map<UUID, StudentProgress> progressByNodeId
@@ -697,7 +697,7 @@ public class RoadmapServiceImpl implements RoadmapService {
                             .map(c -> progressByNodeId.get(c.getNodeId()))
                             .filter(p -> p != null && RoadmapStepStatus.COMPLETED == p.getStatus())
                             .count();
-                    return RoadmapNodeDto.builder()
+                    return RoadmapNodeResponse.builder()
                             .nodeId(node.getNodeId())
                             .nodeName(node.getNodeName())
                             .parentNode(node.getParentNode() != null ? node.getParentNode().getNodeId().toString() : null)

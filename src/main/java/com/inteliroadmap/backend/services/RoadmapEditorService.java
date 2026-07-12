@@ -2,7 +2,7 @@ package com.inteliroadmap.backend.services;
 
 import com.inteliroadmap.backend.domain.dto.request.SaveNodePositionsRequest;
 import com.inteliroadmap.backend.domain.dto.request.UpsertRoadmapNodeRequest;
-import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapNodeDto;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapNodeResponse;
 
 import java.util.List;
 import java.util.UUID;
@@ -15,14 +15,14 @@ import java.util.UUID;
 public interface RoadmapEditorService {
 
     /** All nodes of a career with full editing metadata (no student status). */
-    List<RoadmapNodeDto> getCareerNodes(UUID careerId);
+    List<RoadmapNodeResponse> getCareerNodes(UUID careerId);
 
     /** Bulk-saves dragged node coordinates. */
     void saveNodePositions(SaveNodePositionsRequest request);
 
-    RoadmapNodeDto createNode(UUID careerId, UpsertRoadmapNodeRequest request);
+    RoadmapNodeResponse createNode(UUID careerId, UpsertRoadmapNodeRequest request);
 
-    RoadmapNodeDto updateNode(UUID nodeId, UpsertRoadmapNodeRequest request);
+    RoadmapNodeResponse updateNode(UUID nodeId, UpsertRoadmapNodeRequest request);
 
     /**
      * Deletes a node. Refused while students have progress on it or while

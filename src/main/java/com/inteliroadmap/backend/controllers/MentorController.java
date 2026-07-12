@@ -3,12 +3,12 @@ package com.inteliroadmap.backend.controllers;
 import com.inteliroadmap.backend.domain.dto.request.CreateFeedbackRequest;
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorResponse;
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorCareerDistributionResponse;
-import com.inteliroadmap.backend.domain.dto.response.mentor.MentorDashboardMetrics;
-import com.inteliroadmap.backend.domain.dto.response.mentor.MentorFeedbackHistoryDto;
+import com.inteliroadmap.backend.domain.dto.response.mentor.MentorDashboardMetricsResponse;
+import com.inteliroadmap.backend.domain.dto.response.mentor.MentorFeedbackHistoryResponse;
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorPendingReviewResponse;
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorProfileResponse;
-import com.inteliroadmap.backend.domain.dto.response.mentor.MentorProgressReportDto;
-import com.inteliroadmap.backend.domain.dto.response.mentor.MentorStudentDto;
+import com.inteliroadmap.backend.domain.dto.response.mentor.MentorProgressReportResponse;
+import com.inteliroadmap.backend.domain.dto.response.mentor.MentorStudentResponse;
 import com.inteliroadmap.backend.domain.dto.request.UpdateMentorProfileRequest;
 import com.inteliroadmap.backend.services.MentorService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -49,7 +49,7 @@ public class MentorController {
 
     @GetMapping("/dashboard/metrics")
     @Operation(summary = "Get Mentor Metrics", description = "Get response time, mentees, pending reviews, etc.")
-    public ResponseEntity<MentorDashboardMetrics> getMetrics() {
+    public ResponseEntity<MentorDashboardMetricsResponse> getMetrics() {
         log.info("MentorController: Mentor metrics request received");
         return ResponseEntity.ok(mentorService.getDashboardMetrics());
     }
@@ -83,7 +83,7 @@ public class MentorController {
 
     @GetMapping("/feedback/students")
     @Operation(summary = "Get Student List", description = "Get list of students with pagination")
-    public ResponseEntity<Page<MentorStudentDto>> getStudentInfos(
+    public ResponseEntity<Page<MentorStudentResponse>> getStudentInfos(
             @RequestParam(defaultValue = "0") @Min(value = 0, message = "Page index must not be negative") int page,
             @RequestParam(defaultValue = "10") @Min(value = 1, message = "Page size must be at least 1") @Max(value = 100, message = "Page size must not exceed 100") int size) {
         Pageable pageable = PageRequest.of(page, size);
@@ -92,7 +92,7 @@ public class MentorController {
 
     @GetMapping("/feedback/history")
     @Operation(summary = "Get Feedback History", description = "Get list of feedbacks sent by mentor")
-    public ResponseEntity<Page<MentorFeedbackHistoryDto>> getFeedbackHistory(
+    public ResponseEntity<Page<MentorFeedbackHistoryResponse>> getFeedbackHistory(
             @RequestParam(defaultValue = "0") @Min(value = 0, message = "Page index must not be negative") int page,
             @RequestParam(defaultValue = "10") @Min(value = 1, message = "Page size must be at least 1") @Max(value = 100, message = "Page size must not exceed 100") int size) {
         Pageable pageable = PageRequest.of(page, size);
@@ -101,7 +101,7 @@ public class MentorController {
 
     @GetMapping("/dashboard/progress-reports")
     @Operation(summary = "Get Progress Reports", description = "Get detailed progress reports of mentees")
-    public ResponseEntity<MentorProgressReportDto> getProgressReports() {
+    public ResponseEntity<MentorProgressReportResponse> getProgressReports() {
         return ResponseEntity.ok(mentorService.getProgressReports());
     }
 

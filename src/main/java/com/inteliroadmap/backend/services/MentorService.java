@@ -4,12 +4,12 @@ import com.inteliroadmap.backend.domain.dto.request.CreateFeedbackRequest;
 import com.inteliroadmap.backend.domain.dto.request.UpdateMentorProfileRequest;
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorResponse;
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorCareerDistributionResponse;
-import com.inteliroadmap.backend.domain.dto.response.mentor.MentorDashboardMetrics;
-import com.inteliroadmap.backend.domain.dto.response.mentor.MentorFeedbackHistoryDto;
+import com.inteliroadmap.backend.domain.dto.response.mentor.MentorDashboardMetricsResponse;
+import com.inteliroadmap.backend.domain.dto.response.mentor.MentorFeedbackHistoryResponse;
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorPendingReviewResponse;
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorProfileResponse;
-import com.inteliroadmap.backend.domain.dto.response.mentor.MentorProgressReportDto;
-import com.inteliroadmap.backend.domain.dto.response.mentor.MentorStudentDto;
+import com.inteliroadmap.backend.domain.dto.response.mentor.MentorProgressReportResponse;
+import com.inteliroadmap.backend.domain.dto.response.mentor.MentorStudentResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
@@ -17,7 +17,7 @@ import java.util.List;
 
 public interface MentorService {
 
-    MentorDashboardMetrics getDashboardMetrics();
+    MentorDashboardMetricsResponse getDashboardMetrics();
 
     MentorResponse getWelcomeAlert();
 
@@ -25,7 +25,7 @@ public interface MentorService {
 
     Page<MentorPendingReviewResponse> getPendingReviews(Pageable pageable);
 
-    Page<MentorStudentDto> getStudentInfos(Pageable pageable);
+    Page<MentorStudentResponse> getStudentInfos(Pageable pageable);
 
     List<MentorCareerDistributionResponse> getCareerDistribution();
 
@@ -33,9 +33,9 @@ public interface MentorService {
 
     MentorProfileResponse updateMentorProfile(UpdateMentorProfileRequest request);
 
-    Page<MentorFeedbackHistoryDto> getFeedbackHistory(Pageable pageable);
+    Page<MentorFeedbackHistoryResponse> getFeedbackHistory(Pageable pageable);
 
-    MentorProgressReportDto getProgressReports();
+    MentorProgressReportResponse getProgressReports();
 
     MentorResponse submitFeedback(CreateFeedbackRequest request);
 }

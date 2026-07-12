@@ -7,10 +7,10 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import com.inteliroadmap.backend.ai.client.AiServiceClient;
-import com.inteliroadmap.backend.domain.dto.response.scraper.ScraperResponseDto;
-import com.inteliroadmap.backend.domain.dto.response.scraper.ScrapedCompanyDto;
-import com.inteliroadmap.backend.domain.dto.response.scraper.ScrapedRecruitmentDto;
-import com.inteliroadmap.backend.domain.dto.response.scraper.ScrapedPostDto;
+import com.inteliroadmap.backend.domain.dto.response.scraper.ScraperResponse;
+import com.inteliroadmap.backend.domain.dto.response.scraper.ScrapedCompanyResponse;
+import com.inteliroadmap.backend.domain.dto.response.scraper.ScrapedRecruitmentResponse;
+import com.inteliroadmap.backend.domain.dto.response.scraper.ScrapedPostResponse;
 import com.inteliroadmap.backend.domain.entity.Company;
 import com.inteliroadmap.backend.domain.entity.Recruitment;
 import com.inteliroadmap.backend.domain.entity.RecruitmentPost;
@@ -46,7 +46,7 @@ public class JobScrapingScheduler {
         try {
             // Network I/O (can take minutes) runs OUTSIDE any transaction so a DB
             // connection is not held from the pool during the whole scrape.
-            ScraperResponseDto response = aiServiceClient.triggerTopCvScrape(limit);
+            ScraperResponse response = aiServiceClient.triggerTopCvScrape(limit);
             if (response == null) {
                 log.warn("JobScrapingScheduler: Received empty response from Scraper API");
                 return;
@@ -64,9 +64,9 @@ public class JobScrapingScheduler {
         }
     }
 
-    private void persistScrapedData(ScraperResponseDto response) {
+    private void persistScrapedData(ScraperResponse response) {
             // 1. Save Companies (processed shape: signatures + infos)
-            for (ScrapedCompanyDto cDto : response.getCompanies()) {
+            for (ScrapedCompanyResponse cDto : response.getCompanies()) {
                 Company company = companyRepository.findById(cDto.getCompanyId()).orElse(new Company());
                 company.setTopCvCompanyId(cDto.getCompanyId());
                 company.setSignatures(cDto.getSignatures());
@@ -76,7 +76,7 @@ public class JobScrapingScheduler {
 
             // 2. Save Recruitments (processed shape: recruitment_infos + descriptions)
             DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-            for (ScrapedRecruitmentDto rDto : response.getRecruitments()) {
+            for (ScrapedRecruitmentResponse rDto : response.getRecruitments()) {
                 Recruitment recruitment = recruitmentRepository.findById(rDto.getRecruitmentId()).orElse(new Recruitment());
                 recruitment.setTopCvRecruitmentId(rDto.getRecruitmentId());
                 recruitment.setRecruitmentInfos(rDto.getRecruitmentInfos());
@@ -90,7 +90,7 @@ public class JobScrapingScheduler {
             }
 
             // 3. Save Recruitment Posts
-            for (ScrapedPostDto pDto : response.getRecruitmentPosts()) {
+            for (ScrapedPostResponse pDto : response.getRecruitmentPosts()) {
                 Company comp = companyRepository.findById(pDto.getCompanyId()).orElse(null);
                 Recruitment rec = recruitmentRepository.findById(pDto.getRecruitmentId()).orElse(null);
                 

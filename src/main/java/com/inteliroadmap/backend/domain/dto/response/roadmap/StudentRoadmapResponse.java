@@ -14,5 +14,5 @@ import java.util.List;
 public class StudentRoadmapResponse {
     private String targetCareerRole;
     private Integer progress;
-    private List<RoadmapNodeDto> nodes;
+    private List<RoadmapNodeResponse> nodes;
 }

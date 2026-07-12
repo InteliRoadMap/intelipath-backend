@@ -9,10 +9,11 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class MentorStudentDto {
+public class MentorFeedbackHistoryResponse {
     private String id;
-    private String fullName;
-    private String email;
-    private String career;
-    private String university;
+    private String initials;
+    private String name;
+    private String time;
+    private String tag;
+    private String content;
 }

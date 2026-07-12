@@ -11,7 +11,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-public class MentorProgressReportDto {
+public class MentorProgressReportResponse {
     private List<Metric> metrics;
     private List<StudentProgress> studentsProgress;
     private List<NeedsAttention> needsAttention;

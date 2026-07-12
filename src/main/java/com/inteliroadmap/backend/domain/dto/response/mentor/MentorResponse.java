@@ -1,6 +1,6 @@
 package com.inteliroadmap.backend.domain.dto.response.mentor;
 
-import com.inteliroadmap.backend.domain.dto.response.mentor.MentorDashboardMetrics;
+import com.inteliroadmap.backend.domain.dto.response.mentor.MentorDashboardMetricsResponse;
 import com.inteliroadmap.backend.domain.entity.Feedback;
 import com.inteliroadmap.backend.domain.entity.PortfolioReviewRequest;
 import lombok.AllArgsConstructor;
@@ -17,7 +17,7 @@ import java.util.Map;
 @AllArgsConstructor
 @Builder
 public class MentorResponse {
-    private MentorDashboardMetrics metrics;
+    private MentorDashboardMetricsResponse metrics;
     private Page<PortfolioReviewRequest> pendingReviews;
     private Page<Map<String, Object>> students;
     private Feedback feedback;

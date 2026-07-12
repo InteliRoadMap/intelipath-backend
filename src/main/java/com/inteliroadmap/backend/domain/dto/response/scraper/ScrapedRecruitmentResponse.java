@@ -6,7 +6,7 @@ import java.util.Map;
 
 /** Processed recruitment from the AI service (processed_recruitments). */
 @Data
-public class ScrapedRecruitmentDto {
+public class ScrapedRecruitmentResponse {
     @JsonProperty("recruitment_id")
     private String recruitmentId;
 
