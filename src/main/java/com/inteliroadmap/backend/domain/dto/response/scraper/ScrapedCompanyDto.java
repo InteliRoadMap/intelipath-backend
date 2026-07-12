@@ -2,26 +2,17 @@ package com.inteliroadmap.backend.domain.dto.response.scraper;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.Data;
-import java.util.List;
 import java.util.Map;
 
+/** Processed company from the AI service (processed_companies). */
 @Data
 public class ScrapedCompanyDto {
     @JsonProperty("company_id")
     private String companyId;
 
-//    @JsonProperty("company_link")
-//    private String companyLink;
-//
-//    private String logo;
-//    private String name;
-//
-//    private List<String> introduction;
-//
-//    private Map<String, Object> info;
-//
-//    private List<String> contact;
+    // { link, logo, name }
+    private Map<String, Object> signatures;
 
-    private Map<String, String> signatures;
-    private Map<String, String> infos;
+    // { info, contact }  (AI-summarised)
+    private Map<String, Object> infos;
 }

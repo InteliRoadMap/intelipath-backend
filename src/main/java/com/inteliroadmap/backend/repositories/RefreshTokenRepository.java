@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 import java.util.UUID;
@@ -16,12 +17,12 @@ public interface RefreshTokenRepository extends JpaRepository<RefreshToken, UUID
 //    RefreshToken findByToken(String token);
 //    void deleteByUser_UserId(UUID userId);
 
-    @org.springframework.transaction.annotation.Transactional
+    @Transactional
     boolean deleteByToken(String token);
 
     RefreshToken findByToken(String token);
 
-    @org.springframework.transaction.annotation.Transactional
+    @Transactional
     void deleteByUser_UserId(UUID userId);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)

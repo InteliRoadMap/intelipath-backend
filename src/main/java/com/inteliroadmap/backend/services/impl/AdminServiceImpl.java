@@ -1,23 +1,33 @@
 package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.domain.dto.request.UpdateUserRoleRequest;
+import com.inteliroadmap.backend.domain.dto.request.UpdateUserStatusRequest;
+import com.inteliroadmap.backend.domain.enums.UserStatus;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminCourseMetricResponse;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminSystemHealthResponse;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminUserListItemResponse;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminUserMetricResponse;
 import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
+import com.inteliroadmap.backend.exceptions.BadRequestException;
+import com.inteliroadmap.backend.exceptions.ForbiddenException;
 import com.inteliroadmap.backend.mappers.AdminMapper;
 import com.inteliroadmap.backend.repositories.CareerRoleRepository;
+import com.inteliroadmap.backend.repositories.SkillNodeRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
-import com.inteliroadmap.backend.security.JwtService;
+import com.inteliroadmap.backend.security.SecurityUtils;
+import com.inteliroadmap.backend.ai.client.AiServiceClient;
 import com.inteliroadmap.backend.services.AdminService;
-import com.inteliroadmap.backend.utils.BearerTokenUtil;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import com.zaxxer.hikari.HikariDataSource;
 import org.springframework.stereotype.Service;
 
+import javax.sql.DataSource;
+import java.lang.management.ManagementFactory;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -34,72 +44,136 @@ public class AdminServiceImpl implements AdminService {
 
     private final UserRepository userRepository;
     private final CareerRoleRepository careerRoleRepository;
-    private final JwtService  jwtService;
+    private final SkillNodeRepository skillNodeRepository;
     private final AdminMapper adminMapper;
+    private final DataSource dataSource;
+    private final AiServiceClient aiServiceClient;
 
     /**
      * Retrieves the total users metric for the admin dashboard.
      *
-     * @param authorizationHeader the authorization header containing the admin's JWT token
      * @return the user metric data containing total user count and growth percentage
      */
     @Transactional
     @Override
-    public AdminUserMetricResponse getUserMetrics(String authorizationHeader) {
-        validateAdmin(authorizationHeader);
+    public AdminUserMetricResponse getUserMetrics() {
+
 
         log.info("AdminServiceImpl: Get user metric data");
 
-        // Return user metrics with total count and a default growth percentage of 12%
-        return adminMapper.toUserMetricResponse(userRepository.count(), 12);
+        // Real month-over-month growth: sign-ups in the last 30 days vs the 30 before.
+        LocalDateTime now = LocalDateTime.now();
+        long last30 = userRepository.countByCreatedAtAfter(now.minusDays(30));
+        long prev30 = userRepository.countByCreatedAtBetween(now.minusDays(60), now.minusDays(30));
+        int growth = prev30 == 0
+                ? (last30 > 0 ? 100 : 0)
+                : (int) Math.round((last30 - prev30) * 100.0 / prev30);
+
+        return adminMapper.toUserMetricResponse(userRepository.count(), growth);
     }
 
     /**
      * Retrieves the total learning paths and courses metric for the admin dashboard.
      *
-     * @param authorizationHeader the authorization header containing the admin's JWT token
      * @return the course metric data containing total active courses
      */
     @Transactional
     @Override
-    public AdminCourseMetricResponse getCourseMetrics(String authorizationHeader) {
-        validateAdmin(authorizationHeader);
+    public AdminCourseMetricResponse getCourseMetrics() {
+
 
         log.info("AdminServiceImpl: Get course metric data");
 
-        // Retrieve total number of career roles as active courses
+        // "Courses" = career roles. Progress = how many of them actually have a
+        // roadmap built out (at least one skill node), not an arbitrary number.
         long total = careerRoleRepository.count();
+        long withRoadmap = skillNodeRepository.countDistinctCareersWithNodes();
+        int progress = total == 0 ? 0 : (int) Math.round(withRoadmap * 100.0 / total);
+        String status = total > 0 ? "ACTIVE" : "EMPTY";
 
-        // Return course metrics including total, active status, and arbitrary percentage
-        return adminMapper.toCourseMetricResponse(total, "ACTIVE", 78);
+        return adminMapper.toCourseMetricResponse(total, status, progress);
     }
 
     /**
      * Retrieves the system health status for the admin dashboard.
      *
-     * @param authorizationHeader the authorization header containing the admin's JWT token
      * @return the system health response containing uptime and status
      */
     @Override
-    public AdminSystemHealthResponse getSystemHealth(String authorizationHeader) {
-        validateAdmin(authorizationHeader);
+    public AdminSystemHealthResponse getSystemHealth() {
+
 
         log.info("AdminServiceImpl: Get system health");
 
-        // Return static system health status indicating 99.9% uptime and ONLINE status
-        return adminMapper.toSystemHealthResponse(99.9, "ONLINE");
+        List<AdminSystemHealthResponse.ServiceStatus> services = new ArrayList<>();
+
+        // API: if this request is being served, the API layer is up.
+        services.add(new AdminSystemHealthResponse.ServiceStatus("API", true));
+
+        // Database: a lightweight query proves connectivity.
+        boolean dbUp;
+        try {
+            userRepository.count();
+            dbUp = true;
+        } catch (Exception e) {
+            log.warn("AdminServiceImpl: Database health check failed: {}", e.getMessage());
+            dbUp = false;
+        }
+        services.add(new AdminSystemHealthResponse.ServiceStatus("Database", dbUp));
+
+        // AI Service: ping its root endpoint with a short timeout.
+        services.add(new AdminSystemHealthResponse.ServiceStatus("AI Service", aiServiceClient.isHealthy()));
+
+        int up = (int) services.stream()
+                .filter(AdminSystemHealthResponse.ServiceStatus::isUp)
+                .count();
+
+        Runtime runtime = Runtime.getRuntime();
+        long usedMb = (runtime.totalMemory() - runtime.freeMemory()) / (1024 * 1024);
+        long maxMb = runtime.maxMemory() / (1024 * 1024);
+
+        String version = getClass().getPackage().getImplementationVersion();
+
+        return AdminSystemHealthResponse.builder()
+                .status(up == services.size() ? "Operational" : "Degraded")
+                .servicesUp(up)
+                .servicesTotal(services.size())
+                .services(services)
+                .uptimeMillis(ManagementFactory.getRuntimeMXBean().getUptime())
+                .version(version != null ? version : "dev")
+                .javaVersion(System.getProperty("java.version"))
+                .db(readDbPool())
+                .memory(new AdminSystemHealthResponse.Memory(usedMb, maxMb))
+                .build();
+    }
+
+    /** Live HikariCP connection-pool stats; nulls out gracefully if unavailable. */
+    private AdminSystemHealthResponse.DbPool readDbPool() {
+        try {
+            if (dataSource instanceof HikariDataSource hikari && hikari.getHikariPoolMXBean() != null) {
+                var pool = hikari.getHikariPoolMXBean();
+                return AdminSystemHealthResponse.DbPool.builder()
+                        .active(pool.getActiveConnections())
+                        .idle(pool.getIdleConnections())
+                        .total(pool.getTotalConnections())
+                        .max(hikari.getMaximumPoolSize())
+                        .build();
+            }
+        } catch (Exception e) {
+            log.warn("AdminServiceImpl: Could not read DB pool stats: {}", e.getMessage());
+        }
+        return null;
     }
 
     /**
      * Retrieves a list of all users for the admin dashboard user table.
      *
-     * @param authorizationHeader the authorization header containing the admin's JWT token
      * @return a list of user details including roles and emails
      */
     @Transactional
     @Override
-    public List<AdminUserListItemResponse> getUsers(String authorizationHeader) {
-        validateAdmin(authorizationHeader);
+    public List<AdminUserListItemResponse> getUsers() {
+
 
         log.info("AdminServiceImpl: Get users list");
 
@@ -113,16 +187,15 @@ public class AdminServiceImpl implements AdminService {
     /**
      * Updates the role of a specific user.
      *
-     * @param authorizationHeader the authorization header containing the admin's JWT token
      * @param userId the unique identifier of the user to update
      * @param request the request object containing the new role
      * @return the updated user's details
      */
     @Transactional
     @Override
-    public AdminUserListItemResponse updateUserRole(String authorizationHeader, String userId, UpdateUserRoleRequest request) {
+    public AdminUserListItemResponse updateUserRole(String userId, UpdateUserRoleRequest request) {
 
-        validateAdmin(authorizationHeader);
+
 
         log.info("AdminServiceImpl: Update user role. userId: {}, role: {}", userId, request.getRole());
 
@@ -140,25 +213,57 @@ public class AdminServiceImpl implements AdminService {
     }
 
     /**
+     * Updates the account status of a user (e.g. suspend / reactivate). An admin
+     * cannot suspend or deactivate their own account.
+     *
+     * @param userId the unique identifier of the user to update
+     * @param request the request object containing the new {@link com.inteliroadmap.backend.domain.enums.UserStatus}
+     * @return the updated user's details
+     */
+    @Transactional
+    @Override
+    public AdminUserListItemResponse updateUserStatus(String userId, UpdateUserStatusRequest request) {
+
+
+
+        log.info("AdminServiceImpl: Update user status. userId: {}, status: {}", userId, request.getStatus());
+
+        String currentEmail = SecurityUtils.getCurrentUserEmail();
+        User user = findUserById(userId);
+
+        // An admin must not lock themselves out by suspending/deactivating their own account.
+        if (user.getEmail().equals(currentEmail)
+                && request.getStatus() != UserStatus.ACTIVE) {
+            throw new ForbiddenException("Admin cannot suspend own account");
+        }
+
+        user.setUserStatus(request.getStatus());
+        User updatedUser = userRepository.save(user);
+        log.info("AdminServiceImpl: User status updated successfully. email: {}, status: {}",
+                updatedUser.getEmail(), updatedUser.getUserStatus());
+
+        return adminMapper.toUserListItem(updatedUser);
+    }
+
+    /**
      * Deletes a user by their ID. An admin cannot delete their own account.
      *
-     * @param authorizationHeader the authorization header containing the admin's JWT token
      * @param userId the unique identifier of the user to delete
      * @throws ResourceNotFoundException if the user attempts to delete their own account
      */
     @Transactional
     @Override
-    public void deleteUser(String authorizationHeader, String userId) {validateAdmin(authorizationHeader);
+    public void deleteUser(String userId) {
 
         log.info("AdminServiceImpl: Delete user. userId: {}", userId);
 
         // Extract the email of the admin performing the request to prevent self-deletion
-        String currentEmail = jwtService.extractEmail(BearerTokenUtil.extractToken(authorizationHeader));
+        String currentEmail = SecurityUtils.getCurrentUserEmail();
         User user = findUserById(userId);
 
         // Ensure the admin is not trying to delete their own account
         if (user.getEmail().equals(currentEmail)) {
-            throw new ResourceNotFoundException("Admin cannot delete own account");
+            throw new ForbiddenException("Admin cannot delete own account");
         }
 
         // Proceed to delete the user from the database
@@ -189,25 +294,7 @@ public class AdminServiceImpl implements AdminService {
             return userOptional.get();
         } catch (IllegalArgumentException e) {
             // Handle cases where the provided ID string is not a valid UUID format
-            throw new ResourceNotFoundException("Invalid user id");
-        }
-    }
-
-    /**
-     * Validates that the provided authorization header contains a valid admin token.
-     *
-     * @param authorizationHeader the HTTP authorization header
-     * @throws ResourceNotFoundException if the token is invalid or the user is not an admin
-     */
-    private void validateAdmin(String authorizationHeader) {
-        // Extract the token and role from the authorization header
-        String token = BearerTokenUtil.extractToken(authorizationHeader);
-        String role = jwtService.extractRole(token);
-
-        // Verify the token is valid and the user holds the ADMIN role
-        if (!jwtService.isTokenValid(token) || !"ADMIN".equals(role)) {
-            log.warn("AdminServiceImpl: Access denied. role: {}", role);
-            throw new ResourceNotFoundException("Access denied");
+            throw new BadRequestException("Invalid user id");
         }
     }
 

@@ -3,6 +3,7 @@ package com.inteliroadmap.backend.security;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.Jws;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
@@ -23,10 +24,13 @@ public class JwtService {
     @Value("${JWT_SECRET}")
     private String secretKey;
 
-    @Value("${JWT_ACCESS_EXPIRATION}")
+    // Short-lived access token (default 15 minutes) keeps the blast radius of a
+    // leaked/necessarily-revoked token small, since access tokens are stateless.
+    @Value("${JWT_ACCESS_EXPIRATION:900000}")
     private long accessExpiration;
 
-    @Value("${JWT_REFRESH_EXPIRATION}")
+    // Refresh token default 7 days; it is DB-backed and revocable.
+    @Value("${JWT_REFRESH_EXPIRATION:604800000}")
     private long refreshExpiration;
 
     /**
@@ -44,7 +48,7 @@ public class JwtService {
                     .claim("role", role)
                     .issuedAt(new Date())
                     .expiration(new Date(System.currentTimeMillis() + accessExpiration))
-                    .signWith(getSigningKey())
+                    .signWith(getSigningKey(), Jwts.SIG.HS256)
                     .compact();
         } catch (Exception e) {
             log.error("JwtService: Error generating access token: {}", e.getMessage());
@@ -65,7 +69,7 @@ public class JwtService {
                     .subject(email)
                     .issuedAt(new Date())
                     .expiration(new Date(System.currentTimeMillis() + refreshExpiration))
-                    .signWith(getSigningKey())
+                    .signWith(getSigningKey(), Jwts.SIG.HS256)
                     .compact();
         } catch (Exception e) {
             log.error("JwtService: Error generating refresh token: {}", e.getMessage());
@@ -129,11 +133,18 @@ public class JwtService {
      * @return claims payload
      */
     private Claims getClaims(String token) {
-        return Jwts.parser()
+        Jws<Claims> jws = Jwts.parser()
                 .verifyWith(getSigningKey())
                 .build()
-                .parseSignedClaims(token)
-                .getPayload();
+                .parseSignedClaims(token);
+        // Defence-in-depth: never trust the client-supplied header algorithm.
+        // Only HS256-signed tokens are accepted, so a downgrade or algorithm-swap
+        // header can never route verification down an unexpected path.
+        String alg = jws.getHeader().getAlgorithm();
+        if (!Jwts.SIG.HS256.getId().equals(alg)) {
+            throw new JwtException("Unexpected JWT algorithm: " + alg);
+        }
+        return jws.getPayload();
     }
 
     /**

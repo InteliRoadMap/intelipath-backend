@@ -35,6 +35,24 @@ services:
     container_name: intelipath-service
     ports:
       - "8000:8000"
+    env_file:
+      # Service secrets (SERVICE_API_KEY, LLM_API_KEY, ...). DATABASE_URL below
+      # overrides the one in .env (localhost) with the compose network host.
+      - ../intelipath-service/.env
+    environment:
+      # Service owns its OWN database ("scraper") on the shared Postgres server,
+      # reached over the compose network (host = postgres), not localhost.
+      DATABASE_URL: postgresql://${POSTGRES_USER:-intelipath}:${POSTGRES_PASSWORD:-intelipath_dev_password}@postgres:5432/scraper
+      # The scraper shells out to the system `curl`, which natively honours these
+      # proxy env vars (no code change needed). Point SCRAPER_PROXY at a
+      # residential / Cloudflare-solving proxy to get past TopCV's anti-bot.
+      # Empty = direct connection (default). postgres stays direct via NO_PROXY.
+      HTTPS_PROXY: ${SCRAPER_PROXY:-}
+      ALL_PROXY: ${SCRAPER_PROXY:-}
+      NO_PROXY: postgres,localhost,127.0.0.1
+    depends_on:
+      postgres:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "--fail", "http://localhost:8000/"]
       interval: 10s
@@ -60,8 +78,6 @@ services:
       DB_USERNAME: ${POSTGRES_USER:-intelipath}
       DB_PASSWORD: ${POSTGRES_PASSWORD:-intelipath_dev_password}
       AI_SERVICE_BASE_URL: http://ai-service:8000
-      AI_SERVICE_URL: http://ai-service:8000/api/extract
-      SCRAPER_API: http://ai-service:8000/api/v1/scraper/scrape/topcv/
       MCP_DOCUMENT_SERVICE_ENABLED: "true"
       MCP_DOCUMENT_SERVICE_URL: http://ai-service:8000
     depends_on:

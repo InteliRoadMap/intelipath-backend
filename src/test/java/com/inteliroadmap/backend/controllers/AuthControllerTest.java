@@ -1,6 +1,6 @@
 package com.inteliroadmap.backend.controllers;
 
-import com.inteliroadmap.backend.domain.dto.response.RefreshResponse;
+import com.inteliroadmap.backend.domain.dto.response.auth.RefreshResponse;
 import com.inteliroadmap.backend.exceptions.GlobalExceptionHandler;
 import com.inteliroadmap.backend.security.AuthenticationCookieService;
 import com.inteliroadmap.backend.services.AuthService;

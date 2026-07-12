@@ -4,9 +4,11 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.validation.FieldError;
 import org.springframework.validation.ObjectError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -22,7 +24,35 @@ import java.util.List;
 import java.util.Map;
 
 @RestControllerAdvice
+@Slf4j
 public class GlobalExceptionHandler {
+
+    /** Builds the shared error body so every handler returns the same shape. */
+    private ResponseEntity<ErrorResponse> build(HttpStatus status, String error, String message, WebRequest request) {
+        ErrorResponse body = ErrorResponse.builder()
+                .timestamp(LocalDateTime.now())
+                .status(status.value())
+                .error(error)
+                .message(message)
+                .path(request.getDescription(false).replace("uri=", ""))
+                .build();
+        return new ResponseEntity<>(body, status);
+    }
+
+    @ExceptionHandler(BadRequestException.class)
+    public ResponseEntity<ErrorResponse> handleBadRequest(BadRequestException exception, WebRequest request) {
+        return build(HttpStatus.BAD_REQUEST, "BAD_REQUEST", exception.getMessage(), request);
+    }
+
+    @ExceptionHandler(UnauthorizedException.class)
+    public ResponseEntity<ErrorResponse> handleUnauthorized(UnauthorizedException exception, WebRequest request) {
+        return build(HttpStatus.UNAUTHORIZED, "UNAUTHORIZED", exception.getMessage(), request);
+    }
+
+    @ExceptionHandler({ForbiddenException.class, AccessDeniedException.class})
+    public ResponseEntity<ErrorResponse> handleForbidden(RuntimeException exception, WebRequest request) {
+        return build(HttpStatus.FORBIDDEN, "FORBIDDEN", "You do not have permission to perform this action", request);
+    }
 
     /**
      * Handle ResourceNotFoundException
@@ -96,16 +126,10 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ErrorResponse> handleHttpMessageNotReadableException(
             HttpMessageNotReadableException exception, WebRequest request) {
-        ErrorResponse errorResponse = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.BAD_REQUEST.value())
-                .error("BAD_REQUEST")
-                .message("Request body contains invalid data type")
-                .details(exception.getMostSpecificCause().getMessage())
-                .path(request.getDescription(false).replace("uri=", ""))
-                .build();
-
-        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+        // Log the parser detail server-side; never echo it back (it can reveal
+        // internal field names / types).
+        log.warn("GlobalExceptionHandler: Unreadable request body: {}", exception.getMostSpecificCause().getMessage());
+        return build(HttpStatus.BAD_REQUEST, "BAD_REQUEST", "Request body contains invalid or malformed data", request);
     }
 
     /**
@@ -164,16 +188,13 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleGlobalException(
             Exception exception, WebRequest request) {
 
-        ErrorResponse errorResponse = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.INTERNAL_SERVER_ERROR.value())
-                .error("INTERNAL_SERVER_ERROR")
-                .message("An unexpected error occurred")
-                .details(exception.getMessage())
-                .path(request.getDescription(false).replace("uri=", ""))
-                .build();
+        // Log the full stack trace server-side for debugging, but never leak the
+        // internal message/details to the client.
+        log.error("GlobalExceptionHandler: Unhandled exception on {}",
+                request.getDescription(false).replace("uri=", ""), exception);
 
-        return new ResponseEntity<>(errorResponse, HttpStatus.INTERNAL_SERVER_ERROR);
+        return build(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_SERVER_ERROR",
+                "An unexpected error occurred", request);
     }
 
     @Data

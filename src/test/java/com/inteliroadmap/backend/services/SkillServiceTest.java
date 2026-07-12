@@ -173,7 +173,7 @@ class SkillServiceTest {
         assertAllListsNotNull(response);
     }
 
-    private void assertAllListsNotNull(com.inteliroadmap.backend.domain.dto.response.SkillResponse response) {
+    private void assertAllListsNotNull(com.inteliroadmap.backend.domain.dto.response.roadmap.SkillResponse response) {
         assertNotNull(response.getSelectedSkills());
         assertNotNull(response.getSkills());
         assertNotNull(response.getRequiredSkills());

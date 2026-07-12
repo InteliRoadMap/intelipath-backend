@@ -3,15 +3,29 @@ package com.inteliroadmap.backend.services.impl;
 import com.inteliroadmap.backend.components.RoadmapProgressCalculator;
 import com.inteliroadmap.backend.domain.dto.request.ExportStudentListRequest;
 import com.inteliroadmap.backend.domain.dto.request.UpdateProfileRequest;
-import com.inteliroadmap.backend.domain.dto.response.CounselorResponse;
-import com.inteliroadmap.backend.domain.dto.response.StudentInfoProjection;
-import com.inteliroadmap.backend.domain.dto.response.UpdateProfileResponse;
-import com.inteliroadmap.backend.domain.entity.*;
+import com.inteliroadmap.backend.domain.dto.response.counselor.CounselorResponse;
+import com.inteliroadmap.backend.domain.projection.StudentInfoProjection;
+import com.inteliroadmap.backend.domain.dto.response.student.UpdateProfileResponse;
+import com.inteliroadmap.backend.domain.entity.AcademicCounselor;
+import com.inteliroadmap.backend.domain.entity.CareerRole;
+import com.inteliroadmap.backend.domain.entity.Feedback;
+import com.inteliroadmap.backend.domain.entity.Student;
+import com.inteliroadmap.backend.domain.entity.University;
+import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
+import com.inteliroadmap.backend.exceptions.UnauthorizedException;
 import com.inteliroadmap.backend.mappers.CounselorMapper;
-import com.inteliroadmap.backend.repositories.*;
+import com.inteliroadmap.backend.repositories.AcademicCounselorRepository;
+import com.inteliroadmap.backend.repositories.CareerRoleRepository;
+import com.inteliroadmap.backend.repositories.FeedbackRepository;
+import com.inteliroadmap.backend.repositories.SkillNodeRepository;
+import com.inteliroadmap.backend.repositories.StudentProgressRepository;
+import com.inteliroadmap.backend.repositories.StudentRepository;
+import com.inteliroadmap.backend.repositories.StudentSkillRepository;
+import com.inteliroadmap.backend.repositories.UniversityRepository;
+import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.services.CounselorService;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.ss.usermodel.Row;
@@ -66,7 +80,7 @@ public class CounselorServiceImpl implements CounselorService {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByEmail(email);
         if (user == null) {
-            throw new ResourceNotFoundException("User not found from token");
+            throw new UnauthorizedException("User not found from token");
         }
         return user;
     }
@@ -249,17 +263,23 @@ public class CounselorServiceImpl implements CounselorService {
         User me = userRepository.findByUserId(counselor.getUserId());
         User st = userRepository.findByUserId(studentId);
         Student student = studentRepository.findByUserId(studentId);
+        if (student == null) {
+            throw new ResourceNotFoundException("Student not found");
+        }
+
+        // A student who has not selected a career yet has no roadmap/skill data to report.
+        UUID careerId = student.getCareerRole() != null ? student.getCareerRole().getCareerId() : null;
 
         // Weighted roadmap progress, shared formula with the student-facing views
-        int progress = roadmapProgressCalculator.calculateProgress(
-                skillNodeRepository.findByCareerRole_CareerId(student.getCareerRole().getCareerId()),
+        int progress = careerId == null ? 0 : roadmapProgressCalculator.calculateProgress(
+                skillNodeRepository.findByCareerRole_CareerId(careerId),
                 studentProgressRepository.findByStudent_UserId(student.getUserId()));
 
         // Fetch the list of skills the student has yet to acquire for their current career
-        List<String> missingSkillNames = studentSkillRepository
+        List<String> missingSkillNames = careerId == null ? List.of() : studentSkillRepository
                 .findMissingSkillsByStudentIdAndCareerId(
                         student.getUserId(),
-                        student.getCareerRole().getCareerId()
+                        careerId
                 );
 
         List<Feedback> feedbacks = feedbackRepository

@@ -12,19 +12,23 @@ import java.util.List;
 
 public interface StudentDashboardService {
 
-    DashboardRoadmapProgressResponse getRoadmapProgress() ;
+    DashboardRoadmapProgressResponse getRoadmapProgress();
 
     DashboardRoadmapProgressResponse getRoadmapProgress(Student student);
 
-    List<SkillGapItemResponse> getSkillGaps() ;
+    List<SkillGapItemResponse> getSkillGaps();
 
     List<SkillGapItemResponse> getSkillGaps(Student student);
 
-    List<MentorFeedbackItemResponse> getMentorFeedback() ;
+    List<MentorFeedbackItemResponse> getMentorFeedback();
 
-    List<AiHistoryItemResponse> getAiHistory() ;
+    void markFeedbackRead(java.util.UUID feedbackId);
 
-    MarketDemandResponse getMarketDemand() ;
+    void dismissFeedback(java.util.UUID feedbackId);
 
-    List<RecommendationItemResponse> getRecommendations() ;
+    List<AiHistoryItemResponse> getAiHistory();
+
+    MarketDemandResponse getMarketDemand();
+
+    List<RecommendationItemResponse> getRecommendations();
 }

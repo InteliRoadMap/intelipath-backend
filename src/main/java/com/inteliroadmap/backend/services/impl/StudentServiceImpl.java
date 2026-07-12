@@ -2,9 +2,9 @@ package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.components.RoadmapProgressCalculator;
 import com.inteliroadmap.backend.domain.dto.request.SetupStudentProfileRequest;
-import com.inteliroadmap.backend.domain.dto.response.RequiredSkillResponse;
-import com.inteliroadmap.backend.domain.dto.response.SkillResponse;
-import com.inteliroadmap.backend.domain.dto.response.StudentResponse;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.RequiredSkillResponse;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.SkillResponse;
+import com.inteliroadmap.backend.domain.dto.response.student.StudentResponse;
 import com.inteliroadmap.backend.domain.entity.CareerRequiredSkill;
 import com.inteliroadmap.backend.domain.entity.CareerRole;
 import com.inteliroadmap.backend.domain.entity.RagDocument;
@@ -38,7 +38,7 @@ import com.inteliroadmap.backend.repositories.StudentSkillRepository;
 import com.inteliroadmap.backend.repositories.UniversityRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.services.StudentService;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -81,7 +81,7 @@ public class StudentServiceImpl implements StudentService {
     private final SupabaseStorageService supabaseStorageService;
     private final RagDocumentService ragDocumentService;
     private final DocumentIngestionService documentIngestionService;
-    private final AuthenticatedStudentService AuthenticatedStudentService;
+    private final AuthenticatedStudentService authenticatedStudentService;
 
     /**
      * Sets up or updates the student's profile information such as university, major, admission year, and target career.
@@ -95,7 +95,7 @@ public class StudentServiceImpl implements StudentService {
     public StudentResponse setupStudentProfile(SetupStudentProfileRequest request) {
         log.info("StudentServiceImpl: Setup Student Profile Request received");
 
-        Student student = AuthenticatedStudentService.getOrCreateStudentForUpdate();
+        Student student = authenticatedStudentService.getOrCreateStudentForUpdate();
         User user = userRepository.findByUserId(student.getUserId());
         if (user == null) {
             throw new ResourceNotFoundException("User not found");
@@ -133,6 +133,10 @@ public class StudentServiceImpl implements StudentService {
 
         if (request.getMajor() != null) {
             student.setMajor(request.getMajor());
+        }
+
+        if (request.getGithubProfile() != null) {
+            student.setGithubProfile(request.getGithubProfile().trim());
         }
 
         if (request.getCareerId() != null) {
@@ -173,7 +177,7 @@ public class StudentServiceImpl implements StudentService {
     @Override
     public StudentResponse getStudentProfile() {
         log.info("StudentServiceImpl: Student profile retrieval request received");
-        Student student = AuthenticatedStudentService.getRequiredStudent();
+        Student student = authenticatedStudentService.getRequiredStudent();
         return studentMapper.toProfileResponse(student);
     }
 
@@ -188,7 +192,7 @@ public class StudentServiceImpl implements StudentService {
     @Override
     public StudentResponse updateTargetCareer(UUID careerId) {
         log.info("StudentServiceImpl: Student target career update request received. careerId: {}", careerId);
-        Student student = AuthenticatedStudentService.getOrCreateStudentForUpdate();
+        Student student = authenticatedStudentService.getOrCreateStudentForUpdate();
         CareerRole career = careerRoleRepository.findByCareerId(careerId);
         if (career == null) {
             throw new ResourceNotFoundException("Career role not found");
@@ -217,7 +221,7 @@ public class StudentServiceImpl implements StudentService {
 
         // Fetch the list of skills the student has explicitly selected
         List<StudentSkill> selectedSkills = studentSkillRepository.findByStudent_UserId(student.getUserId());
-        if (student.getCareerRole().getCareerId() == null) {
+        if (student.getCareerRole() == null || student.getCareerRole().getCareerId() == null) {
             // Return early if no career is selected, showing only what the student selected
             return SkillResponse.builder()
                     .selectedSkills(skillMapper.toSelectedSkillResponses(selectedSkills))
@@ -258,7 +262,7 @@ public class StudentServiceImpl implements StudentService {
      * @return the current {@link Student}
      */
     private Student getCurrentStudent() {
-        return AuthenticatedStudentService.getOrCreateStudent();
+        return authenticatedStudentService.getOrCreateStudent();
     }
 
     /**
@@ -269,6 +273,9 @@ public class StudentServiceImpl implements StudentService {
      */
     @Override
     public List<CareerRequiredSkill> findMissingRequiredSkills(Student student) {
+        if (student.getCareerRole() == null || student.getCareerRole().getCareerId() == null) {
+            return List.of();
+        }
         List<CareerRequiredSkill> requiredSkills = careerRequiredSkillRepository
                 .findByCareerRole_CareerId(student.getCareerRole().getCareerId());
         List<StudentSkill> selectedSkills = studentSkillRepository.findByStudent_UserId(student.getUserId());
@@ -311,6 +318,9 @@ public class StudentServiceImpl implements StudentService {
         if (studentSkillRepository.existsByStudent_UserIdAndSkill_SkillId(student.getUserId(), skillId)) {
             return 100;
         }
+        if (student.getCareerRole() == null || student.getCareerRole().getCareerId() == null) {
+            return 0;
+        }
         List<SkillNode> allNodesForSkill = skillNodeRepository.findBySkill_SkillIdAndCareerRole_CareerId(skillId, student.getCareerRole().getCareerId());
         if (allNodesForSkill.isEmpty()) {
             return 0;
@@ -327,7 +337,7 @@ public class StudentServiceImpl implements StudentService {
         if (file == null || file.isEmpty()) {
             throw new IllegalArgumentException("Transcript file is required");
         }
-        Student student = AuthenticatedStudentService.getOrCreateStudentForUpdate();
+        Student student = authenticatedStudentService.getOrCreateStudentForUpdate();
         User user = userRepository.findByUserId(student.getUserId());
         if (user == null) {
             throw new ResourceNotFoundException("User not found");

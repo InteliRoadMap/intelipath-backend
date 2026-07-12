@@ -29,7 +29,7 @@ public class GithubPortfolioController {
 
     @PostMapping("/github-import")
     @Operation(summary = "Import Project from GitHub", description = "Extracts repo info and README, uses AI to summarize, and returns project info without saving.")
-    public ResponseEntity<com.inteliroadmap.backend.domain.dto.response.PortfolioResponse.PortfolioProjectResponse> importFromGithub(@RequestBody @Valid GithubImportRequest request) {
+    public ResponseEntity<com.inteliroadmap.backend.domain.dto.response.portfolio.PortfolioResponse.PortfolioProjectResponse> importFromGithub(@RequestBody @Valid GithubImportRequest request) {
         log.info("GithubPortfolioController: Request received: Import Portfolio Project from GitHub: {}", request.getRepoUrl());
         return ResponseEntity.ok(githubPortfolioService.importFromGithub(request));
     }

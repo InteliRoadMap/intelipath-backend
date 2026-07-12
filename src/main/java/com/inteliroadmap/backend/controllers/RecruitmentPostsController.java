@@ -1,8 +1,8 @@
 package com.inteliroadmap.backend.controllers;
 
-import com.inteliroadmap.backend.domain.dto.response.CompanyResponse;
-import com.inteliroadmap.backend.domain.dto.response.RecruitmentPostDto;
-import com.inteliroadmap.backend.domain.dto.response.RecruitmentResponse;
+import com.inteliroadmap.backend.domain.dto.response.scraper.CompanyResponse;
+import com.inteliroadmap.backend.domain.dto.response.scraper.RecruitmentPostDto;
+import com.inteliroadmap.backend.domain.dto.response.scraper.RecruitmentResponse;
 import com.inteliroadmap.backend.exceptions.GlobalExceptionHandler.ErrorResponse;
 import java.util.List;
 import com.inteliroadmap.backend.services.ScraperService;

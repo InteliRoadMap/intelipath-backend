@@ -2,9 +2,9 @@ package com.inteliroadmap.backend.services;
 
 import com.inteliroadmap.backend.domain.dto.request.CreateFeedbackRequest;
 import com.inteliroadmap.backend.domain.dto.request.ModifyFeedbackRequest;
-import com.inteliroadmap.backend.domain.dto.response.FeedbackResponse;
-
+import com.inteliroadmap.backend.domain.dto.response.counselor.FeedbackResponse;
 import org.springframework.web.multipart.MultipartFile;
+
 import java.util.List;
 import java.util.UUID;
 

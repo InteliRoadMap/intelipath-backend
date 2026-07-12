@@ -5,7 +5,6 @@ import com.fasterxml.jackson.annotation.JsonValue;
 public enum FeedbackStatus {
     NEW,
     READ,
-    UPDATED,
     DELETED;
 
     @JsonValue

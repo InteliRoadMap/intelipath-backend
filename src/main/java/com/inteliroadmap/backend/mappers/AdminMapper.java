@@ -1,10 +1,10 @@
 package com.inteliroadmap.backend.mappers;
 
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminCourseMetricResponse;
-import com.inteliroadmap.backend.domain.dto.response.admin.AdminSystemHealthResponse;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminUserListItemResponse;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminUserMetricResponse;
 import com.inteliroadmap.backend.domain.entity.User;
+import com.inteliroadmap.backend.domain.enums.UserStatus;
 import org.springframework.stereotype.Component;
 
 import java.time.format.DateTimeFormatter;
@@ -29,18 +29,12 @@ public class AdminMapper {
                 .build();
     }
 
-    public AdminSystemHealthResponse toSystemHealthResponse(double uptime, String status) {
-        return AdminSystemHealthResponse.builder()
-                .uptime(uptime)
-                .status(status)
-                .build();
-    }
-
     public AdminUserListItemResponse toUserListItem(User user) {
         return AdminUserListItemResponse.builder()
                 .id(user.getUserId().toString())
                 .name(user.getFullName())
                 .role(user.getRole().name())
+                .status(user.getUserStatus() != null ? user.getUserStatus().name() : UserStatus.ACTIVE.name())
                 .joinedDate(user.getCreatedAt().format(DATE_FORMATTER))
                 .build();
     }

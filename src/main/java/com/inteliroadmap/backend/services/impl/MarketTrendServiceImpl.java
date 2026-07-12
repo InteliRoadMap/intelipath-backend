@@ -48,12 +48,12 @@ public class MarketTrendServiceImpl implements MarketTrendService {
     @Transactional(readOnly = true)
     @Override
     public List<MarketTrendResponse.CompanyTrendResponse> getTopHiringCompanies(int limit) {
-        // Query the database for the top companies based on hiring volume, limiting the results by 'limit'
-        List<Company> topCompanies = companyRepository.findTopHiringCompanies(PageRequest.of(0, limit));
-        
-        // Map the entity models to DTO responses using MarketTrendMapper and return as a List
-        return topCompanies.stream()
-                .map(marketTrendMapper::toCompanyTrendResponse)
+        // Query the database for the top companies WITH their post count.
+        List<Object[]> rows = companyRepository.findTopHiringCompaniesWithCount(PageRequest.of(0, limit));
+
+        // Map [Company, count] rows to DTO responses using MarketTrendMapper.
+        return rows.stream()
+                .map(row -> marketTrendMapper.toCompanyTrendResponse((Company) row[0], ((Number) row[1]).longValue()))
                 .collect(Collectors.toList());
     }
 

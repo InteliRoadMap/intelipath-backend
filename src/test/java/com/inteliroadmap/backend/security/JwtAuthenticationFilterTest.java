@@ -12,7 +12,7 @@ class JwtAuthenticationFilterTest {
 
     @Test
     void skipsPostRefreshEndpoint() {
-        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(mock(JwtService.class));
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(mock(JwtService.class), mock(com.inteliroadmap.backend.repositories.UserRepository.class));
         HttpServletRequest request = mock(HttpServletRequest.class);
         when(request.getMethod()).thenReturn("POST");
         when(request.getRequestURI()).thenReturn("/api/v1/auth/refresh");
@@ -22,7 +22,7 @@ class JwtAuthenticationFilterTest {
 
     @Test
     void doesNotSkipOtherRequests() {
-        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(mock(JwtService.class));
+        JwtAuthenticationFilter filter = new JwtAuthenticationFilter(mock(JwtService.class), mock(com.inteliroadmap.backend.repositories.UserRepository.class));
         HttpServletRequest request = mock(HttpServletRequest.class);
         when(request.getMethod()).thenReturn("GET");
         when(request.getRequestURI()).thenReturn("/api/v1/student/profile");

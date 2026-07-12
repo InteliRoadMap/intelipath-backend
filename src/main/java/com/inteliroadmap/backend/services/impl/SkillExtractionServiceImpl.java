@@ -1,5 +1,6 @@
 package com.inteliroadmap.backend.services.impl;
 
+import com.inteliroadmap.backend.ai.client.AiServiceClient;
 import com.inteliroadmap.backend.domain.entity.Recruitment;
 import com.inteliroadmap.backend.domain.entity.Skill;
 import com.inteliroadmap.backend.domain.entity.SkillTrend;
@@ -9,11 +10,8 @@ import com.inteliroadmap.backend.repositories.SkillTrendRepository;
 import com.inteliroadmap.backend.services.SkillExtractionService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestTemplate;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -34,12 +32,7 @@ public class SkillExtractionServiceImpl implements SkillExtractionService {
     private final RecruitmentRepository recruitmentRepository;
     private final SkillRepository skillRepository;
     private final SkillTrendRepository skillTrendRepository;
-
-    @Value("${ai.service.base-url:http://localhost:8000}")
-    private String aiServiceBaseUrl;
-
-    public record SkillExtractRequest(List<String> descriptions) {}
-    public record SkillExtractResponse(List<List<String>> skills_per_doc) {}
+    private final AiServiceClient aiServiceClient;
 
     /**
      * Extracts skills from recruitment descriptions using an external AI service
@@ -65,7 +58,7 @@ public class SkillExtractionServiceImpl implements SkillExtractionService {
         for (Recruitment r : recruitments) {
             StringBuilder descBuilder = new StringBuilder();
             // Append title to the description
-            String title = r.getRecruitmentInfos() != null ? (String) r.getRecruitmentInfos().get("title") : null;
+            String title = com.inteliroadmap.backend.mappers.ScraperMapper.str(r.getRecruitmentInfos(), "title");
             if (title != null) {
                 descBuilder.append(title).append(". ");
             }
@@ -99,22 +92,12 @@ public class SkillExtractionServiceImpl implements SkillExtractionService {
             dates.add(date);
         }
 
-        RestTemplate restTemplate = new RestTemplate();
-        String extractUrl = aiServiceBaseUrl + "/api/extract-skills";
-        
-        log.info("SkillExtractionServiceImpl: Sending {} descriptions to AI Service at: {}", descriptions.size(), extractUrl);
-        ResponseEntity<SkillExtractResponse> response = restTemplate.postForEntity(
-                extractUrl,
-                new SkillExtractRequest(descriptions),
-                SkillExtractResponse.class
-        );
-
-        if (!response.getStatusCode().is2xxSuccessful() || response.getBody() == null) {
-            log.error("SkillExtractionServiceImpl: Error occurred while calling AI Service.");
+        log.info("SkillExtractionServiceImpl: Sending {} descriptions to AI Service", descriptions.size());
+        List<List<String>> extractedSkills = aiServiceClient.extractSkills(descriptions);
+        if (extractedSkills.isEmpty()) {
+            log.warn("SkillExtractionServiceImpl: AI Service returned no skills; nothing to rebuild.");
             return;
         }
-
-        List<List<String>> extractedSkills = response.getBody().skills_per_doc();
         log.info("SkillExtractionServiceImpl: AI Service extraction completed successfully.");
 
         // 3. Group by (SkillName, Date) -> Count

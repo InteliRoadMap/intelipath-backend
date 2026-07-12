@@ -1,8 +1,8 @@
 package com.inteliroadmap.backend.repositories;
 
 import com.inteliroadmap.backend.domain.entity.Feedback;
-import com.inteliroadmap.backend.domain.entity.Student;
 import com.inteliroadmap.backend.domain.entity.User;
+import com.inteliroadmap.backend.domain.enums.FeedbackStatus;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -15,7 +15,13 @@ import java.util.UUID;
 public interface FeedbackRepository extends JpaRepository<Feedback, UUID> {
     Feedback findByFeedbackId(UUID feedbackId);
     List<Feedback> findTop5ByReceiver_UserIdOrderByCreatedAtDesc(UUID receiverId);
+
+    // Notification inbox: newest feedback the student hasn't dismissed (status != DELETED).
+    List<Feedback> findTop5ByReceiver_UserIdAndStatusNotOrderByCreatedAtDesc(
+            UUID receiverId, FeedbackStatus status);
+
     List<Feedback> findBySender(User receiver);
+    List<Feedback> findByReceiver(User receiver);
 
     @Query("SELECT COUNT(f) FROM Feedback f WHERE f.sender.userId = :senderId AND f.createdAt >= :since")
     long countFeedbacksBySenderIdSince(@Param("senderId") UUID senderId, @Param("since") java.time.LocalDateTime since);

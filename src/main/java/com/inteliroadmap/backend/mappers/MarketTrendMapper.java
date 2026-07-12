@@ -12,16 +12,17 @@ import java.util.stream.Collectors;
 @Component
 public class MarketTrendMapper {
 
-    public MarketTrendResponse.CompanyTrendResponse toCompanyTrendResponse(Company company) {
+    public MarketTrendResponse.CompanyTrendResponse toCompanyTrendResponse(Company company, long recruitmentCount) {
         if (company == null) {
             return null;
         }
+        var sig = company.getSignatures();
         return MarketTrendResponse.CompanyTrendResponse.builder()
                 .topCvCompanyId(company.getTopCvCompanyId())
-                .name(company.getSignatures() != null && company.getSignatures().has("name") ? company.getSignatures().get("name").asText() : null)
-                .logo(company.getSignatures() != null && company.getSignatures().has("logo") ? company.getSignatures().get("logo").asText() : null)
-                .companyLink(company.getSignatures() != null && company.getSignatures().has("link") ? company.getSignatures().get("link").asText() : null)
-                .recruitmentCount(0)
+                .name(ScraperMapper.str(sig, "name"))
+                .logo(ScraperMapper.str(sig, "logo"))
+                .companyLink(ScraperMapper.str(sig, "link"))
+                .recruitmentCount((int) recruitmentCount)
                 .build();
     }
 

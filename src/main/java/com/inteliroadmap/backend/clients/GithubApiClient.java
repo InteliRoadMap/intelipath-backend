@@ -27,9 +27,9 @@ public class GithubApiClient {
     @Value("${github.token:}")
     private String githubToken;
 
-    public GithubApiClient(ObjectMapper objectMapper) {
+    public GithubApiClient(ObjectMapper objectMapper, RestTemplate externalApiRestTemplate) {
         this.objectMapper = objectMapper;
-        this.restTemplate = new RestTemplate();
+        this.restTemplate = externalApiRestTemplate;
     }
 
     public GithubRepoMetadata getRepoMetadata(String owner, String repo) {

@@ -1,9 +1,9 @@
 package com.inteliroadmap.backend.mappers;
 
-import com.inteliroadmap.backend.domain.dto.response.CounselorResponse;
+import com.inteliroadmap.backend.domain.dto.response.counselor.CounselorResponse;
+import com.inteliroadmap.backend.domain.dto.response.counselor.FeedbackResponse;
+import com.inteliroadmap.backend.domain.dto.response.student.UpdateProfileResponse;
 import com.inteliroadmap.backend.domain.dto.response.FeedbackAttachmentResponse;
-import com.inteliroadmap.backend.domain.dto.response.FeedbackResponse;
-import com.inteliroadmap.backend.domain.dto.response.UpdateProfileResponse;
 import com.inteliroadmap.backend.domain.entity.AcademicCounselor;
 import com.inteliroadmap.backend.domain.entity.Feedback;
 import com.inteliroadmap.backend.domain.entity.User;
@@ -12,6 +12,7 @@ import org.springframework.stereotype.Component;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @Component
 public class CounselorMapper {
@@ -77,7 +78,7 @@ public class CounselorMapper {
                                         .fileType(att.getFileType())
                                         .fileSize(att.getFileSize())
                                         .build())
-                                .collect(java.util.stream.Collectors.toList()) : new java.util.ArrayList<>()
+                                .collect(Collectors.toList()) : new ArrayList<>()
                 )
                 .createdAt(f.getCreatedAt())
                 .updatedAt(f.getUpdatedAt())

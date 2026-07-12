@@ -29,7 +29,7 @@ import com.inteliroadmap.backend.repositories.StudentSkillEvidenceRepository;
 import com.inteliroadmap.backend.repositories.StudentSkillRepository;
 import com.inteliroadmap.backend.services.AuthenticatedStudentService;
 import com.inteliroadmap.backend.services.RoadmapPersonalizationService;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -208,10 +208,6 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
                 .decidedAt(recommendation.getDecidedAt())
                 .build();
     }
-
-    // ------------------------------------------------------------------
-    // Generation helpers
-    // ------------------------------------------------------------------
 
     /** A roadmap node the student can likely skip, with the best supporting confidence. */
     private record NodeCandidate(SkillNode node, BigDecimal confidence, String reason, List<UUID> evidenceIds) {

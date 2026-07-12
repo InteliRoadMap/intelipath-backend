@@ -44,7 +44,7 @@ public class Feedback {
     @Enumerated(EnumType.STRING)
     private FeedbackType type;
 
-    // New
+    // Notification/lifecycle state: NEW (unread) -> READ, or DELETED (dismissed).
     @Column(name = "status")
     @Enumerated(EnumType.STRING)
     private FeedbackStatus status;

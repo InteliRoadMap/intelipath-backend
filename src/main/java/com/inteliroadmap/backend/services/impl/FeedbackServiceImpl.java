@@ -3,17 +3,18 @@ package com.inteliroadmap.backend.services.impl;
 import com.inteliroadmap.backend.domain.dto.request.CreateFeedbackRequest;
 import com.inteliroadmap.backend.domain.dto.request.ModifyFeedbackRequest;
 import com.inteliroadmap.backend.domain.dto.response.FeedbackAttachmentResponse;
-import com.inteliroadmap.backend.domain.dto.response.FeedbackResponse;
+import com.inteliroadmap.backend.domain.dto.response.counselor.FeedbackResponse;
 import com.inteliroadmap.backend.domain.entity.Feedback;
 import com.inteliroadmap.backend.domain.entity.FeedbackAttachment;
 import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.domain.enums.FeedbackStatus;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
+import com.inteliroadmap.backend.exceptions.UnauthorizedException;
 import com.inteliroadmap.backend.repositories.FeedbackRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.services.EmailService;
 import com.inteliroadmap.backend.services.FeedbackService;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -23,14 +24,6 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
-
-import jakarta.transaction.Transactional;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.core.context.SecurityContextHolder;
-import org.springframework.stereotype.Service;
-
 import java.util.UUID;
 
 @Service
@@ -54,7 +47,7 @@ public class FeedbackServiceImpl implements FeedbackService {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByEmail(email);
         if (user == null) {
-            throw new ResourceNotFoundException("User not found from token");
+            throw new UnauthorizedException("User not found from token");
         }
         return user;
     }
@@ -84,7 +77,7 @@ public class FeedbackServiceImpl implements FeedbackService {
                 .status(FeedbackStatus.NEW)
                 .attachments(new ArrayList<>())
                 .build();
-                
+
         if (files != null && !files.isEmpty()) {
             for (MultipartFile file : files) {
                 if (!file.isEmpty()) {
@@ -141,11 +134,11 @@ public class FeedbackServiceImpl implements FeedbackService {
             throw new ResourceNotFoundException("Feedback not found");
         }
         
-        // Update feedback properties
+        // Update feedback properties (updated_at is bumped automatically; the
+        // read/unread status is preserved).
         feedback.setContent(request.getContent());
         feedback.setType(request.getType());
-        feedback.setStatus(FeedbackStatus.UPDATED);
-        
+
         if (files != null && !files.isEmpty()) {
             if (feedback.getAttachments() == null) {
                 feedback.setAttachments(new ArrayList<>());

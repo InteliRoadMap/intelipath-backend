@@ -18,7 +18,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -128,6 +131,28 @@ public class StudentDashboardController {
     public ResponseEntity<List<MentorFeedbackItemResponse>> getMentorFeedback() {
         log.info("StudentDashboardController: Get mentor feedback request received");
         return ResponseEntity.ok(studentDashboardService.getMentorFeedback());
+    }
+
+    /**
+     * Mark one feedback item as read for the authenticated student.
+     */
+    @PatchMapping("/mentor-feedback/{feedbackId}/read")
+    @Operation(summary = "Mark feedback as read", description = "Mark a mentor feedback item as read for the authenticated student")
+    public ResponseEntity<Void> markFeedbackRead(@PathVariable java.util.UUID feedbackId) {
+        log.info("StudentDashboardController: Mark feedback {} read", feedbackId);
+        studentDashboardService.markFeedbackRead(feedbackId);
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Dismiss (soft-hide) one feedback item for the authenticated student.
+     */
+    @DeleteMapping("/mentor-feedback/{feedbackId}")
+    @Operation(summary = "Dismiss feedback", description = "Dismiss (soft-hide) a mentor feedback item for the authenticated student")
+    public ResponseEntity<Void> dismissFeedback(@PathVariable java.util.UUID feedbackId) {
+        log.info("StudentDashboardController: Dismiss feedback {}", feedbackId);
+        studentDashboardService.dismissFeedback(feedbackId);
+        return ResponseEntity.noContent().build();
     }
 
     /**

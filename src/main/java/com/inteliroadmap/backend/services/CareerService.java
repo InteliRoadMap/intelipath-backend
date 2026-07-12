@@ -1,6 +1,6 @@
 package com.inteliroadmap.backend.services;
 
-import com.inteliroadmap.backend.domain.dto.response.CareerResponse;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.CareerResponse;
 
 import java.util.List;
 import java.util.UUID;

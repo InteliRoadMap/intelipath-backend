@@ -13,9 +13,9 @@ public interface RecruitmentRepository extends JpaRepository<Recruitment, String
     boolean existsByTopCvRecruitmentId(String topCvRecruitmentId);
     Recruitment findByTopCvRecruitmentId(String topCvRecruitmentId);
     
-    @Query(value = "SELECT * FROM processed_recruitments WHERE basic_info->>'title' ILIKE %:keyword% LIMIT 10", nativeQuery = true)
+    @Query(value = "SELECT * FROM recruitments WHERE recruitment_infos->>'title' ILIKE %:keyword% LIMIT 10", nativeQuery = true)
     List<Recruitment> findTop10ByTitleContainingIgnoreCase(@Param("keyword") String keyword);
 
-    @Query(value = "SELECT basic_info->>'salary' FROM processed_recruitments WHERE basic_info->>'salary' IS NOT NULL AND basic_info->>'salary' != ''", nativeQuery = true)
+    @Query(value = "SELECT recruitment_infos->>'salary' FROM recruitments WHERE recruitment_infos->>'salary' IS NOT NULL AND recruitment_infos->>'salary' != ''", nativeQuery = true)
     List<String> findAllSalaries();
 }

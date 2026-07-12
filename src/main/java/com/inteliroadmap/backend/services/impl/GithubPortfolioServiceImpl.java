@@ -1,11 +1,11 @@
 package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.domain.dto.request.GithubImportRequest;
-import com.inteliroadmap.backend.domain.dto.response.PortfolioResponse;
+import com.inteliroadmap.backend.domain.dto.response.portfolio.PortfolioResponse;
 import com.inteliroadmap.backend.domain.entity.Student;
 import com.inteliroadmap.backend.domain.enums.EvidenceType;
 import com.inteliroadmap.backend.clients.GithubApiClient;
-import com.inteliroadmap.backend.components.PortfolioAiAnalyzer;
+import com.inteliroadmap.backend.ai.analyzer.PortfolioAiAnalyzer;
 import com.inteliroadmap.backend.services.AuthenticatedStudentService;
 import com.inteliroadmap.backend.services.GithubPortfolioService;
 import com.inteliroadmap.backend.services.SkillEvidenceService;

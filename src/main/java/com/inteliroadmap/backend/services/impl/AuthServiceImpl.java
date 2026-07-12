@@ -1,14 +1,16 @@
 package com.inteliroadmap.backend.services.impl;
 
-import com.inteliroadmap.backend.domain.dto.response.RefreshResponse;
+import com.inteliroadmap.backend.domain.dto.response.auth.RefreshResponse;
 import com.inteliroadmap.backend.domain.entity.RefreshToken;
 import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
+import com.inteliroadmap.backend.exceptions.UnauthorizedException;
 import com.inteliroadmap.backend.repositories.RefreshTokenRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.security.JwtService;
+import com.inteliroadmap.backend.security.TokenHashUtil;
 import com.inteliroadmap.backend.services.AuthService;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -58,13 +60,13 @@ public class AuthServiceImpl implements AuthService {
             throw invalidRefreshToken();
         }
 
-        // Step 4: Find and lock refresh token from database
+        // Step 4: Find and lock refresh token from database (stored as a SHA-256 digest)
         Optional<RefreshToken> storedTokenOptional =
-                refreshTokenRepository.findByTokenForUpdate(refreshToken);
+                refreshTokenRepository.findByTokenForUpdate(TokenHashUtil.sha256Hex(refreshToken));
 
         if (storedTokenOptional.isEmpty()) {
             log.warn("AuthServiceImpl: Refresh token was not found for user: {}", email);
-            throw new ResourceNotFoundException("Refresh token or user not found");
+            throw new UnauthorizedException("Refresh token or user not found");
         }
 
         RefreshToken storedToken = storedTokenOptional.get();
@@ -77,7 +79,7 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByEmail(email);
         if (user == null) {
             log.warn("AuthServiceImpl: Refresh token user was not found: {}", email);
-            throw new ResourceNotFoundException("Refresh token or user not found");
+            throw new UnauthorizedException("Refresh token or user not found");
         }
 
         if (!storedToken.getUser().getUserId().equals(user.getUserId())) {
@@ -97,8 +99,8 @@ public class AuthServiceImpl implements AuthService {
         refreshTokenRepository.delete(storedToken);
 
         RefreshToken newStoredToken = RefreshToken.builder()
-                .token(newRefreshToken)
-                .user(com.inteliroadmap.backend.domain.entity.User.builder().userId(user.getUserId()).build())
+                .token(TokenHashUtil.sha256Hex(newRefreshToken))
+                .user(User.builder().userId(user.getUserId()).build())
                 .expiredAt(LocalDateTime.now().plus(Duration.ofMillis(jwtService.getRefreshExpiration())))
                 .build();
 
@@ -115,7 +117,7 @@ public class AuthServiceImpl implements AuthService {
         if (refreshToken == null || refreshToken.isBlank()) {
             return;
         }
-        refreshTokenRepository.deleteByToken(refreshToken);
+        refreshTokenRepository.deleteByToken(TokenHashUtil.sha256Hex(refreshToken));
     }
 
     /**

@@ -2,7 +2,7 @@ package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.domain.dto.request.CreateFeedbackRequest;
 import com.inteliroadmap.backend.domain.dto.request.UpdateMentorProfileRequest;
-import com.inteliroadmap.backend.domain.dto.response.MentorResponse;
+import com.inteliroadmap.backend.domain.dto.response.mentor.MentorResponse;
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorCareerDistributionResponse;
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorDashboardMetrics;
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorFeedbackHistoryDto;
@@ -20,6 +20,7 @@ import com.inteliroadmap.backend.domain.enums.ReviewStatus;
 import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
 import com.inteliroadmap.backend.domain.enums.UserRole;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
+import com.inteliroadmap.backend.exceptions.ForbiddenException;
 import com.inteliroadmap.backend.repositories.FeedbackRepository;
 import com.inteliroadmap.backend.repositories.IndustryMentorRepository;
 import com.inteliroadmap.backend.repositories.PortfolioReviewRequestRepository;
@@ -30,7 +31,7 @@ import com.inteliroadmap.backend.repositories.StudentSkillRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.services.MentorService;
 import com.inteliroadmap.backend.services.RoadmapService;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
@@ -71,7 +72,7 @@ public class MentorServiceImpl implements MentorService {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         User user = userRepository.findByEmail(email);
         if (user == null || user.getRole() != UserRole.MENTOR) {
-            throw new ResourceNotFoundException("Mentor not found from token or invalid role");
+            throw new ForbiddenException("Mentor not found from token or invalid role");
         }
         return user;
     }
@@ -98,6 +99,26 @@ public class MentorServiceImpl implements MentorService {
                 .pendingReviews(pendingReviews)
                 .feedbacks(feedbacksThisWeek)
                 .build();
+    }
+
+    @Override
+    public MentorResponse getWelcomeAlert() {
+        User mentor = getAuthenticatedMentor();
+        long pending = reviewRequestRepository.countByMentor_UserIdAndStatus(mentor.getUserId(), ReviewStatus.PENDING);
+        String message = pending > 0
+                ? "Chào ngày mới! Bạn có " + pending + " portfolio đang chờ duyệt."
+                : "Chào ngày mới! Hiện không có portfolio nào đang chờ duyệt.";
+        return MentorResponse.builder().welcomeAlert(message).build();
+    }
+
+    @Override
+    public MentorResponse getInsight() {
+        User mentor = getAuthenticatedMentor();
+        long pending = reviewRequestRepository.countByMentor_UserIdAndStatus(mentor.getUserId(), ReviewStatus.PENDING);
+        String insight = pending > 0
+                ? "Có " + pending + " sinh viên đang chờ feedback portfolio từ bạn."
+                : "Bạn đã xử lý hết các yêu cầu feedback. Làm tốt lắm!";
+        return MentorResponse.builder().insight(insight).build();
     }
 
     private String formatResponseTime(Double seconds) {

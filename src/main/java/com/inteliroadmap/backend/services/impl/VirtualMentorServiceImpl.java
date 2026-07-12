@@ -1,18 +1,19 @@
 package com.inteliroadmap.backend.services.impl;
 
+import com.inteliroadmap.backend.ai.client.AiServiceClient;
 import com.inteliroadmap.backend.domain.dto.request.VirtualMentorChatRequest;
 import com.inteliroadmap.backend.domain.entity.ChatMessage;
 import com.inteliroadmap.backend.domain.entity.ChatSession;
 import com.inteliroadmap.backend.domain.entity.Student;
 import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
+import com.inteliroadmap.backend.exceptions.ForbiddenException;
 import com.inteliroadmap.backend.repositories.ChatMessageRepository;
 import com.inteliroadmap.backend.repositories.ChatSessionRepository;
 import com.inteliroadmap.backend.repositories.StudentRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
-import com.inteliroadmap.backend.security.JwtService;
+import com.inteliroadmap.backend.security.SecurityUtils;
 import com.inteliroadmap.backend.services.VirtualMentorService;
-import com.inteliroadmap.backend.utils.BearerTokenUtil;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
@@ -23,9 +24,15 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import reactor.core.publisher.Flux;
 
+import java.io.IOException;
+import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -43,9 +50,18 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
     private final ChatMessageRepository chatMessageRepository;
     private final StudentRepository studentRepository;
     private final UserRepository userRepository;
-    private final JwtService jwtService;
     private final ChatClient chatClient;
     private final VectorStore vectorStore;
+    private final AiServiceClient aiServiceClient;
+    private final String systemPromptTemplate;
+    private final String ragPromptTemplate;
+
+    /** Cap on how much extracted document text to inject, to keep prompts bounded. */
+    private static final int MAX_ATTACHMENT_CHARS = 12000;
+
+    /** When false, skip RAG retrieval (embedding + vector search) for faster replies. */
+    @Value("${mentor.rag-enabled:true}")
+    private boolean ragEnabled;
 
     /**
      * Constructs a VirtualMentorServiceImpl with the required dependencies.
@@ -54,7 +70,6 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
      * @param chatMessageRepository repository for chat messages
      * @param studentRepository repository for student profiles
      * @param userRepository repository for user profiles
-     * @param jwtService service for JWT operations
      * @param chatClientBuilder builder for creating the chat client
      * @param vectorStore the vector store for AI search and retrieval
      */
@@ -62,29 +77,36 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
                                 ChatMessageRepository chatMessageRepository,
                                 StudentRepository studentRepository,
                                 UserRepository userRepository,
-                                JwtService jwtService,
-                                ChatClient.Builder chatClientBuilder,
-                                VectorStore vectorStore) {
+                                ChatClient chatClient,
+                                VectorStore vectorStore,
+                                AiServiceClient aiServiceClient,
+                                @Value("classpath:prompts/virtual-mentor-system.st") Resource systemPrompt,
+                                @Value("classpath:prompts/virtual-mentor-rag.st") Resource ragPrompt) {
         this.chatSessionRepository = chatSessionRepository;
         this.chatMessageRepository = chatMessageRepository;
         this.studentRepository = studentRepository;
         this.userRepository = userRepository;
-        this.jwtService = jwtService;
         this.vectorStore = vectorStore;
-        this.chatClient = chatClientBuilder.build();
+        this.chatClient = chatClient;
+        this.aiServiceClient = aiServiceClient;
+        try {
+            this.systemPromptTemplate = systemPrompt.getContentAsString(StandardCharsets.UTF_8);
+            this.ragPromptTemplate = ragPrompt.getContentAsString(StandardCharsets.UTF_8);
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to load virtual mentor prompts", e);
+        }
     }
 
     /**
      * Creates a new chat session for the authenticated user.
      *
-     * @param authorizationHeader the authorization header containing the user's JWT token
      * @param sessionName the name for the new session, defaults to "New Chat" if blank or null
      * @return the created ChatSession
      */
     @Override
-    public ChatSession createSession(String authorizationHeader, String sessionName) {
+    public ChatSession createSession(String sessionName) {
         // Retrieve authenticated user from the provided token
-        User user = getAuthenticatedUser(authorizationHeader);
+        User user = getAuthenticatedUser();
         
         // Build the new chat session and handle default naming
         ChatSession chatSession = ChatSession.builder()
@@ -100,31 +122,29 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
     /**
      * Retrieves all chat sessions for the authenticated user.
      *
-     * @param authorizationHeader the authorization header containing the user's JWT token
      * @return a list of chat sessions belonging to the user
      */
     @Override
-    public List<ChatSession> getUserSessions(String authorizationHeader) {
-        User user = getAuthenticatedUser(authorizationHeader);
+    public List<ChatSession> getUserSessions() {
+        User user = getAuthenticatedUser();
         return chatSessionRepository.findByUser_UserIdOrderByCreatedAtDesc(user.getUserId());
     }
 
     /**
      * Retrieves all messages for a specific chat session belonging to the user.
      *
-     * @param authorizationHeader the authorization header containing the user's JWT token
      * @param sessionId the ID of the chat session
      * @return a list of chat messages for the session
      * @throws ResourceNotFoundException if the session is not found or access is denied
      */
     @Override
-    public List<ChatMessage> getSessionMessages(String authorizationHeader, UUID sessionId) {
-        User user = getAuthenticatedUser(authorizationHeader);
+    public List<ChatMessage> getSessionMessages(UUID sessionId) {
+        User user = getAuthenticatedUser();
         ChatSession session = chatSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Chat session not found"));
                 
         if (!session.getUser().getUserId().equals(user.getUserId())) {
-            throw new ResourceNotFoundException("Access denied to this session");
+            throw new ForbiddenException("Access denied to this session");
         }
         
         return chatMessageRepository.findByChatSession_SessionIdOrderByCreatedAtAsc(sessionId);
@@ -133,21 +153,20 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
     /**
      * Renames an existing chat session for the authenticated user.
      *
-     * @param authorizationHeader the authorization header containing the user's JWT token
      * @param sessionId the ID of the chat session to rename
      * @param newName the new name for the chat session
      * @return the updated ChatSession
      * @throws ResourceNotFoundException if the session is not found or access is denied
      */
-    @org.springframework.transaction.annotation.Transactional
+    @Transactional
     @Override
-    public ChatSession renameSession(String authorizationHeader, UUID sessionId, String newName) {
-        User user = getAuthenticatedUser(authorizationHeader);
+    public ChatSession renameSession(UUID sessionId, String newName) {
+        User user = getAuthenticatedUser();
         ChatSession session = chatSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Chat session not found"));
 
         if (!session.getUser().getUserId().equals(user.getUserId())) {
-            throw new ResourceNotFoundException("Access denied to this session");
+            throw new ForbiddenException("Access denied to this session");
         }
 
         session.setSessionName(newName);
@@ -157,19 +176,18 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
     /**
      * Deletes a specific chat session and all associated messages.
      *
-     * @param authorizationHeader the authorization header containing the user's JWT token
      * @param sessionId the ID of the chat session to delete
      * @throws ResourceNotFoundException if the session is not found or access is denied
      */
-    @org.springframework.transaction.annotation.Transactional
+    @Transactional
     @Override
-    public void deleteSession(String authorizationHeader, UUID sessionId) {
-        User user = getAuthenticatedUser(authorizationHeader);
+    public void deleteSession(UUID sessionId) {
+        User user = getAuthenticatedUser();
         ChatSession session = chatSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Chat session not found"));
 
         if (!session.getUser().getUserId().equals(user.getUserId())) {
-            throw new ResourceNotFoundException("Access denied to this session");
+            throw new ForbiddenException("Access denied to this session");
         }
 
         // Delete all messages belonging to this session first to prevent foreign key constraint violations
@@ -181,22 +199,21 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
     /**
      * Streams a chat response from the virtual mentor in a specific chat session.
      *
-     * @param authorizationHeader the authorization header containing the user's JWT token
      * @param sessionId the ID of the chat session
      * @param request the request containing the user's message
      * @return a Flux streaming the AI's response content
      * @throws ResourceNotFoundException if the session is not found or access is denied
      */
     @Override
-    public Flux<String> streamChat(String authorizationHeader, UUID sessionId, VirtualMentorChatRequest request) {
+    public Flux<String> streamChat(UUID sessionId, VirtualMentorChatRequest request) {
         // Authenticate user and fetch the targeted chat session
-        User user = getAuthenticatedUser(authorizationHeader);
+        User user = getAuthenticatedUser();
         ChatSession session = chatSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new ResourceNotFoundException("Chat session not found"));
 
         // Ensure the authenticated user owns this chat session
         if (!session.getUser().getUserId().equals(user.getUserId())) {
-            throw new ResourceNotFoundException("Access denied to this session");
+            throw new ForbiddenException("Access denied to this session");
         }
 
         // Save User Message to the database
@@ -235,22 +252,28 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
             }
         }
         
+        // If the user attached a document, read it once and inject its text so the
+        // model answers about the actual content (reliable, and no tool round-trip).
+        String userPrompt = augmentWithAttachment(request.getMessage(), request.getFileUrl());
+
         // We use StringBuffer to accumulate the full response for saving to DB asynchronously
         StringBuffer fullResponse = new StringBuffer();
 
-        return chatClient.prompt()
+        var promptSpec = chatClient.prompt()
                 .messages(messageHistory)
-                .user(request.getMessage())
-                // Configure Vector Store Search request to attach relevant context retrieved from embedding DB
-                .advisors(QuestionAnswerAdvisor.builder(vectorStore)
-                        .searchRequest(SearchRequest.builder().build())
-                        .promptTemplate(new PromptTemplate("\n\n[OPTIONAL RETRIEVED CONTEXT]\n" +
-                        "---------------------\n" +
-                        "{question_answer_context}\n" +
-                        "---------------------\n" +
-                        "If the above context is relevant to the user's question, use it. Otherwise, ignore it and rely completely on the conversation history, the attached PDF (if any), and your own knowledge. DO NOT say you cannot answer just because the context is empty or irrelevant."))
-                        .build())
-                .toolNames("jobMarketTool", "studentProgressTool", "markItDownTool")
+                .user(userPrompt)
+                .toolNames("jobMarketTool", "studentProgressTool", "markItDownTool");
+
+        // Attach vector-store retrieval only when RAG is enabled (embedding +
+        // search add latency; skipping is much faster when knowledge is unused).
+        if (ragEnabled) {
+            promptSpec = promptSpec.advisors(QuestionAnswerAdvisor.builder(vectorStore)
+                    .searchRequest(SearchRequest.builder().build())
+                    .promptTemplate(new PromptTemplate(ragPromptTemplate))
+                    .build());
+        }
+
+        return promptSpec
                 .stream()
                 .content()
                 .doOnNext(fullResponse::append)
@@ -273,36 +296,50 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
      * @param student the student profile associated with the user, if any
      * @return the constructed system prompt string
      */
-    private String buildSystemPrompt(User user, Student student) {
-        StringBuilder prompt = new StringBuilder();
-        prompt.append("You are an expert AI Virtual Career Mentor for the InteliRoadMap platform.\n");
-        prompt.append("Your goal is to provide actionable, encouraging, and highly technical career advice to IT students.\n");
-        prompt.append("User Name: ").append(user.getFullName()).append("\n");
-        
-        if (student != null) {
-            prompt.append("University: ").append(student.getUniversity() != null ? student.getUniversity().getName() : "N/A").append("\n");
-            prompt.append("Major: ").append(student.getMajor() != null ? student.getMajor() : "N/A").append("\n");
-            prompt.append("GitHub Profile: ").append(student.getGithubProfile() != null ? student.getGithubProfile() : "N/A").append("\n");
-            prompt.append("Transcript Info: ").append(student.getTranscriptUrl() != null ? student.getTranscriptUrl() : "N/A").append("\n");
-            // Here we could implement the Retrieval Augmented Generation (RAG) by downloading and parsing 
-            // the transcript URL or fetching GitHub API directly.
+    /**
+     * If a document was attached, read its text via the AI service once and append
+     * it to the user's message so the model can answer about the real content.
+     * Falls back gracefully (keeps the original message) if extraction fails.
+     */
+    private String augmentWithAttachment(String message, String fileUrl) {
+        String base = message == null ? "" : message;
+        if (fileUrl == null || fileUrl.isBlank()) {
+            return base;
         }
-        
-        prompt.append("\nRespond in Markdown format. Keep your answers concise, structured, and helpful. ");
-        prompt.append("If the user asks about something unrelated to IT careers or learning paths, politely redirect them.");
-        return prompt.toString();
+        try {
+            String docText = aiServiceClient.extractMarkdown(fileUrl);
+            if (docText == null || docText.isBlank()) {
+                return base;
+            }
+            if (docText.length() > MAX_ATTACHMENT_CHARS) {
+                docText = docText.substring(0, MAX_ATTACHMENT_CHARS) + "\n...[truncated]";
+            }
+            String lead = base.isBlank() ? "Please review the attached document." : base;
+            return lead + "\n\n[Attached document content — analyze it, but reply in the language of my message above]\n" + docText;
+        } catch (Exception e) {
+            log.warn("VirtualMentorServiceImpl: failed to read attachment {}: {}", fileUrl, e.getMessage());
+            return base.isBlank()
+                    ? "The user attached a document but it could not be read. Ask them to re-upload it."
+                    : base;
+        }
+    }
+
+    private String buildSystemPrompt(User user, Student student) {
+        String university = student != null && student.getUniversity() != null ? student.getUniversity().getName() : "N/A";
+        String major = student != null && student.getMajor() != null ? student.getMajor() : "N/A";
+        String github = student != null && student.getGithubProfile() != null ? student.getGithubProfile() : "N/A";
+        String transcript = student != null && student.getTranscriptUrl() != null ? student.getTranscriptUrl() : "N/A";
+        return String.format(systemPromptTemplate, user.getFullName(), university, major, github, transcript);
     }
 
     /**
-     * Helper method to authenticate and retrieve the user from the authorization header.
+     * Resolves the current user from the security context.
      *
-     * @param authorizationHeader the authorization header containing the JWT token
      * @return the authenticated User
      * @throws ResourceNotFoundException if the user is not found
      */
-    private User getAuthenticatedUser(String authorizationHeader) {
-        String token = BearerTokenUtil.extractToken(authorizationHeader);
-        String email = jwtService.extractEmail(token);
+    private User getAuthenticatedUser() {
+        String email = SecurityUtils.getCurrentUserEmail();
         User user = userRepository.findByEmail(email);
         if (user == null) {
             throw new ResourceNotFoundException("User not found");

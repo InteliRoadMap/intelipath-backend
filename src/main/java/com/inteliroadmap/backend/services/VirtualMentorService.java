@@ -10,15 +10,15 @@ import java.util.UUID;
 
 public interface VirtualMentorService {
 
-    ChatSession createSession(String authorizationHeader, String sessionName) ;
+    ChatSession createSession(String sessionName);
 
-    List<ChatSession> getUserSessions(String authorizationHeader) ;
+    List<ChatSession> getUserSessions();
 
-    List<ChatMessage> getSessionMessages(String authorizationHeader, UUID sessionId) ;
+    List<ChatMessage> getSessionMessages(UUID sessionId);
 
-    ChatSession renameSession(String authorizationHeader, UUID sessionId, String newName) ;
+    ChatSession renameSession(UUID sessionId, String newName);
 
-    void deleteSession(String authorizationHeader, UUID sessionId) ;
+    void deleteSession(UUID sessionId);
 
-    Flux<String> streamChat(String authorizationHeader, UUID sessionId, VirtualMentorChatRequest request) ;
+    Flux<String> streamChat(UUID sessionId, VirtualMentorChatRequest request);
 }

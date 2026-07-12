@@ -16,4 +16,5 @@ public class MentorFeedbackItemResponse {
     private String name;
     private String time;
     private String text;
+    private boolean read;
 }

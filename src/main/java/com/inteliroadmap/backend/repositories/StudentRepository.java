@@ -1,6 +1,6 @@
 package com.inteliroadmap.backend.repositories;
 
-import com.inteliroadmap.backend.domain.dto.response.StudentInfoProjection;
+import com.inteliroadmap.backend.domain.projection.StudentInfoProjection;
 import com.inteliroadmap.backend.domain.entity.CareerRole;
 import com.inteliroadmap.backend.domain.entity.Student;
 import org.springframework.data.domain.Page;

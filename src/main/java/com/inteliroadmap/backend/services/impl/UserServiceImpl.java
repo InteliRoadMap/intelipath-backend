@@ -2,14 +2,15 @@ package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.domain.dto.request.SetupUserProfileRequest;
 import com.inteliroadmap.backend.domain.dto.request.UserRequest;
-import com.inteliroadmap.backend.domain.dto.response.UserResponse;
+import com.inteliroadmap.backend.domain.dto.response.auth.UserResponse;
 import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
+import com.inteliroadmap.backend.exceptions.UnauthorizedException;
 import com.inteliroadmap.backend.mappers.UserMapper;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.services.SupabaseStorageService;
 import com.inteliroadmap.backend.services.UserService;
-import jakarta.transaction.Transactional;
+import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -46,7 +47,7 @@ public class UserServiceImpl implements UserService {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
         if (email == null || email.isBlank()) {
             log.warn("UserServiceImpl: Cannot extract email from security context");
-            throw new ResourceNotFoundException("Cannot extract email from security context");
+            throw new UnauthorizedException("Cannot extract email from security context");
         }
 
         // Retrieve the user entity from the database using the email

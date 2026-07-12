@@ -17,9 +17,14 @@ public interface SkillNodeRepository extends JpaRepository<SkillNode, UUID> {
     List<SkillNode> findByCareerRole_CareerIdOrderByNodeLevelAscNodeNameAsc(UUID careerId);
     List<SkillNode> findBySkill_SkillIdAndCareerRole_CareerId(UUID skillId, UUID careerId);
     boolean existsByParentNode_NodeId(UUID nodeId);
+    List<SkillNode> findByParentNode_NodeId(UUID nodeId);
     boolean existsByPreviousNode_NodeId(UUID nodeId);
 
     @Query("SELECT COUNT(sn) FROM SkillNode sn WHERE sn.careerRole.careerId = :careerId")
     int findTotalNodeOfRoadmap(@Param("careerId") UUID careerId);
+
+    // Number of distinct careers that already have at least one roadmap node.
+    @Query("SELECT COUNT(DISTINCT sn.careerRole.careerId) FROM SkillNode sn")
+    long countDistinctCareersWithNodes();
 
 }

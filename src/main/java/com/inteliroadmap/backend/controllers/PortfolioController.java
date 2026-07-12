@@ -2,7 +2,7 @@ package com.inteliroadmap.backend.controllers;
 
 import com.inteliroadmap.backend.domain.dto.request.PortfolioUpsertRequest;
 import com.inteliroadmap.backend.domain.dto.request.UpdateSlugRequest;
-import com.inteliroadmap.backend.domain.dto.response.PortfolioResponse;
+import com.inteliroadmap.backend.domain.dto.response.portfolio.PortfolioResponse;
 import com.inteliroadmap.backend.services.PortfolioService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;

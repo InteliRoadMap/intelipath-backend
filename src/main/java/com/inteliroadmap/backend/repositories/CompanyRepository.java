@@ -11,6 +11,10 @@ import java.util.List;
 public interface CompanyRepository extends JpaRepository<Company, String> {
     Company findByTopCvCompanyId(String topCvCompanyId);
 
-    @Query("SELECT c FROM Company c LEFT JOIN RecruitmentPost rp ON c.topCvCompanyId = rp.company.topCvCompanyId GROUP BY c ORDER BY COUNT(rp.postId) DESC")
-    List<Company> findTopHiringCompanies(org.springframework.data.domain.Pageable pageable);
+    /**
+     * Top hiring companies with their post count. Returns rows of
+     * [Company, Long postCount], ordered by post count descending.
+     */
+    @Query("SELECT c, COUNT(rp.postId) FROM Company c LEFT JOIN RecruitmentPost rp ON c.topCvCompanyId = rp.company.topCvCompanyId GROUP BY c ORDER BY COUNT(rp.postId) DESC")
+    List<Object[]> findTopHiringCompaniesWithCount(org.springframework.data.domain.Pageable pageable);
 }

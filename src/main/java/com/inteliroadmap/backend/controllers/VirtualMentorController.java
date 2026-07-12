@@ -2,8 +2,8 @@ package com.inteliroadmap.backend.controllers;
 
 import com.inteliroadmap.backend.domain.dto.request.VirtualMentorChatRequest;
 import com.inteliroadmap.backend.domain.dto.request.VirtualMentorSessionRequest;
-import com.inteliroadmap.backend.domain.dto.response.VirtualMentorMessageResponse;
-import com.inteliroadmap.backend.domain.dto.response.VirtualMentorSessionResponse;
+import com.inteliroadmap.backend.domain.dto.response.mentor.VirtualMentorMessageResponse;
+import com.inteliroadmap.backend.domain.dto.response.mentor.VirtualMentorSessionResponse;
 import com.inteliroadmap.backend.domain.entity.ChatMessage;
 import com.inteliroadmap.backend.domain.entity.ChatSession;
 import com.inteliroadmap.backend.services.SupabaseStorageService;
@@ -23,7 +23,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -52,20 +51,18 @@ public class VirtualMentorController {
     @PostMapping("/sessions")
     @Operation(summary = "Create a new chat session")
     public ResponseEntity<VirtualMentorSessionResponse> createSession(
-            @RequestHeader("Authorization") String authorizationHeader,
             @RequestBody(required = false) VirtualMentorSessionRequest request) {
         log.info("VirtualMentorController: Creating new AI chat session");
         String sessionName = (request != null && request.getSessionName() != null) ? request.getSessionName() : "New Chat";
-        ChatSession session = virtualMentorService.createSession(authorizationHeader, sessionName);
+        ChatSession session = virtualMentorService.createSession(sessionName);
         return ResponseEntity.status(HttpStatus.CREATED).body(mapToSessionResponse(session));
     }
 
     @GetMapping("/sessions")
     @Operation(summary = "Get all chat sessions for the authenticated user")
-    public ResponseEntity<List<VirtualMentorSessionResponse>> getSessions(
-            @RequestHeader("Authorization") String authorizationHeader) {
+    public ResponseEntity<List<VirtualMentorSessionResponse>> getSessions() {
         log.info("VirtualMentorController: Fetching chat sessions for user");
-        List<ChatSession> sessions = virtualMentorService.getUserSessions(authorizationHeader);
+        List<ChatSession> sessions = virtualMentorService.getUserSessions();
         List<VirtualMentorSessionResponse> response = sessions.stream()
                 .map(this::mapToSessionResponse)
                 .collect(Collectors.toList());
@@ -75,31 +72,28 @@ public class VirtualMentorController {
     @PutMapping("/sessions/{sessionId}")
     @Operation(summary = "Rename a chat session")
     public ResponseEntity<VirtualMentorSessionResponse> renameSession(
-            @RequestHeader("Authorization") String authorizationHeader,
             @PathVariable UUID sessionId,
             @RequestBody @Valid com.inteliroadmap.backend.domain.dto.request.VirtualMentorRenameSessionRequest request) {
         log.info("VirtualMentorController: Renaming chat session: {}", sessionId);
-        ChatSession updatedSession = virtualMentorService.renameSession(authorizationHeader, sessionId, request.getSessionName());
+        ChatSession updatedSession = virtualMentorService.renameSession(sessionId, request.getSessionName());
         return ResponseEntity.ok(mapToSessionResponse(updatedSession));
     }
 
     @DeleteMapping("/sessions/{sessionId}")
     @Operation(summary = "Delete a chat session and its messages")
     public ResponseEntity<Void> deleteSession(
-            @RequestHeader("Authorization") String authorizationHeader,
             @PathVariable UUID sessionId) {
         log.info("VirtualMentorController: Deleting chat session: {}", sessionId);
-        virtualMentorService.deleteSession(authorizationHeader, sessionId);
+        virtualMentorService.deleteSession(sessionId);
         return ResponseEntity.noContent().build();
     }
 
     @GetMapping("/sessions/{sessionId}/messages")
     @Operation(summary = "Get messages for a specific session")
     public ResponseEntity<List<VirtualMentorMessageResponse>> getSessionMessages(
-            @RequestHeader("Authorization") String authorizationHeader,
             @PathVariable UUID sessionId) {
         log.info("VirtualMentorController: Getting messages for session: {}", sessionId);
-        List<ChatMessage> messages = virtualMentorService.getSessionMessages(authorizationHeader, sessionId);
+        List<ChatMessage> messages = virtualMentorService.getSessionMessages(sessionId);
         return ResponseEntity.ok(messages.stream()
                 .map(this::mapToMessageResponse)
                 .collect(Collectors.toList()));
@@ -108,11 +102,10 @@ public class VirtualMentorController {
     @PostMapping(value = "/sessions/{sessionId}/stream", produces = "text/event-stream;charset=UTF-8")
     @Operation(summary = "Stream chat with AI Virtual Mentor")
     public Flux<String> streamChat(
-            @RequestHeader("Authorization") String authorizationHeader,
             @PathVariable UUID sessionId,
             @Valid @RequestBody VirtualMentorChatRequest request) {
         log.info("VirtualMentorController: Streaming chat for session: {}", sessionId);
-        return virtualMentorService.streamChat(authorizationHeader, sessionId, request);
+        return virtualMentorService.streamChat(sessionId, request);
     }
 
     @PostMapping("/files/upload")

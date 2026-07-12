@@ -1,7 +1,7 @@
 package com.inteliroadmap.backend.mappers;
 
 import com.inteliroadmap.backend.domain.dto.request.PortfolioUpsertRequest;
-import com.inteliroadmap.backend.domain.dto.response.PortfolioResponse;
+import com.inteliroadmap.backend.domain.dto.response.portfolio.PortfolioResponse;
 import com.inteliroadmap.backend.domain.entity.PortfolioConfig;
 import com.inteliroadmap.backend.domain.entity.PortfolioProject;
 import com.inteliroadmap.backend.domain.entity.Skill;
@@ -111,7 +111,7 @@ public class PortfolioMapper {
         }
         return projectRequests.stream().map(p ->
                 PortfolioProject.builder()
-                        .user(com.inteliroadmap.backend.domain.entity.User.builder().userId(user.getUserId()).build())
+                        .user(User.builder().userId(user.getUserId()).build())
                         .projectName(p.getProjectName())
                         .repoUrl(p.getRepoUrl())
                         .demoUrl(p.getDemoUrl())
@@ -129,7 +129,7 @@ public class PortfolioMapper {
         }
         return educationRequests.stream().map(e ->
                 StudentEducation.builder()
-                        .user(com.inteliroadmap.backend.domain.entity.Student.builder().userId(student.getUserId()).build())
+                        .user(Student.builder().userId(student.getUserId()).build())
                         .university(e.getUniversity())
                         .degree(e.getDegree())
                         .period(e.getPeriod())

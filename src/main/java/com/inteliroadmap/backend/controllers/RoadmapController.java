@@ -2,7 +2,6 @@ package com.inteliroadmap.backend.controllers;
 
 import com.inteliroadmap.backend.domain.dto.request.UpdateNodeProgressRequest;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapNodeDto;
-import com.inteliroadmap.backend.domain.dto.response.roadmap.SkillGapResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.StudentRoadmapResponse;
 import com.inteliroadmap.backend.services.RoadmapService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -21,7 +20,6 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -74,9 +72,8 @@ public class RoadmapController {
             @ApiResponse(responseCode = "401", description = "Unauthorized")
     })
     public ResponseEntity<Integer> getCareerProgress(
-            @PathVariable UUID careerId,
-            @RequestHeader("Authorization") String authHeader) {
-        return ResponseEntity.ok(roadmapService.getCareerProgress(careerId, authHeader));
+            @PathVariable UUID careerId) {
+        return ResponseEntity.ok(roadmapService.getCareerProgress(careerId));
     }
 
     @GetMapping("/nodes/{nodeId}")
@@ -109,22 +106,8 @@ public class RoadmapController {
                             schema = @Schema(implementation = UpdateNodeProgressRequest.class)
                     )
             )
-            @Valid @RequestBody UpdateNodeProgressRequest request,
-            @RequestHeader("Authorization") String authHeader) {
-        roadmapService.updateNodeProgress(request, authHeader);
+            @Valid @RequestBody UpdateNodeProgressRequest request) {
+        roadmapService.updateNodeProgress(request);
         return ResponseEntity.ok().build();
-    }
-
-    @PostMapping("/skills/compare")
-    @Operation(summary = "Compare skills", description = "Compare the student's current skills with the skills required by the Career to find Skill Gaps.")
-    @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Successful",
-                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = SkillGapResponse.class))),
-            @ApiResponse(responseCode = "401", description = "Unauthorized"),
-            @ApiResponse(responseCode = "404", description = "Not Found - Student has not selected a Career")
-    })
-    public ResponseEntity<SkillGapResponse> compareSkills(
-            @RequestHeader("Authorization") String authHeader) {
-        return ResponseEntity.ok(roadmapService.compareSkills(authHeader));
     }
 }

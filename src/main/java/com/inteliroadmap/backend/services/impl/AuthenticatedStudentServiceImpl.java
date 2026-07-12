@@ -3,6 +3,7 @@ package com.inteliroadmap.backend.services.impl;
 import com.inteliroadmap.backend.domain.entity.Student;
 import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
+import com.inteliroadmap.backend.exceptions.UnauthorizedException;
 import com.inteliroadmap.backend.repositories.StudentRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.services.AuthenticatedStudentService;
@@ -88,7 +89,7 @@ public class AuthenticatedStudentServiceImpl implements AuthenticatedStudentServ
         Optional<User> userOptional = userRepository.findByEmailForUpdate(email);
         if (userOptional.isEmpty()) {
             log.error("AuthenticatedStudentServiceImpl: User not found from token: {}", email);
-            throw new ResourceNotFoundException("User not found from token");
+            throw new UnauthorizedException("User not found from token");
         }
 
         // Retrieve or lock the associated student profile
@@ -122,7 +123,7 @@ public class AuthenticatedStudentServiceImpl implements AuthenticatedStudentServ
         // Throw an exception if the user record doesn't exist
         if (user == null) {
             log.error("AuthenticatedStudentServiceImpl: User not found from token: {}", email);
-            throw new ResourceNotFoundException("User not found from token");
+            throw new UnauthorizedException("User not found from token");
         }
         return user;
     }
@@ -141,7 +142,7 @@ public class AuthenticatedStudentServiceImpl implements AuthenticatedStudentServ
         // Validate that the authentication information is present and contains the email/username
         if (authentication == null || authentication.getName() == null || authentication.getName().isBlank()) {
             log.error("AuthenticatedStudentServiceImpl: Cannot extract user from security context");
-            throw new ResourceNotFoundException("Cannot extract user from security context");
+            throw new UnauthorizedException("Cannot extract user from security context");
         }
         
         // Return the authenticated username (typically the email)

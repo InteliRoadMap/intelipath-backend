@@ -1,6 +1,6 @@
 package com.inteliroadmap.backend.services.impl;
 
-import com.inteliroadmap.backend.domain.dto.response.CareerResponse;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.CareerResponse;
 import com.inteliroadmap.backend.domain.entity.CareerRole;
 import com.inteliroadmap.backend.domain.entity.SkillNode;
 import com.inteliroadmap.backend.repositories.CareerRoleRepository;

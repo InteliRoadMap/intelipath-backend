@@ -49,7 +49,7 @@ public class PdfToMarkdownServiceImpl implements PdfToMarkdownService {
     private static final String VISION_PROMPT = """
             You are an elite document-to-Markdown converter. Your sole task is to transcribe the content of the provided PDF page image into Markdown with strict formatting and zero external commentary.
             
-            OUTPUT RULES (non-negotiable):
+            OUTPUT RULES (non-negotiable):  
             1. Output raw Markdown only. No code fences (```markdown), no explanations, no preamble.
             2. If the page is blank or completely unreadable, output exactly: <!-- empty page -->
             
@@ -79,10 +79,10 @@ public class PdfToMarkdownServiceImpl implements PdfToMarkdownService {
     /**
      * Constructor for PdfToMarkdownServiceImpl.
      *
-     * @param chatClientBuilder the builder used to construct the {@link ChatClient}
+     * @param chatClient the shared {@link ChatClient}
      */
-    public PdfToMarkdownServiceImpl(ChatClient.Builder chatClientBuilder) {
-        this.chatClient = chatClientBuilder.build();
+    public PdfToMarkdownServiceImpl(ChatClient chatClient) {
+        this.chatClient = chatClient;
     }
 
     /**
