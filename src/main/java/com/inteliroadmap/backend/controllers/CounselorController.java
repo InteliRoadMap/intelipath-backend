@@ -109,13 +109,16 @@ public class CounselorController {
      * @param search an optional search term to filter students
      * @return ResponseEntity containing a CounselorResponse with paginated student info.
      */
-    @GetMapping({"/feedback/students/page={page}/size={size}/search={search}"})
+    @GetMapping("/feedback/students")
     @Operation(summary = "Get students info", description = "Get all students info")
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "Students retrieved successfully", content = @Content(mediaType = "application/json", schema = @Schema(implementation = CounselorResponse.class))),
             @ApiResponse(responseCode = "401", description = "Unauthorized or invalid token")
     })
-    public ResponseEntity<CounselorResponse> getStudentInfos(@PathVariable int page, @PathVariable int size, @PathVariable(required = false) String search) {
+    public ResponseEntity<CounselorResponse> getStudentInfos(
+            @RequestParam(required = false) String search,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
         log.info("CounselorController: Assigned students info retrieval request received");
         return ResponseEntity.ok(counselorService.getStudentInfos(search, page, size));
     }
