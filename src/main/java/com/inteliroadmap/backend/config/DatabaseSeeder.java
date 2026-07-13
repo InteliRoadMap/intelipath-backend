@@ -64,11 +64,11 @@ public class DatabaseSeeder implements CommandLineRunner {
         log.info("DatabaseSeeder: =====================================================");
         log.info("DatabaseSeeder:  CHECKING DATABASE SEED DATA... ");
 
-        importUniversityData();
-        importCareerData();
-        importSkillData();
-        importRoadmapData();
-        importMockUsersData();
+//        importUniversityData();
+//        importCareerData();
+//        importSkillData();
+//        importRoadmapData();
+//        importMockUsersData();
 
         log.info("DatabaseSeeder: =====================================================");
         log.info("DatabaseSeeder:  SEEDING SUMMARY NOTIFICATION ");
@@ -387,7 +387,7 @@ public class DatabaseSeeder implements CommandLineRunner {
             userSt = User.builder().email("mainclone2@gmail.com").build();
         }
         userSt.setFullName("Hau ST");
-        userSt.setYob(LocalDate.now().minusYears(10));
+        userSt.setYob(LocalDate.now().getYear() - 10);
         userSt.setRole(UserRole.STUDENT);
         userSt = userRepository.save(userSt);
 
@@ -396,7 +396,7 @@ public class DatabaseSeeder implements CommandLineRunner {
             st = Student.builder().userId(userSt.getUserId()).build();
         }
         st.setUniversity(uni);
-        st.setUniversityName(uni.getName());
+        st.setUniversityName(uni == null ? "" : uni.getName());
         st.setCareerRole(careerRoleRepository.findByCareerName("Frontend"));
         st.setMajor("Software Engineer");
         studentRepository.save(st);

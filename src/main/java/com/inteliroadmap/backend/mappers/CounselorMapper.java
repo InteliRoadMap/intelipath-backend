@@ -85,8 +85,6 @@ public class CounselorMapper {
                 .build();
     }
 
-
-
     public UpdateProfileResponse toCrudProfileResponse(User user, AcademicCounselor academicCounselor) {
         return UpdateProfileResponse.builder()
                 .user(user)

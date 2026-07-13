@@ -15,7 +15,7 @@ public class MentorProfileResponse {
     private UUID userId;
     private String email;
     private String fullName;
-    private java.time.LocalDate yob;
+    private Integer yob;
     private String bio;
     private String avatar;
     private String role;

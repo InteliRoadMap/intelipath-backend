@@ -39,7 +39,7 @@ CREATE TABLE IF NOT EXISTS users (
     user_id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email           VARCHAR(255) UNIQUE NOT NULL,
     full_name       VARCHAR(255),
-    yob             DATE,
+    yob             INT,
     bio             TEXT,
     avatar_url      TEXT,
     created_at      TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -55,8 +55,8 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE TABLE IF NOT EXISTS students (
     user_id             UUID PRIMARY KEY,
     career_id           UUID,
-    university_id        UUID,
-    university_name      VARCHAR(255),
+    university_id       UUID,
+    university_name     VARCHAR(255),
     year_of_admission   INT,
     major               VARCHAR(255),
     github_profile      VARCHAR(255),
@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS students (
 
 CREATE TABLE IF NOT EXISTS academic_counselor (
     user_id             UUID PRIMARY KEY,
-    university_id        UUID,
+    university_id       UUID,
     department          VARCHAR(255),
     year_of_admission   INT,
     CONSTRAINT fk_ac_user

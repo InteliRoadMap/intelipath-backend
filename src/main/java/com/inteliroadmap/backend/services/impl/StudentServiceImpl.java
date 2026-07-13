@@ -154,7 +154,7 @@ public class StudentServiceImpl implements StudentService {
             userChanged = true;
         }
         if (request.getYob() != null && !request.getYob().trim().isEmpty()) {
-            user.setYob(LocalDate.parse(request.getYob()));
+            user.setYob(Integer.parseInt(request.getYob().trim()));
             userChanged = true;
         }
 
