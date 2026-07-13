@@ -21,10 +21,16 @@ public interface StudentRepository extends JpaRepository<Student, UUID> {
     Student findByUserId(UUID userId);
     List<Student> findByCareerRole(CareerRole career);
 
-    @Query("SELECT s.userId as studentId, u.fullName as fullName, u.email as email, COALESCE(s.universityName, s.university.name) as university, c.careerName as careerName " +
+    @Query(value = "SELECT s.userId as studentId, u.fullName as fullName, u.email as email, COALESCE(s.universityName, s.university.name) as university, c.careerName as careerName " +
            "FROM Student s " +
            "JOIN User u ON s.userId = u.userId " +
            "LEFT JOIN CareerRole c ON s.careerRole.careerId = c.careerId " +
+           "WHERE (LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%'))) " +
+           "AND s.university.universityId = :universityId " +
+           "AND u.role = UserRole.STUDENT",
+           countQuery = "SELECT COUNT(s) " +
+           "FROM Student s " +
+           "JOIN User u ON s.userId = u.userId " +
            "WHERE (LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%'))) " +
            "AND s.university.universityId = :universityId " +
            "AND u.role = UserRole.STUDENT")
