@@ -87,11 +87,11 @@ public class CounselorMapper {
 
 
 
-//    public UpdateProfileResponse toCrudProfileResponse(User user, AcademicCounselor academicCounselor) {
-//        return UpdateProfileResponse.builder()
-//                .user(user)
-//                .academicCounselor(academicCounselor)
-//                .build();
-//    }
+    public UpdateProfileResponse toCrudProfileResponse(User user, AcademicCounselor academicCounselor) {
+        return UpdateProfileResponse.builder()
+                .user(user)
+                .academicCounselor(academicCounselor)
+                .build();
+    }
 
 }

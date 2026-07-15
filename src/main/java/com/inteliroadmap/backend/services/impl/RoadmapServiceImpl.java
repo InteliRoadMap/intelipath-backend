@@ -1,6 +1,8 @@
 package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.components.RoadmapProgressCalculator;
+import com.inteliroadmap.backend.components.RoadmapSelectionResolver;
+import com.inteliroadmap.backend.components.SelectionView;
 import com.inteliroadmap.backend.domain.dto.request.UpdateNodeProgressRequest;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapNodeResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.StudentRoadmapResponse;
@@ -27,6 +29,7 @@ import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.exceptions.ForbiddenException;
 import com.inteliroadmap.backend.security.SecurityUtils;
 import com.inteliroadmap.backend.services.AuthenticatedStudentService;
+import com.inteliroadmap.backend.services.RoadmapSelectionService;
 import com.inteliroadmap.backend.services.RoadmapService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -66,12 +69,17 @@ public class RoadmapServiceImpl implements RoadmapService {
     private final StudentSkillRepository studentSkillRepository;
     private final CareerRequiredSkillRepository careerRequiredSkillRepository;
     private final SkillRepository skillRepository;
+    private final RoadmapSelectionService roadmapSelectionService;
+    private final RoadmapSelectionResolver roadmapSelectionResolver;
 
     private static final String COMPLETED_STATUS = "COMPLETED";
     private static final String FRONTEND_COMPLETED_STATUS = "completed";
     private static final String FRONTEND_IN_PROGRESS_STATUS = "in_progress";
     private static final String FRONTEND_CURRENT_STATUS = "current";
     private static final String FRONTEND_LOCKED_STATUS = "locked";
+    // An alternative in a CHOOSE_ONE group the student did not pick: shown greyed
+    // out, not part of the active path, and not counted toward progress.
+    private static final String FRONTEND_ALTERNATIVE_STATUS = "alternative";
     private final AuthenticatedStudentService authenticatedStudentService;
 
     /**
@@ -119,6 +127,15 @@ public class RoadmapServiceImpl implements RoadmapService {
                     .build();
         }
 
+        // Seed any obvious CHOOSE_ONE picks from the student's skill profile before
+        // reading the roadmap, so a Java student sees Java pre-selected on first load.
+        // Runs in its own transaction; a failure here must not break the read.
+        try {
+            roadmapSelectionService.autoDefaultSelections();
+        } catch (RuntimeException e) {
+            log.warn("RoadmapServiceImpl: auto-default selections skipped: {}", e.getMessage());
+        }
+
         // Look up the career role and associated skill nodes
         CareerRole careerRole = careerRoleRepository.findByCareerId(student.getCareerRole().getCareerId());
         List<SkillNode> nodes = skillNodeRepository
@@ -140,9 +157,13 @@ public class RoadmapServiceImpl implements RoadmapService {
                 )
         );
 
-        // Compute frontend statuses (e.g., locked, current, completed) and overall progress
-        Map<UUID, String> statusByNodeId = buildFrontendStatusMap(nodes, progressByNodeId);
-        int progress = calculateProgress(nodes, progressByNodeId);
+        // Resolve the student's CHOOSE_ONE picks: which alternatives are off-path.
+        SelectionView selectionView = roadmapSelectionResolver.resolve(student.getUserId(), nodes);
+
+        // Compute frontend statuses (e.g., locked, current, completed) and overall progress.
+        // Progress counts the active path only, so picking a language never dilutes the %.
+        Map<UUID, String> statusByNodeId = buildFrontendStatusMap(nodes, progressByNodeId, selectionView);
+        int progress = calculateProgress(selectionView.activePathNodes(nodes), progressByNodeId);
 
         // Build the hierarchical roadmap tree
         return StudentRoadmapResponse.builder()
@@ -204,9 +225,10 @@ public class RoadmapServiceImpl implements RoadmapService {
                         nodeIds
                 );
 
-        // Delegate to the shared weight-based calculator so this endpoint reports the
-        // same percentage as /roadmaps/student and the dashboard (single source of truth).
-        return roadmapProgressCalculator.calculateProgress(nodes, progressList);
+        // Count only the student's active path (chosen alternatives), matching
+        // /roadmaps/student. Delegate to the shared calculator (single source of truth).
+        SelectionView selectionView = roadmapSelectionResolver.resolve(student.getUserId(), nodes);
+        return roadmapProgressCalculator.calculateProgress(selectionView.activePathNodes(nodes), progressList);
     }
 
     /**
@@ -242,6 +264,21 @@ public class RoadmapServiceImpl implements RoadmapService {
         }
 
         SkillNode node = nodeOptional.get();
+
+        // Resolve the student's CHOOSE_ONE picks over this career once; used both to
+        // block writes on off-path nodes and to gate topic auto-completion below.
+        List<SkillNode> careerNodes = (node.getCareerRole() != null && node.getCareerRole().getCareerId() != null)
+                ? skillNodeRepository.findByCareerRole_CareerIdOrderByNodeLevelAscNodeNameAsc(node.getCareerRole().getCareerId())
+                : List.of();
+        SelectionView selectionView = roadmapSelectionResolver.resolve(student.getUserId(), careerNodes);
+
+        // An alternative the student has not chosen (or any alternative while the
+        // CHOOSE_ONE group is still undecided) is off the active path: the student
+        // must pick it first before tracking progress on it.
+        if (selectionView.isExcludedFromProgress(node.getNodeId())) {
+            throw new ForbiddenException("Select this alternative for your roadmap before tracking progress on it.");
+        }
+
         Optional<StudentProgress> progressOptional =
                 studentProgressRepository.findByStudent_UserIdAndSkillNode_NodeId(student.getUserId(), node.getNodeId());
 
@@ -267,14 +304,12 @@ public class RoadmapServiceImpl implements RoadmapService {
         // locked (prerequisite/stage/parent not satisfied) cannot be advanced. This keeps
         // the write path from completing nodes out of order and feeding bad auto-completion.
         if ((newStatus == RoadmapStepStatus.IN_PROGRESS || newStatus == RoadmapStepStatus.COMPLETED)
-                && node.getCareerRole() != null && node.getCareerRole().getCareerId() != null) {
-            List<SkillNode> careerNodes = skillNodeRepository
-                    .findByCareerRole_CareerIdOrderByNodeLevelAscNodeNameAsc(node.getCareerRole().getCareerId());
+                && !careerNodes.isEmpty()) {
             Map<UUID, StudentProgress> progressByNode = mapProgressByNodeId(
                     studentProgressRepository.findByStudent_UserIdAndSkillNode_NodeIdIn(
                             student.getUserId(),
                             careerNodes.stream().map(SkillNode::getNodeId).toList()));
-            String computedStatus = buildFrontendStatusMap(careerNodes, progressByNode).get(node.getNodeId());
+            String computedStatus = buildFrontendStatusMap(careerNodes, progressByNode, selectionView).get(node.getNodeId());
             if (FRONTEND_LOCKED_STATUS.equals(computedStatus)) {
                 throw new ForbiddenException("This node is locked; complete its prerequisites first.");
             }
@@ -327,7 +362,7 @@ public class RoadmapServiceImpl implements RoadmapService {
 
         // A topic (spine) node auto-completes from its children, so whenever a child's
         // status changes, re-evaluate every ancestor topic and complete/revert it.
-        syncTopicAutoCompletion(student, node);
+        syncTopicAutoCompletion(student, node, selectionView);
     }
 
     /**
@@ -336,7 +371,7 @@ public class RoadmapServiceImpl implements RoadmapService {
      * its child weight crosses {@link #parentCompletionThreshold}, and reverted back to
      * IN_PROGRESS if a child is later un-completed and drags it below the threshold.
      */
-    private void syncTopicAutoCompletion(Student student, SkillNode changedNode) {
+    private void syncTopicAutoCompletion(Student student, SkillNode changedNode, SelectionView selectionView) {
         SkillNode topic = changedNode.getParentNode();
         while (topic != null) {
             final SkillNode currentTopic = topic;
@@ -344,6 +379,11 @@ public class RoadmapServiceImpl implements RoadmapService {
             long totalWeight = 0;
             long doneWeight = 0;
             for (SkillNode child : children) {
+                // Off-path alternatives never count toward a topic's completion, so
+                // e.g. "Pick a Language" completes from the single chosen language.
+                if (selectionView.isExcludedFromProgress(child.getNodeId())) {
+                    continue;
+                }
                 int weight = nodeWeight(child);
                 totalWeight += weight;
                 StudentProgress childProgress = studentProgressRepository
@@ -458,7 +498,8 @@ public class RoadmapServiceImpl implements RoadmapService {
 
     private Map<UUID, String> buildFrontendStatusMap(
             List<SkillNode> nodes,
-            Map<UUID, StudentProgress> progressByNodeId
+            Map<UUID, StudentProgress> progressByNodeId,
+            SelectionView selectionView
     ) {
         Map<UUID, String> statusByNodeId = new HashMap<>();
         Set<String> passedStages = findPassedStages(nodes, progressByNodeId);
@@ -468,6 +509,13 @@ public class RoadmapServiceImpl implements RoadmapService {
         // Parents/previous nodes must be classified before their dependants,
         // regardless of the level/name order the nodes were fetched in.
         for (SkillNode node : orderDependenciesFirst(nodes)) {
+            // Unchosen alternative of a decided CHOOSE_ONE group (and its subtree):
+            // greyed out, off the active path — bypass the normal gating rules.
+            if (selectionView.isGreyedAlternative(node.getNodeId())) {
+                statusByNodeId.put(node.getNodeId(), FRONTEND_ALTERNATIVE_STATUS);
+                continue;
+            }
+
             StudentProgress progress = progressByNodeId.get(node.getNodeId());
             if (progress != null && RoadmapStepStatus.COMPLETED == progress.getStatus()) {
                 statusByNodeId.put(node.getNodeId(), FRONTEND_COMPLETED_STATUS);
@@ -487,7 +535,7 @@ public class RoadmapServiceImpl implements RoadmapService {
                         || isSequentialGateLocked(node.getPreviousNode(), statusByNodeId);
                 if (gateLocked) {
                     statusByNodeId.put(node.getNodeId(), FRONTEND_LOCKED_STATUS);
-                } else if (childCompletionRatio(node, childrenByParent, progressByNodeId) >= parentCompletionThreshold) {
+                } else if (childCompletionRatio(node, childrenByParent, progressByNodeId, selectionView) >= parentCompletionThreshold) {
                     statusByNodeId.put(node.getNodeId(), FRONTEND_COMPLETED_STATUS);
                 } else {
                     statusByNodeId.put(node.getNodeId(), FRONTEND_CURRENT_STATUS);
@@ -523,16 +571,25 @@ public class RoadmapServiceImpl implements RoadmapService {
                 .collect(Collectors.groupingBy(n -> n.getParentNode().getNodeId()));
     }
 
-    /** Completed-child weight over total-child weight for a topic (0.0 when it has no children). */
+    /**
+     * Completed-child weight over total-child weight for a topic (0.0 when it has no
+     * counted children). Children off the active path (unchosen alternatives, or all
+     * alternatives while a CHOOSE_ONE group is undecided) are excluded from both sides,
+     * so e.g. "Pick a Language" completes once the single chosen language is done.
+     */
     private double childCompletionRatio(
             SkillNode topic,
             Map<UUID, List<SkillNode>> childrenByParent,
-            Map<UUID, StudentProgress> progressByNodeId
+            Map<UUID, StudentProgress> progressByNodeId,
+            SelectionView selectionView
     ) {
         List<SkillNode> children = childrenByParent.getOrDefault(topic.getNodeId(), List.of());
         long totalWeight = 0;
         long doneWeight = 0;
         for (SkillNode child : children) {
+            if (selectionView.isExcludedFromProgress(child.getNodeId())) {
+                continue;
+            }
             int weight = nodeWeight(child);
             totalWeight += weight;
             StudentProgress p = progressByNodeId.get(child.getNodeId());
@@ -697,6 +754,10 @@ public class RoadmapServiceImpl implements RoadmapService {
                             .map(c -> progressByNodeId.get(c.getNodeId()))
                             .filter(p -> p != null && RoadmapStepStatus.COMPLETED == p.getStatus())
                             .count();
+                    StudentProgress nodeProgress = progressByNodeId.get(node.getNodeId());
+                    String completedAt = nodeProgress != null && nodeProgress.getCompletedAt() != null
+                            ? nodeProgress.getCompletedAt().toString()
+                            : null;
                     return RoadmapNodeResponse.builder()
                             .nodeId(node.getNodeId())
                             .nodeName(node.getNodeName())
@@ -711,6 +772,12 @@ public class RoadmapServiceImpl implements RoadmapService {
                             .parentTopic(isTopic)
                             .childTotal(children.size())
                             .childCompleted(childCompleted)
+                            .selection(node.getSelection())
+                            .chooseCount(node.getChooseCount())
+                            .nodeKind(node.getNodeKind())
+                            .axis(node.getAxis())
+                            .isOptional(node.getIsOptional())
+                            .isCheckpoint(node.getIsCheckpoint())
                             .positionX(layout != null ? layout.getPositionX() : null)
                             .positionY(layout != null ? layout.getPositionY() : null)
                             .lane(layout != null ? layout.getLane() : null)
@@ -718,6 +785,7 @@ public class RoadmapServiceImpl implements RoadmapService {
                             .description(node.getDescription())
                             .resource(node.getResource())
                             .status(statusByNodeId.getOrDefault(node.getNodeId(), FRONTEND_LOCKED_STATUS))
+                            .completedAt(completedAt)
                             .build();
                 })
                 .toList();

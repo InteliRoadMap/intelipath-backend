@@ -53,10 +53,16 @@ public class DatabaseSeeder implements CommandLineRunner {
     private final NodeTypeRepository nodeTypeRepository;
     private final UniversityRepository universityRepository;
 
-    private static final String ROADMAP_TEMPLATE = "data/RoadmapDataTemplate.csv";
-    private static final String SKILL_TEMPLATE = "data/SkillDataTemplate.csv";
-    private static final String CAREER_TEMPLATE = "data/CareerDataTemplate.csv";
-    private static final String UNIVERSITY_TEMPLATE = "data/VNUniversityDataTemplate.csv";
+    // v2 seed data: id-based tree + selection semantics (see intelipath-service/scripts/migrate_roadmap.py).
+    private static final String ROADMAP_TEMPLATE = "data/v2/roadmap_nodes.csv";
+    private static final String SKILL_TEMPLATE = "data/v2/skills.csv";
+    private static final String CAREER_TEMPLATE = "data/v2/careers.csv";
+    private static final String UNIVERSITY_TEMPLATE = "data/vietnam_universities_en.csv";
+
+    // Resolves a roadmap row's career_id slug (e.g. "backend") to the persisted
+    // CareerRole. Populated by importCareerData, consumed by importSkillData and
+    // importRoadmapData.
+    private final Map<String, CareerRole> careerBySlug = new HashMap<>();
 
     @Override
     @Transactional
@@ -126,43 +132,60 @@ public class DatabaseSeeder implements CommandLineRunner {
         }
 
         log.info("DatabaseSeeder: Starting CSV Import for Career Roles...");
+        // v2 careers.csv columns: career_id (slug), name, prerequisites (name list), description.
+        // Prerequisites reference other careers by name, so upsert every career first
+        // (pass 1) and only then wire up the prerequisite links (pass 2).
+        List<String[]> rows = new ArrayList<>();
         try (CSVReader reader = new CSVReader(new FileReader(careerDataFile))) {
             String[] line;
             int rowNum = 0;
-
             while ((line = reader.readNext()) != null) {
                 rowNum++;
-                // Skip the header row
-                if (rowNum <= 1) continue;
-                if (line.length < 1) continue;
-
-                String careerName = line[0];
-                String prerequisite = line.length > 1 ? line[1] : "";
-                String description = line.length > 2 ? line[2] : "";
-
-                List<CareerRole> prerequisites = new ArrayList<>();
-                String[] roles = prerequisite.split(",");
-                for (String role : roles) {
-                    prerequisites.add(careerRoleRepository.findByCareerName(role.trim()));
-                }
-
-                CareerRole careerRole = careerRoleRepository.findByCareerName(careerName);
-                if (careerRole == null) {
-                    careerRole = CareerRole.builder()
-                            .careerName(careerName)
-                            .prerequisite(prerequisites)
-                            .description(description)
-                            .build();
-                } else {
-                    careerRole.setPrerequisite(prerequisites);
-                    careerRole.setDescription(description);
-                }
-                careerRoleRepository.save(careerRole);
+                if (rowNum <= 1) continue; // header
+                if (line.length < 2) continue;
+                rows.add(line);
             }
-            log.info("DatabaseSeeder: CareerDataTemplate.csv data imported successfully.");
         } catch (Exception e) {
-            log.error("DatabaseSeeder: Error occurred while importing CareerDataTemplate.csv", e);
+            log.error("DatabaseSeeder: Error occurred while reading {}", CAREER_TEMPLATE, e);
+            return;
         }
+
+        // Pass 1: upsert careers and index them by slug for later imports.
+        for (String[] line : rows) {
+            String slug = line[0].trim();
+            String careerName = line[1].trim();
+            String description = line.length > 3 ? line[3] : "";
+
+            CareerRole careerRole = careerRoleRepository.findByCareerName(careerName);
+            if (careerRole == null) {
+                careerRole = CareerRole.builder()
+                        .careerName(careerName)
+                        .description(description)
+                        .build();
+            } else {
+                careerRole.setDescription(description);
+            }
+            careerRole = careerRoleRepository.save(careerRole);
+            careerBySlug.put(slug, careerRole);
+        }
+
+        // Pass 2: resolve prerequisite career names now that all careers exist.
+        for (String[] line : rows) {
+            String prerequisite = line.length > 2 ? line[2] : "";
+            if (prerequisite.isBlank()) continue;
+
+            CareerRole careerRole = careerRoleRepository.findByCareerName(line[1].trim());
+            if (careerRole == null) continue;
+
+            List<CareerRole> prerequisites = new ArrayList<>();
+            for (String role : prerequisite.split(",")) {
+                CareerRole prereq = careerRoleRepository.findByCareerName(role.trim());
+                if (prereq != null) prerequisites.add(prereq);
+            }
+            careerRole.setPrerequisite(prerequisites);
+            careerRoleRepository.save(careerRole);
+        }
+        log.info("DatabaseSeeder: careers.csv data imported successfully ({} careers).", careerBySlug.size());
     }
 
     private void importSkillData() {
@@ -174,71 +197,88 @@ public class DatabaseSeeder implements CommandLineRunner {
         }
 
         log.info("DatabaseSeeder: Starting CSV Import for Skill...");
+        // v2 skills.csv columns: name, career_id (slug), importance. One row per
+        // (skill, career): a skill shared by two careers appears twice. Keep a single
+        // Skill entity per name and accumulate its careers across rows.
         try (CSVReader reader = new CSVReader(new FileReader(skillDataFile))) {
             String[] line;
             int rowNum = 0;
 
             while ((line = reader.readNext()) != null) {
                 rowNum++;
-                // Skip the header rows
+                // Skip the header row
                 if (rowNum <= 1) continue;
-                if (line.length < 4) continue;
+                if (line.length < 3) continue;
 
-                String category = line[0];
-                String careerRequired = line[1];
-                String skillName = line[2];
-                String importanceLevel = line[3];
+                String skillName = line[0].trim();
+                String careerSlug = line[1].trim();
+                String importanceLevel = line[2].trim();
+                if (skillName.isEmpty()) continue;
 
-                List<CareerRole> required = new ArrayList<>();
-                String[] careers = careerRequired.split(",");
-                for(String career: careers) {
-                    required.add(careerRoleRepository.findByCareerName(career.trim()));
+                CareerRole role = careerBySlug.get(careerSlug);
+                if (role == null) {
+                    log.warn("DatabaseSeeder: Unknown career slug '{}' for skill '{}'. Skipping.", careerSlug, skillName);
+                    continue;
                 }
 
                 Skill skill = skillRepository.findBySkillName(skillName);
                 if (skill == null) {
                     skill = Skill.builder()
-                            .category(category)
-                            .careers(required)
                             .skillName(skillName)
+                            .careers(new ArrayList<>(List.of(role)))
                             .build();
-                } else {
-                    skill.setCategory(category);
-                    skill.setCareers(required);
+                } else if (skill.getCareers() == null || skill.getCareers().stream()
+                        .noneMatch(c -> c.getCareerId().equals(role.getCareerId()))) {
+                    List<CareerRole> careers = skill.getCareers() != null
+                            ? new ArrayList<>(skill.getCareers()) : new ArrayList<>();
+                    careers.add(role);
+                    skill.setCareers(careers);
                 }
                 skill = skillRepository.save(skill);
 
-                for(String career: careers) {
-                    CareerRole role = careerRoleRepository.findByCareerName(career.trim());
-                    if (role != null) {
-                        // Skip mappings that already exist so re-running the seeder
-                        // (every app restart) does not violate uq_career_skill.
-                        boolean mappingExists = careerRequiredSkillRepository
-                                .existsByCareerRole_CareerIdAndSkill_SkillId(role.getCareerId(), skill.getSkillId());
-                        if (mappingExists) continue;
+                // Skip mappings that already exist so re-running the seeder
+                // (every app restart) does not violate uq_career_skill.
+                boolean mappingExists = careerRequiredSkillRepository
+                        .existsByCareerRole_CareerIdAndSkill_SkillId(role.getCareerId(), skill.getSkillId());
+                if (mappingExists) continue;
 
-                        CareerRequiredSkill careerRequiredSkill = CareerRequiredSkill.builder()
-                                .careerRole(role)
-                                .skill(skill)
-                                .importanceLevel(ImportanceLevel.valueOf(importanceLevel.toUpperCase()))
-                                .build();
-                        careerRequiredSkillRepository.save(careerRequiredSkill);
-                    } else {
-                        log.warn("DatabaseSeeder: Career role '{}' not found for skill '{}'. Skipping required skill mapping.", career, skillName);
-                    }
-                }
+                careerRequiredSkillRepository.save(CareerRequiredSkill.builder()
+                        .careerRole(role)
+                        .skill(skill)
+                        .importanceLevel(parseImportance(importanceLevel))
+                        .build());
             }
-            log.info("DatabaseSeeder: SkillDataTemplate.csv data imported successfully.");
+            log.info("DatabaseSeeder: skills.csv data imported successfully.");
         } catch (Exception e) {
-            log.error("DatabaseSeeder: Error occurred while importing SkillDataTemplate.csv", e);
+            log.error("DatabaseSeeder: Error occurred while importing {}", SKILL_TEMPLATE, e);
         }
     }
+
+    /** Maps a CSV importance token (HIGH/AVG/LOW) to the enum, defaulting to AVG. */
+    private ImportanceLevel parseImportance(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return ImportanceLevel.AVG;
+        }
+        try {
+            return ImportanceLevel.valueOf(raw.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return ImportanceLevel.AVG;
+        }
+    }
+
+    // v2 roadmap_nodes.csv column indices.
+    private static final int R_NODE_ID = 0, R_CAREER_ID = 1, R_SKILL_GROUP = 2, R_NAME = 3,
+            R_NODE_LEVEL = 4, R_STAGE = 5, R_AXIS = 6, R_NODE_KIND = 7, R_IS_OPTIONAL = 8,
+            R_IS_CHECKPOINT = 9, R_SELECTION = 10, R_CHOOSE_COUNT = 11, R_WEIGHT = 12,
+            R_COMPLETION_POLICY = 13, R_REQUIRED_PROFICIENCY = 14, R_EVIDENCE_KEYWORDS = 15,
+            R_PARENT_ID = 16, R_PREVIOUS_ID = 17, R_DESCRIPTION = 18, R_LINK1 = 19, R_LINK2 = 20,
+            R_LINK3 = 21;
 
     private void importRoadmapData() {
         // ----------------------------- IMPORT ROADMAP DATA ---------------------------- //
         File roadmapDataFile = new File(ROADMAP_TEMPLATE);
         if (!roadmapDataFile.exists()) {
-            log.warn("DatabaseSeeder: RoadmapDataTemplate.csv not found. Skipping import.");
+            log.warn("DatabaseSeeder: {} not found. Skipping roadmap import.", ROADMAP_TEMPLATE);
             return;
         }
 
@@ -246,7 +286,7 @@ public class DatabaseSeeder implements CommandLineRunner {
         // its node tree. Seed per-career: skip any career that already has nodes,
         // but still import careers whose roadmap hasn't been seeded yet (e.g. adding
         // Backend/Full Stack after Frontend already exists).
-        java.util.Set<java.util.UUID> careersAlreadySeeded = new java.util.HashSet<>();
+        Set<UUID> careersAlreadySeeded = new HashSet<>();
         for (SkillNode existing : skillNodeRepository.findAll()) {
             if (existing.getCareerRole() != null && existing.getCareerRole().getCareerId() != null) {
                 careersAlreadySeeded.add(existing.getCareerRole().getCareerId());
@@ -254,97 +294,143 @@ public class DatabaseSeeder implements CommandLineRunner {
         }
 
         log.info("DatabaseSeeder: Starting CSV Import for Roadmap Nodes...");
+        ObjectMapper mapper = new ObjectMapper();
         try (CSVReader reader = new CSVReader(new FileReader(roadmapDataFile))) {
+            // v2 refs are stable slug ids (parent_id/previous_id), which may point
+            // forward in the file. Import in two passes: create every node first
+            // (indexed by its slug), then wire up parent/previous edges.
+            Map<String, SkillNode> nodesBySlug = new HashMap<>();
+            List<String[]> edgeRows = new ArrayList<>();
+
             String[] line;
             int rowNum = 0;
-
-            // Node names repeat across stages (e.g. "React" under CORE and again under
-            // ADVANCED), so a DB lookup by name is ambiguous. Resolve previous/parent
-            // references against the most recently imported node with that name instead.
-            Map<String, SkillNode> importedNodesByName = new HashMap<>();
-
             while ((line = reader.readNext()) != null) {
                 rowNum++;
-                // Skip the header row
-                if (rowNum <= 1) continue;
-                if (line.length < 13) continue;
+                if (rowNum <= 1) continue; // header
+                if (line.length <= R_PREVIOUS_ID) continue;
 
-                String careerName = line[0];
-                CareerRole career = careerRoleRepository.findByCareerName(careerName);
-                // Skip import Roadmap nodes for non-existing career
+                String nodeSlug = cell(line, R_NODE_ID);
+                if (nodeSlug.isEmpty()) continue;
+
+                CareerRole career = careerBySlug.get(cell(line, R_CAREER_ID));
                 if (career == null) continue;
-                // Skip careers that were already seeded in a previous run.
                 if (careersAlreadySeeded.contains(career.getCareerId())) continue;
 
-                String skillName = line[1];
-                String stageName = line[2];
-                String unlockKey = line[3];
-                int weight = (line[4] == null || line[4].isEmpty()) ? 0 : Integer.parseInt(line[4]);
-                String completionPolicy = line[5];
-                int reqProficiency = (line[6] == null || line[6].isEmpty()) ? 0 : Integer.parseInt(line[6]);
-                String keywords = line[7];
-                String previousNodeName = line[8];
-                String parentNodeName = line[9];
-                String nodeName = line[10];
-                int nodeLevel = (line[11] == null || line[11].isEmpty()) ? 0 : Integer.parseInt(line[11]);
-                String description = line[12];
-                String link1 = line.length > 13 ? line[13] : "";
-                String link2 = line.length > 14 ? line[14] : "";
-                String link3 = line.length > 15 ? line[15] : "";
-
-                ObjectMapper mapper = new ObjectMapper();
                 ArrayNode links = mapper.createArrayNode();
-                if (!link1.isEmpty()) links.add(link1);
-                if (!link2.isEmpty()) links.add(link2);
-                if (!link3.isEmpty()) links.add(link3);
-
-                List<String> stageUnlockKey = new ArrayList<>();
-                boolean requiredKey = false;
-                if (!unlockKey.isEmpty()) {
-                    requiredKey = true;
-                    String[] keys = unlockKey.split(",");
-                    for (String key : keys) stageUnlockKey.add(key.trim());
+                for (int idx : new int[]{R_LINK1, R_LINK2, R_LINK3}) {
+                    String link = cell(line, idx);
+                    if (!link.isEmpty()) links.add(link);
                 }
 
                 ArrayNode evidenceKeywords = mapper.createArrayNode();
+                String keywords = cell(line, R_EVIDENCE_KEYWORDS);
                 if (!keywords.isEmpty()) {
-                    String [] keys = keywords.split(",");
-                    for (String key : keys) evidenceKeywords.add(key.trim());
+                    for (String key : keywords.split(",")) {
+                        String trimmed = key.trim();
+                        if (!trimmed.isEmpty()) evidenceKeywords.add(trimmed);
+                    }
                 }
 
-                Skill skill = !skillName.isEmpty() ? skillRepository.findBySkillName(skillName) : null;
+                String skillName = cell(line, R_SKILL_GROUP);
+                Skill skill = skillName.isEmpty() ? null : skillRepository.findBySkillName(skillName);
 
-                SkillNode previousNode = importedNodesByName.get(previousNodeName.trim());
-                SkillNode parentNode = importedNodesByName.get(parentNodeName.trim());
+                // Stage/weight still live on NodeType. The v2 schema no longer carries
+                // stage-unlock keys, so gating is driven purely by parent/previous edges.
+                NodeType nodeType = nodeTypeRepository.save(NodeType.builder()
+                        .stage(parseStage(cell(line, R_STAGE)))
+                        .unlockKeyRequired(false)
+                        .stageUnlockKey(new ArrayList<>())
+                        .weight(parseInt(cell(line, R_WEIGHT), 0))
+                        .build());
 
-                NodeType nodeType = NodeType.builder()
-                        .stage(StageType.valueOf(stageName.toUpperCase()))
-                        .unlockKeyRequired(requiredKey)
-                        .stageUnlockKey(stageUnlockKey)
-                        .weight(weight)
-                        .build();
-                nodeType = nodeTypeRepository.save(nodeType);
-
-                SkillNode skillNode = SkillNode.builder()
+                SkillNode skillNode = skillNodeRepository.save(SkillNode.builder()
                         .careerRole(career)
                         .skill(skill)
                         .type(nodeType)
-                        .previousNode(previousNode)
-                        .parentNode(parentNode)
-                        .nodeName(nodeName)
-                        .nodeLevel(nodeLevel)
-                        .description(description)
+                        .nodeName(cell(line, R_NAME))
+                        .nodeLevel(parseInt(cell(line, R_NODE_LEVEL), 0))
+                        .description(cell(line, R_DESCRIPTION))
                         .resource(links)
-                        .completionPolicy(completionPolicy)
-                        .requiredProficiency(reqProficiency)
+                        .completionPolicy(blankToNull(cell(line, R_COMPLETION_POLICY)))
+                        .requiredProficiency(parseInt(cell(line, R_REQUIRED_PROFICIENCY), 0))
                         .evidenceKeywords(evidenceKeywords)
-                        .build();
-                skillNode = skillNodeRepository.save(skillNode);
-                importedNodesByName.put(nodeName.trim(), skillNode);
+                        .selection(defaultTo(cell(line, R_SELECTION), "ALL"))
+                        .chooseCount(parseNullableInt(cell(line, R_CHOOSE_COUNT)))
+                        .nodeKind(defaultTo(cell(line, R_NODE_KIND), "CORE"))
+                        .axis(defaultTo(cell(line, R_AXIS), "MAIN"))
+                        .isOptional(parseBool(cell(line, R_IS_OPTIONAL)))
+                        .isCheckpoint(parseBool(cell(line, R_IS_CHECKPOINT)))
+                        .build());
+
+                nodesBySlug.put(nodeSlug, skillNode);
+                edgeRows.add(line);
             }
-            log.info("DatabaseSeeder: CSV Import for Roadmap completed successfully.");
+
+            // Pass 2: resolve parent/previous slug references to persisted nodes.
+            for (String[] row : edgeRows) {
+                SkillNode node = nodesBySlug.get(cell(row, R_NODE_ID));
+                if (node == null) continue;
+                SkillNode parent = nodesBySlug.get(cell(row, R_PARENT_ID));
+                SkillNode previous = nodesBySlug.get(cell(row, R_PREVIOUS_ID));
+                if (parent == null && previous == null) continue;
+                node.setParentNode(parent);
+                node.setPreviousNode(previous);
+                skillNodeRepository.save(node);
+            }
+
+            log.info("DatabaseSeeder: roadmap_nodes.csv import completed successfully ({} nodes).", nodesBySlug.size());
         } catch (Exception e) {
-            log.error("DatabaseSeeder: Error occurred while importing CSV of Roadmap", e);
+            log.error("DatabaseSeeder: Error occurred while importing {}", ROADMAP_TEMPLATE, e);
+        }
+    }
+
+    /** Safe cell accessor: trimmed value or "" when the column is missing/null. */
+    private String cell(String[] row, int index) {
+        if (row == null || index >= row.length || row[index] == null) {
+            return "";
+        }
+        return row[index].trim();
+    }
+
+    private String blankToNull(String value) {
+        return (value == null || value.isBlank()) ? null : value;
+    }
+
+    private String defaultTo(String value, String fallback) {
+        return (value == null || value.isBlank()) ? fallback : value;
+    }
+
+    private int parseInt(String value, int fallback) {
+        try {
+            return (value == null || value.isBlank()) ? fallback : Integer.parseInt(value.trim());
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
+    }
+
+    private Integer parseNullableInt(String value) {
+        try {
+            return (value == null || value.isBlank()) ? null : Integer.parseInt(value.trim());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    /** CSV holds "true"/"false"/"" for boolean flags; empty means false. */
+    private boolean parseBool(String value) {
+        return "true".equalsIgnoreCase(value) || "1".equals(value);
+    }
+
+    /** Parses a stage token to StageType, defaulting to FOUNDATION on unknown/empty. */
+    private StageType parseStage(String value) {
+        if (value == null || value.isBlank()) {
+            return StageType.FOUNDATION;
+        }
+        try {
+            return StageType.valueOf(value.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            log.warn("DatabaseSeeder: Unknown stage '{}', defaulting to FOUNDATION.", value);
+            return StageType.FOUNDATION;
         }
     }
 

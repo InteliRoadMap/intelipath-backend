@@ -130,10 +130,22 @@ CREATE TABLE IF NOT EXISTS skill_nodes (
     description          TEXT,
     resource             JSONB,
     completion_policy    VARCHAR(50) DEFAULT 'NEVER_COMPLETE',
+    selection            VARCHAR(20) DEFAULT 'ALL',
+    choose_count         INT,
+    node_kind            VARCHAR(20) DEFAULT 'CORE',
+    axis                 VARCHAR(20) DEFAULT 'MAIN',
+    is_optional          BOOLEAN DEFAULT FALSE,
+    is_checkpoint        BOOLEAN DEFAULT FALSE,
     required_proficiency INT,
     evidence_keywords    JSONB,
     CONSTRAINT ck_skill_nodes_completion_policy
         CHECK (completion_policy IS NULL OR completion_policy IN ('NEVER_COMPLETE', 'MANUAL_ONLY', 'EVIDENCE_ALLOWED')),
+    CONSTRAINT ck_skill_nodes_selection
+        CHECK (selection IS NULL OR selection IN ('ALL', 'CHOOSE_ONE')),
+    CONSTRAINT ck_skill_nodes_node_kind
+        CHECK (node_kind IS NULL OR node_kind IN ('CORE', 'ALTERNATIVE', 'OPTIONAL')),
+    CONSTRAINT ck_skill_nodes_axis
+        CHECK (axis IS NULL OR axis IN ('MAIN', 'BRANCH')),
     CONSTRAINT fk_sn_career
         FOREIGN KEY (career_id) REFERENCES career_roles (career_id) ON DELETE CASCADE,
     CONSTRAINT fk_sn_skill
@@ -198,6 +210,25 @@ CREATE TABLE IF NOT EXISTS student_progress (
         FOREIGN KEY (user_id) REFERENCES students (user_id) ON DELETE CASCADE,
     CONSTRAINT fk_sp_node
         FOREIGN KEY (node_id) REFERENCES skill_nodes (node_id) ON DELETE CASCADE
+);
+
+-- Which alternative a student picked inside a CHOOSE_ONE group. The roadmap
+-- template is shared across all students; this per-student overlay records the
+-- choice (e.g. "for Pick a Language, this student chose Java") so a Java student
+-- is never forced to complete C#. One row per (student, group).
+CREATE TABLE IF NOT EXISTS student_node_selections (
+    selection_id   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id        UUID NOT NULL,
+    group_node_id  UUID NOT NULL,
+    chosen_node_id UUID NOT NULL,
+    created_at     TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_student_node_selection UNIQUE (user_id, group_node_id),
+    CONSTRAINT fk_sns_student
+        FOREIGN KEY (user_id) REFERENCES students (user_id) ON DELETE CASCADE,
+    CONSTRAINT fk_sns_group
+        FOREIGN KEY (group_node_id) REFERENCES skill_nodes (node_id) ON DELETE CASCADE,
+    CONSTRAINT fk_sns_chosen
+        FOREIGN KEY (chosen_node_id) REFERENCES skill_nodes (node_id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS skill_trends (
@@ -555,3 +586,31 @@ CREATE TABLE IF NOT EXISTS course_enrollments (
     CONSTRAINT fk_enroll_student FOREIGN KEY (student_id) REFERENCES students (user_id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_enroll_student ON course_enrollments (student_id);
+
+-- ============================================================
+-- In-place migrations for databases created before this revision
+-- ============================================================
+-- CREATE TABLE IF NOT EXISTS above never adds columns to a pre-existing table,
+-- so bring skill_nodes up to date with the new roadmap-selection columns.
+ALTER TABLE skill_nodes ADD COLUMN IF NOT EXISTS selection     VARCHAR(20) DEFAULT 'ALL';
+ALTER TABLE skill_nodes ADD COLUMN IF NOT EXISTS choose_count  INT;
+ALTER TABLE skill_nodes ADD COLUMN IF NOT EXISTS node_kind     VARCHAR(20) DEFAULT 'CORE';
+ALTER TABLE skill_nodes ADD COLUMN IF NOT EXISTS axis          VARCHAR(20) DEFAULT 'MAIN';
+ALTER TABLE skill_nodes ADD COLUMN IF NOT EXISTS is_optional   BOOLEAN DEFAULT FALSE;
+ALTER TABLE skill_nodes ADD COLUMN IF NOT EXISTS is_checkpoint BOOLEAN DEFAULT FALSE;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_skill_nodes_selection') THEN
+        ALTER TABLE skill_nodes ADD CONSTRAINT ck_skill_nodes_selection
+            CHECK (selection IS NULL OR selection IN ('ALL', 'CHOOSE_ONE'));
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_skill_nodes_node_kind') THEN
+        ALTER TABLE skill_nodes ADD CONSTRAINT ck_skill_nodes_node_kind
+            CHECK (node_kind IS NULL OR node_kind IN ('CORE', 'ALTERNATIVE', 'OPTIONAL'));
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_skill_nodes_axis') THEN
+        ALTER TABLE skill_nodes ADD CONSTRAINT ck_skill_nodes_axis
+            CHECK (axis IS NULL OR axis IN ('MAIN', 'BRANCH'));
+    END IF;
+END $$;

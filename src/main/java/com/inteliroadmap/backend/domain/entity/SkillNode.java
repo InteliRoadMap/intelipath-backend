@@ -70,6 +70,31 @@ public class SkillNode {
     @Column(name = "completion_policy", length = 50)
     private String completionPolicy;
 
+    // How a parent's children relate: ALL = learn them all; CHOOSE_ONE = pick one
+    // alternative (e.g. one Backend language). Drives per-student selection.
+    @Column(name = "selection", length = 20)
+    private String selection;
+
+    // For CHOOSE_ONE groups, how many children the student must pick (usually 1).
+    @Column(name = "choose_count")
+    private Integer chooseCount;
+
+    // Visual/semantic role of the node: CORE | ALTERNATIVE | OPTIONAL.
+    @Column(name = "node_kind", length = 20)
+    private String nodeKind;
+
+    // Layout axis: MAIN (on the roadmap spine) | BRANCH (rendered off to the side).
+    @Column(name = "axis", length = 20)
+    private String axis;
+
+    // Dashed "nice to have" node that never blocks progress.
+    @Column(name = "is_optional")
+    private Boolean isOptional;
+
+    // Milestone gate that visually marks the end of a stage.
+    @Column(name = "is_checkpoint")
+    private Boolean isCheckpoint;
+
     @Column(name = "required_proficiency")
     private Integer requiredProficiency;
 

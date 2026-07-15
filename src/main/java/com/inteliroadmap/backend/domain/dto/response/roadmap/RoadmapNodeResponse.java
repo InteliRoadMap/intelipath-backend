@@ -25,6 +25,15 @@ public class RoadmapNodeResponse {
     private Boolean parentTopic;
     private Integer childTotal;
     private Integer childCompleted;
+    // Roadmap selection semantics (v2). selection: ALL | CHOOSE_ONE; nodeKind:
+    // CORE | ALTERNATIVE | OPTIONAL; axis: MAIN (spine) | BRANCH. Drive how the
+    // frontend renders choice groups, alternatives, and optional/checkpoint nodes.
+    private String selection;
+    private Integer chooseCount;
+    private String nodeKind;
+    private String axis;
+    private Boolean isOptional;
+    private Boolean isCheckpoint;
     // Layout metadata (presentation only, sourced from roadmap_node_layouts).
     private Double positionX;
     private Double positionY;
@@ -34,4 +43,6 @@ public class RoadmapNodeResponse {
     private String description;
     private Object resource;
     private String status;
+    // ISO-8601 timestamp of when the student completed this node (null if not completed).
+    private String completedAt;
 }

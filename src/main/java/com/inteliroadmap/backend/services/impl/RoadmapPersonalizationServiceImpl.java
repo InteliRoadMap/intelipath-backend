@@ -1,6 +1,8 @@
 package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.components.RoadmapProgressCalculator;
+import com.inteliroadmap.backend.components.RoadmapSelectionResolver;
+import com.inteliroadmap.backend.components.SelectionView;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapRecommendationDecisionResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapRecommendationResponse;
 import com.inteliroadmap.backend.domain.entity.CareerRequiredSkill;
@@ -96,6 +98,7 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
     private final CareerRequiredSkillRepository careerRequiredSkillRepository;
     private final RoadmapRecommendationMapper recommendationMapper;
     private final RoadmapProgressCalculator progressCalculator;
+    private final RoadmapSelectionResolver roadmapSelectionResolver;
 
     @Transactional
     @Override
@@ -114,6 +117,9 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
         Set<UUID> excludedNodeIds = new HashSet<>();
         excludedNodeIds.addAll(findCompletedNodeIds(student.getUserId()));
         excludedNodeIds.addAll(findNodeIdsInPendingRecommendations(student.getUserId()));
+        // Never recommend completing an off-path alternative (e.g. C# once the student
+        // chose Java); acceptRecommendation writes progress directly, bypassing gating.
+        excludedNodeIds.addAll(roadmapSelectionResolver.resolve(student.getUserId(), careerNodes).progressExcluded());
 
         Map<UUID, ImportanceLevel> importanceBySkillId = loadImportanceBySkillId(careerId);
         Map<UUID, NodeCandidate> candidates = collectCandidates(student, careerNodes, excludedNodeIds, importanceBySkillId);
@@ -581,7 +587,9 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
         List<SkillNode> careerNodes = skillNodeRepository
                 .findByCareerRole_CareerId(student.getCareerRole().getCareerId());
         List<StudentProgress> progresses = studentProgressRepository.findByStudent_UserId(student.getUserId());
-        return progressCalculator.calculateProgress(careerNodes, progresses);
+        // Count only the student's active path so the reported % matches the roadmap view.
+        SelectionView selectionView = roadmapSelectionResolver.resolve(student.getUserId(), careerNodes);
+        return progressCalculator.calculateProgress(selectionView.activePathNodes(careerNodes), progresses);
     }
 
     private Map<UUID, String> nodeNamesById(List<SkillNode> nodes) {
