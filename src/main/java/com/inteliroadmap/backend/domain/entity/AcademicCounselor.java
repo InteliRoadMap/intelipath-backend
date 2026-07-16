@@ -28,7 +28,7 @@ public class AcademicCounselor {
     @Column(name = "user_id")
     private UUID userId;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "university_id", foreignKey = @ForeignKey(name = "fk_ac_university"))
     private University university;
 
