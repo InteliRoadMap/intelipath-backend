@@ -461,11 +461,11 @@ public class DatabaseSeeder implements CommandLineRunner {
         log.info("DatabaseSeeder: Seeding Mock Data (Students, Counselors, Feedbacks, Progress)...");
 
         // ---------------------------- Import Admin Account ---------------------------- //
-        User admin = userRepository.findByEmail("thanhhau2110@gmail.com");
+        User admin = userRepository.findByEmail("intelipath@gmail.com");
         if (admin == null) {
-            admin = User.builder().email("thanhhau2110@gmail.com").build();
+            admin = User.builder().email("intelipath@gmail.com").build();
         }
-        admin.setFullName("Hau Admin");
+        admin.setFullName("Admin");
         admin.setRole(UserRole.ADMIN);
         admin.setAccountType(AccountType.FPT);
         applySeedCredentials(admin, seedAccounts.getAdmin(), "admin");
@@ -476,7 +476,7 @@ public class DatabaseSeeder implements CommandLineRunner {
         if (userCou == null) {
             userCou = User.builder().email("mainclone1@gmail.com").build();
         }
-        userCou.setFullName("Hau Counselor");
+        userCou.setFullName("Counselor");
         userCou.setRole(UserRole.COUNSELOR);
         // FPT so this counselor's student list resolves to the FPT students below.
         userCou.setAccountType(AccountType.FPT);
@@ -485,7 +485,10 @@ public class DatabaseSeeder implements CommandLineRunner {
 
         AcademicCounselor counselor = academicCounselorRepository.findByUserId(userCou.getUserId());
         if (counselor == null) {
-            counselor = AcademicCounselor.builder().userId(userCou.getUserId()).build();
+            counselor = AcademicCounselor.builder()
+                    .userId(userCou.getUserId())
+                    .department("Software Engineering")
+                    .build();
         }
         counselor.setDepartment("Software Engineer");
         academicCounselorRepository.save(counselor);
@@ -540,14 +543,14 @@ public class DatabaseSeeder implements CommandLineRunner {
                     .fullName("Frontend Student " + i)
                     .role(UserRole.STUDENT)
                     // Non-FPT bulk students: they see roadmap.sh resources only.
-                    .accountType(AccountType.OTHER)
+                    .accountType(AccountType.FPT)
                     .build();
             sUser = userRepository.save(sUser);
 
             Student stu = Student.builder()
                     .userId(sUser.getUserId())
                     .careerRole(frontend)
-                    .universityName("Example University")
+                    .universityName(FPT_UNIVERSITY_NAME)
                     .yearOfAdmission(LocalDate.now().getYear() - random.nextInt(4))
                     .major("Software Engineer")
                     .build();
