@@ -19,7 +19,7 @@ public class SeedAccountsProperties {
     private Account admin = new Account();
     private Account counselor = new Account();
     private Account student = new Account();
-
+    private Account mentor = new Account();
     @Data
     public static class Account {
         private String username;
