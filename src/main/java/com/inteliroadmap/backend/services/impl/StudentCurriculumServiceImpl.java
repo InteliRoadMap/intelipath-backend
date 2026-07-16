@@ -80,7 +80,7 @@ public class StudentCurriculumServiceImpl implements StudentCurriculumService {
     public StudentCurriculumResponse getCurriculum() {
         Student student = authenticatedStudentService.getRequiredStudent();
         FptCurriculum curriculum = resolveCurriculum(student);
-        return buildCurriculumResponse(student.getUserId(), curriculum);
+        return buildCurriculumResponse(student, curriculum);
     }
 
     @Override
@@ -92,7 +92,7 @@ public class StudentCurriculumServiceImpl implements StudentCurriculumService {
         int term = request.getCompletedTerm();
 
         List<FptCurriculumSubject> upToTerm = fptCurriculumSubjectRepository
-                .findByCurriculumIdAndSemesterLessThanEqual(curriculum.getId(), term);
+                .findForStudentUpToTerm(curriculum.getId(), term, student.getFptComboCode());
         int marked = 0;
         for (FptCurriculumSubject cs : upToTerm) {
             StudentFptSubject existing = studentFptSubjectRepository
@@ -109,7 +109,7 @@ public class StudentCurriculumServiceImpl implements StudentCurriculumService {
         log.info("StudentCurriculumService: user {} declared term {} on {} -> {} subjects marked PASSED",
                 userId, term, curriculum.getCode(), marked);
         syncEvidenceFromPassedSubjects(userId);
-        return buildCurriculumResponse(userId, curriculum);
+        return buildCurriculumResponse(student, curriculum);
     }
 
     @Override
@@ -135,7 +135,7 @@ public class StudentCurriculumServiceImpl implements StudentCurriculumService {
         }
 
         syncEvidenceFromPassedSubjects(userId);
-        return buildCurriculumResponse(userId, curriculum);
+        return buildCurriculumResponse(student, curriculum);
     }
 
     @Override
@@ -148,7 +148,7 @@ public class StudentCurriculumServiceImpl implements StudentCurriculumService {
         student.setFptCurriculumId(curriculum.getId());
         studentRepository.save(student);
         log.info("StudentCurriculumService: user {} set curriculum -> {}", student.getUserId(), curriculum.getCode());
-        return buildCurriculumResponse(student.getUserId(), curriculum);
+        return buildCurriculumResponse(student, curriculum);
     }
 
     /** Insert or update a PASSED declaration for one subject. */
@@ -289,7 +289,12 @@ public class StudentCurriculumServiceImpl implements StudentCurriculumService {
         return value.min(CONFIDENCE_CAP);
     }
 
-    private StudentCurriculumResponse buildCurriculumResponse(UUID userId, FptCurriculum curriculum) {
+    /**
+     * @param student the owner — scopes the subject list to their curriculum AND combo,
+     *                so another specialisation's courses never leak into the response
+     */
+    private StudentCurriculumResponse buildCurriculumResponse(Student student, FptCurriculum curriculum) {
+        UUID userId = student.getUserId();
         List<CurriculumOptionResponse> available = fptCurriculumRepository
                 .findAllByOrderByProgramAscCohortDescCodeAsc().stream()
                 .map(StudentCurriculumServiceImpl::toOption)
@@ -303,9 +308,10 @@ public class StudentCurriculumServiceImpl implements StudentCurriculumService {
                     .build();
         }
 
-        // Term placement for THIS curriculum, ordered by semester then code.
+        // Term placement for THIS curriculum and this student's combo, ordered by
+        // semester then code.
         List<FptCurriculumSubject> mapping = fptCurriculumSubjectRepository
-                .findByCurriculumId(curriculum.getId());
+                .findForStudent(curriculum.getId(), student.getFptComboCode());
         mapping.sort(Comparator
                 .comparing((FptCurriculumSubject cs) -> cs.getSemester() == null ? Integer.MAX_VALUE : cs.getSemester())
                 .thenComparing(FptCurriculumSubject::getSubjectCode));

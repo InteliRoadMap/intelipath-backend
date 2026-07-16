@@ -70,11 +70,15 @@ public class FptOverlayImportServiceImpl implements FptOverlayImportService {
                     .build());
             subjectCount++;
 
-            // Per-curriculum term placement.
+            // Per-curriculum term placement and combo membership. An overlay predating
+            // combo support has no combo_code, which reads as "trunk" — the same subject
+            // set everyone saw before, rather than a curriculum that suddenly looks empty.
             fptCurriculumSubjectRepository.save(FptCurriculumSubject.builder()
                     .curriculumId(curriculum.getId())
                     .subjectCode(code)
                     .semester(s.hasNonNull("semester") ? s.get("semester").asInt() : null)
+                    .comboCode(textOr(s, "combo_code", null))
+                    .comboName(textOr(s, "combo_name", null))
                     .build());
 
             // Rebuild this subject's skills + resources (scoped bulk delete + re-insert).

@@ -617,15 +617,27 @@ CREATE INDEX IF NOT EXISTS idx_fc_program_cohort ON fpt_curricula (program, coho
 
 -- Maps a subject into a curriculum at a given term. Same subject_code, different
 -- semester across curricula — this is where "trùng môn khác kỳ" is resolved.
+--
+-- combo_code splits a curriculum into its specialisation tracks. FLM's curriculum only
+-- reserves slots (SE_COM*1..*3) and the real subjects live behind a combo: Intensive
+-- Java gives HSF302/SBA301/MSS301, React/NodeJS and .NET give different ones. NULL means
+-- a trunk subject every student on the curriculum takes; a value means it belongs to
+-- that combo alone. Without this the tracks collapse and a .NET student is shown Java.
+-- combo_name is denormalised for display only — one importer writes both, so it cannot
+-- drift, and it saves a table for what is a handful of rows per curriculum.
 CREATE TABLE IF NOT EXISTS fpt_curriculum_subjects (
     curriculum_id UUID NOT NULL,
     subject_code  VARCHAR(20) NOT NULL,
     semester      INT,
+    combo_code    VARCHAR(40),
+    combo_name    TEXT,
     PRIMARY KEY (curriculum_id, subject_code),
     CONSTRAINT fk_fcs_curriculum FOREIGN KEY (curriculum_id) REFERENCES fpt_curricula (id) ON DELETE CASCADE,
     CONSTRAINT fk_fcs_subject FOREIGN KEY (subject_code) REFERENCES fpt_subjects (code) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_fcs_curriculum ON fpt_curriculum_subjects (curriculum_id);
+-- The student read path is "trunk OR my combo", so it always filters on both columns.
+CREATE INDEX IF NOT EXISTS idx_fcs_curriculum_combo ON fpt_curriculum_subjects (curriculum_id, combo_code);
 
 CREATE TABLE IF NOT EXISTS fpt_subject_skills (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -702,6 +714,14 @@ END $$;
 ALTER TABLE fpt_subjects        DROP COLUMN IF EXISTS semester;
 ALTER TABLE student_fpt_subjects ADD COLUMN IF NOT EXISTS curriculum_id UUID;
 ALTER TABLE students             ADD COLUMN IF NOT EXISTS fpt_curriculum_id UUID;
+
+-- Specialisation combos: which track's subjects a curriculum row belongs to, and which
+-- track the student picked. NULL combo_code = trunk (everyone); NULL fpt_combo_code =
+-- the student hasn't picked, so they see the trunk only rather than another combo's.
+ALTER TABLE fpt_curriculum_subjects ADD COLUMN IF NOT EXISTS combo_code VARCHAR(40);
+ALTER TABLE fpt_curriculum_subjects ADD COLUMN IF NOT EXISTS combo_name TEXT;
+ALTER TABLE students                ADD COLUMN IF NOT EXISTS fpt_combo_code VARCHAR(40);
+CREATE INDEX IF NOT EXISTS idx_fcs_curriculum_combo ON fpt_curriculum_subjects (curriculum_id, combo_code);
 
 DO $$
 BEGIN

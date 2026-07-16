@@ -54,5 +54,14 @@ public class Student {
     /** The FLM curriculum version this student follows (their cohort's program). */
     @Column(name = "fpt_curriculum_id")
     private UUID fptCurriculumId;
+
+    /**
+     * The specialisation combo the student picked within that curriculum (e.g.
+     * {@code SE_COM10.2} for Intensive Java). Null until they choose: they then see the
+     * curriculum's trunk subjects only, which is the honest answer — showing another
+     * combo's subjects would be worse than showing none.
+     */
+    @Column(name = "fpt_combo_code", length = 40)
+    private String fptComboCode;
 }
 
