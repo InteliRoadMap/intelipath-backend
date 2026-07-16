@@ -650,12 +650,38 @@ CREATE TABLE IF NOT EXISTS fpt_subject_skills (
 );
 CREATE INDEX IF NOT EXISTS idx_fss_skill_name ON fpt_subject_skills (LOWER(skill_name));
 
+-- Course Learning Outcomes, straight from the syllabus (gvLO). These are what a subject
+-- page shows a student ("be able to work with JDBC"); they are also the text the skill
+-- matcher reads, but that happens upstream in the scraper. Subjects carry 4-13 each.
+CREATE TABLE IF NOT EXISTS fpt_subject_clos (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    subject_code  VARCHAR(20) NOT NULL,
+    code          VARCHAR(20) NOT NULL,   -- CLO1, CLO2, ...
+    outcome       TEXT NOT NULL,
+    order_index   INT NOT NULL DEFAULT 0,
+    CONSTRAINT fk_fsc_subject FOREIGN KEY (subject_code) REFERENCES fpt_subjects (code) ON DELETE CASCADE,
+    CONSTRAINT uq_fsc UNIQUE (subject_code, code)
+);
+CREATE INDEX IF NOT EXISTS idx_fsc_subject ON fpt_subject_clos (subject_code);
+
+-- kind=MATERIAL is a bibliographic reference (textbook, ISBN, an online article's link);
+-- kind=SESSION is one class session, and the only rows that ever carry a real file.
+--
+-- source_url is where a file was harvested from and is NEVER sent to a client: we mirror
+-- the file into our own storage and serve that. storage_path is the object key in the
+-- private bucket; a signed URL is minted per request after the FPT check, so the gate is
+-- a real boundary rather than a hidden link. NULL storage_path = not mirrored (yet), which
+-- is normal — 7 of 28 subjects publish no files at all.
 CREATE TABLE IF NOT EXISTS fpt_subject_resources (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     subject_code  VARCHAR(20) NOT NULL,
     kind          VARCHAR(20) NOT NULL,
     title         TEXT NOT NULL,
     url           TEXT,
+    source_url    TEXT,
+    storage_path  TEXT,
+    size_bytes    BIGINT,
+    mirrored_at   TIMESTAMP,
     topic         TEXT,
     clo_ref       TEXT,
     order_index   INT NOT NULL DEFAULT 0,
@@ -722,6 +748,12 @@ ALTER TABLE fpt_curriculum_subjects ADD COLUMN IF NOT EXISTS combo_code VARCHAR(
 ALTER TABLE fpt_curriculum_subjects ADD COLUMN IF NOT EXISTS combo_name TEXT;
 ALTER TABLE students                ADD COLUMN IF NOT EXISTS fpt_combo_code VARCHAR(40);
 CREATE INDEX IF NOT EXISTS idx_fcs_curriculum_combo ON fpt_curriculum_subjects (curriculum_id, combo_code);
+
+-- Mirrored materials: we host the file, so the FPT gate actually withholds it.
+ALTER TABLE fpt_subject_resources ADD COLUMN IF NOT EXISTS source_url   TEXT;
+ALTER TABLE fpt_subject_resources ADD COLUMN IF NOT EXISTS storage_path TEXT;
+ALTER TABLE fpt_subject_resources ADD COLUMN IF NOT EXISTS size_bytes   BIGINT;
+ALTER TABLE fpt_subject_resources ADD COLUMN IF NOT EXISTS mirrored_at  TIMESTAMP;
 
 DO $$
 BEGIN

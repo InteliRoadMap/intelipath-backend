@@ -1,5 +1,6 @@
 package com.inteliroadmap.backend.domain.entity;
 
+import com.fasterxml.jackson.annotation.JsonIgnore;
 import com.inteliroadmap.backend.domain.enums.FptResourceKind;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -14,6 +15,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDateTime;
 import java.util.UUID;
 
 /**
@@ -44,8 +46,30 @@ public class FptSubjectResource {
     @Column(name = "title", nullable = false, columnDefinition = "TEXT")
     private String title;
 
+    /** A reference link the syllabus itself published (docs, library catalogue). Safe to show. */
     @Column(name = "url", columnDefinition = "TEXT")
     private String url;
+
+    /**
+     * Where the file was harvested from. Never leaves the server: clients are given a
+     * short-lived signed URL to our own copy instead, so withholding the material is a
+     * real decision rather than an unlisted link.
+     */
+    @JsonIgnore
+    @Column(name = "source_url", columnDefinition = "TEXT")
+    private String sourceUrl;
+
+    /** Object key in the private storage bucket, or null when nothing has been mirrored. */
+    @JsonIgnore
+    @Column(name = "storage_path", columnDefinition = "TEXT")
+    private String storagePath;
+
+    /** Size of the mirrored file, so the UI can say "13.6 MB" before a student commits. */
+    @Column(name = "size_bytes")
+    private Long sizeBytes;
+
+    @Column(name = "mirrored_at")
+    private LocalDateTime mirroredAt;
 
     @Column(name = "topic", columnDefinition = "TEXT")
     private String topic;

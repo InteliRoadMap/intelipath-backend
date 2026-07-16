@@ -4,6 +4,7 @@ import com.inteliroadmap.backend.domain.dto.request.AdminFlmSyncRequest;
 import com.inteliroadmap.backend.domain.dto.response.admin.FlmSyncStartResponse;
 import com.inteliroadmap.backend.domain.dto.response.admin.FlmSyncStatusResponse;
 import com.inteliroadmap.backend.services.AdminFlmSyncService;
+import com.inteliroadmap.backend.services.FptMaterialMirrorService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
@@ -37,6 +39,26 @@ import org.springframework.web.bind.annotation.RestController;
 public class AdminFlmController {
 
     private final AdminFlmSyncService adminFlmSyncService;
+    private final FptMaterialMirrorService fptMaterialMirrorService;
+
+    /**
+     * Copies the files a sync discovered into our own storage, so students download from us.
+     *
+     * Separate from /sync on purpose: a sync only needs the syllabus HTML, while this pulls
+     * tens of MB and can be re-run on its own when a file fails or an upstream copy changes.
+     * No cookie is involved — the source files are public.
+     */
+    @PostMapping("/mirror-materials")
+    @Operation(summary = "Mirror FPT course materials into storage",
+            description = "Downloads the files referenced by synced syllabi and stores our own copy. "
+                    + "Runs inline and may take a while; omit subjectCode to do every un-mirrored file.")
+    public ResponseEntity<FptMaterialMirrorService.MirrorSummary> mirrorMaterials(
+            @RequestParam(required = false) String subjectCode,
+            @RequestParam(defaultValue = "false") boolean force) {
+        log.info("AdminFlmController: material mirror requested (subjectCode={}, force={})",
+                subjectCode, force);
+        return ResponseEntity.ok(fptMaterialMirrorService.mirrorMaterials(subjectCode, force));
+    }
 
     @PostMapping("/sync")
     @Operation(summary = "Start an FLM sync",

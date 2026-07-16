@@ -3,6 +3,7 @@ package com.inteliroadmap.backend.services.impl;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.inteliroadmap.backend.domain.entity.FptCurriculum;
 import com.inteliroadmap.backend.domain.entity.FptCurriculumSubject;
+import com.inteliroadmap.backend.domain.entity.FptSubjectClo;
 import com.inteliroadmap.backend.domain.entity.FptSubject;
 import com.inteliroadmap.backend.domain.entity.FptSubjectResource;
 import com.inteliroadmap.backend.domain.entity.FptSubjectSkill;
@@ -10,6 +11,7 @@ import com.inteliroadmap.backend.domain.entity.Skill;
 import com.inteliroadmap.backend.domain.enums.FptResourceKind;
 import com.inteliroadmap.backend.repositories.FptCurriculumRepository;
 import com.inteliroadmap.backend.repositories.FptCurriculumSubjectRepository;
+import com.inteliroadmap.backend.repositories.FptSubjectCloRepository;
 import com.inteliroadmap.backend.repositories.FptSubjectRepository;
 import com.inteliroadmap.backend.repositories.FptSubjectResourceRepository;
 import com.inteliroadmap.backend.repositories.FptSubjectSkillRepository;
@@ -36,6 +38,7 @@ public class FptOverlayImportServiceImpl implements FptOverlayImportService {
     private final FptSubjectRepository fptSubjectRepository;
     private final FptSubjectSkillRepository fptSubjectSkillRepository;
     private final FptSubjectResourceRepository fptSubjectResourceRepository;
+    private final FptSubjectCloRepository fptSubjectCloRepository;
     private final FptCurriculumRepository fptCurriculumRepository;
     private final FptCurriculumSubjectRepository fptCurriculumSubjectRepository;
 
@@ -55,6 +58,7 @@ public class FptOverlayImportServiceImpl implements FptOverlayImportService {
         int subjectCount = 0;
         int skillCount = 0;
         int resourceCount = 0;
+        int cloCount = 0;
         int unmatchedSkills = 0;
         for (JsonNode s : subjects) {
             String code = s.path("code").asText("").trim();
@@ -96,12 +100,16 @@ public class FptOverlayImportServiceImpl implements FptOverlayImportService {
                 skillCount++;
             }
 
+            fptSubjectCloRepository.deleteBySubjectCode(code);
+            cloCount += importSubjectClos(code, s);
+
             fptSubjectResourceRepository.deleteBySubjectCode(code);
             resourceCount += importSubjectResources(code, s);
         }
 
-        log.info("FptOverlayImport: curriculum {} — {} subjects, {} skill links ({} unmatched), {} resources.",
-                curriculum.getCode(), subjectCount, skillCount, unmatchedSkills, resourceCount);
+        log.info("FptOverlayImport: curriculum {} — {} subjects, {} skill links ({} unmatched), "
+                        + "{} CLOs, {} resources.",
+                curriculum.getCode(), subjectCount, skillCount, unmatchedSkills, cloCount, resourceCount);
         return new ImportSummary(subjectCount, skillCount, unmatchedSkills, resourceCount);
     }
 
@@ -176,6 +184,29 @@ public class FptOverlayImportServiceImpl implements FptOverlayImportService {
         return -1;
     }
 
+    /**
+     * Stores a subject's CLOs verbatim. An overlay produced before the scraper carried
+     * them simply has no "clos" key, which leaves the subject with none rather than
+     * failing the import.
+     */
+    private int importSubjectClos(String code, JsonNode subject) {
+        int count = 0;
+        int order = 0;
+        for (JsonNode c : subject.path("clos")) {
+            String cloCode = textOr(c, "code", null);
+            String outcome = textOr(c, "outcome", null);
+            if (cloCode == null || outcome == null) continue;
+            fptSubjectCloRepository.save(FptSubjectClo.builder()
+                    .subjectCode(code)
+                    .code(cloCode)
+                    .outcome(outcome)
+                    .orderIndex(order++)
+                    .build());
+            count++;
+        }
+        return count;
+    }
+
     /** Flattens a subject's materials[] and sessions[] into fpt_subject_resources rows. */
     private int importSubjectResources(String code, JsonNode subject) {
         int count = 0;
@@ -201,7 +232,11 @@ public class FptOverlayImportServiceImpl implements FptOverlayImportService {
                     .subjectCode(code)
                     .kind(FptResourceKind.SESSION)
                     .title(session.isBlank() ? topic : "Session " + session + ": " + topic)
-                    .url(textOr(ses, "download", null))
+                    // "url" is the syllabus's own reference link; the harvested file goes to
+                    // sourceUrl, which never reaches a client — students are served our
+                    // mirrored copy through a signed URL after the FPT check.
+                    .url(textOr(ses, "url", null))
+                    .sourceUrl(textOr(ses, "download", null))
                     .topic(topic)
                     .cloRef(textOr(ses, "lo", null))
                     .orderIndex(order++)
