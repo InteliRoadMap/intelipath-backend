@@ -34,7 +34,7 @@ public class PortfolioMapper {
                 .bio(user.getBio())
                 .email(user.getEmail())
                 .portfolioSlug(student.getPortfolioSlug())
-                .university(resolveUniversityDisplayName(student))
+                .university(student.getUniversityName())
                 .avatarUrl(user.getAvatarUrl())
                 .build();
 
@@ -96,13 +96,6 @@ public class PortfolioMapper {
                 .projects(projectResponses)
                 .education(educationResponses)
                 .build();
-    }
-
-    private String resolveUniversityDisplayName(Student student) {
-        if (student.getUniversityName() != null && !student.getUniversityName().isBlank()) {
-            return student.getUniversityName();
-        }
-        return student.getUniversity() != null ? student.getUniversity().getName() : null;
     }
 
     public List<PortfolioProject> toPortfolioProjects(List<PortfolioUpsertRequest.PortfolioProjectRequest> projectRequests, User user) {

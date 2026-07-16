@@ -13,7 +13,6 @@ import com.inteliroadmap.backend.domain.entity.SkillNode;
 import com.inteliroadmap.backend.domain.entity.Student;
 import com.inteliroadmap.backend.domain.entity.StudentProgress;
 import com.inteliroadmap.backend.domain.entity.StudentSkill;
-import com.inteliroadmap.backend.domain.entity.University;
 import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
@@ -35,7 +34,6 @@ import com.inteliroadmap.backend.repositories.SkillTrendRepository;
 import com.inteliroadmap.backend.repositories.StudentProgressRepository;
 import com.inteliroadmap.backend.repositories.StudentRepository;
 import com.inteliroadmap.backend.repositories.StudentSkillRepository;
-import com.inteliroadmap.backend.repositories.UniversityRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.services.StudentService;
 import org.springframework.transaction.annotation.Transactional;
@@ -77,7 +75,6 @@ public class StudentServiceImpl implements StudentService {
     private final StudentDashboardMapper studentDashboardMapper;
     private final StudentMapper studentMapper;
     private final CareerRoleRepository careerRoleRepository;
-    private final UniversityRepository universityRepository;
     private final SupabaseStorageService supabaseStorageService;
     private final RagDocumentService ragDocumentService;
     private final DocumentIngestionService documentIngestionService;
@@ -101,31 +98,9 @@ public class StudentServiceImpl implements StudentService {
             throw new ResourceNotFoundException("User not found");
         }
 
-        if (request.getUniversityId() != null) {
-            University university = universityRepository.findById(request.getUniversityId())
-                    .orElseThrow(() -> new ResourceNotFoundException("University not found"));
-            student.setUniversity(university);
-            if (request.getUniversityName() == null || request.getUniversityName().isBlank()) {
-                student.setUniversityName(university.getName());
-            }
-        }
-
         if (request.getUniversityName() != null) {
             String universityName = request.getUniversityName().trim();
-            if (universityName.isEmpty()) {
-                student.setUniversityName(null);
-                if (request.getUniversityId() == null) {
-                    student.setUniversity(null);
-                }
-            } else {
-                student.setUniversityName(universityName);
-                if (request.getUniversityId() == null) {
-                    University matchedUniversity = universityRepository
-                            .findFirstByNameIgnoreCase(universityName)
-                            .orElse(null);
-                    student.setUniversity(matchedUniversity);
-                }
-            }
+            student.setUniversityName(universityName.isEmpty() ? null : universityName);
         }
         if (request.getYearOfAdmission() != null) {
             student.setYearOfAdmission(request.getYearOfAdmission());

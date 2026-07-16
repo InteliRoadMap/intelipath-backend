@@ -1,10 +1,13 @@
 package com.inteliroadmap.backend.services;
 
+import com.inteliroadmap.backend.domain.dto.request.LoginRequest;
 import com.inteliroadmap.backend.domain.dto.response.auth.RefreshResponse;
 import com.inteliroadmap.backend.services.impl.AuthServiceImpl;
 import com.inteliroadmap.backend.domain.entity.RefreshToken;
 import com.inteliroadmap.backend.domain.entity.User;
+import com.inteliroadmap.backend.domain.enums.AccountType;
 import com.inteliroadmap.backend.domain.enums.UserRole;
+import com.inteliroadmap.backend.domain.enums.UserStatus;
 import com.inteliroadmap.backend.exceptions.UnauthorizedException;
 import com.inteliroadmap.backend.security.TokenHashUtil;
 import com.inteliroadmap.backend.repositories.RefreshTokenRepository;
@@ -13,6 +16,8 @@ import com.inteliroadmap.backend.security.JwtService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.ArgumentCaptor;
+import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
@@ -27,6 +32,7 @@ class AuthServiceTest {
     private UserRepository userRepository;
     private RefreshTokenRepository refreshTokenRepository;
     private JwtService jwtService;
+    private PasswordEncoder passwordEncoder;
     private AuthService authService;
 
     @BeforeEach
@@ -34,11 +40,12 @@ class AuthServiceTest {
         userRepository = mock(UserRepository.class);
         refreshTokenRepository = mock(RefreshTokenRepository.class);
         jwtService = mock(JwtService.class);
-        authService = new AuthServiceImpl(userRepository, refreshTokenRepository, jwtService);
+        passwordEncoder = mock(PasswordEncoder.class);
+        authService = new AuthServiceImpl(userRepository, refreshTokenRepository, jwtService, passwordEncoder);
     }
 
     @Test
-    void refreshesTokensAndDeletesOldToken() {
+    void refreshesTokensAndLeavesOldTokenInGraceWindow() {
         User user = user();
         RefreshToken storedToken = storedToken(user, LocalDateTime.now().plusHours(1));
         stubValidToken(storedToken, user);
@@ -53,12 +60,90 @@ class AuthServiceTest {
         assertEquals("new-refresh", response.getRefreshToken());
         assertNotNull(response.getExpiresIn());
         assertDoesNotThrow(() -> LocalDateTime.parse(response.getExpiresIn()));
-        verify(refreshTokenRepository).delete(storedToken);
+
+        // The used token is kept alive briefly rather than deleted, so a concurrent
+        // refresh carrying the same cookie still resolves.
+        verify(refreshTokenRepository, never()).delete(any());
+        assertTrue(storedToken.getExpiredAt().isBefore(LocalDateTime.now().plusMinutes(1)));
 
         ArgumentCaptor<RefreshToken> tokenCaptor = ArgumentCaptor.forClass(RefreshToken.class);
+        verify(refreshTokenRepository, times(2)).save(tokenCaptor.capture());
+        RefreshToken newToken = tokenCaptor.getAllValues().get(1);
+        assertEquals(TokenHashUtil.sha256Hex("new-refresh"), newToken.getToken());
+        assertEquals(user.getUserId(), newToken.getUser().getUserId());
+    }
+
+    @Test
+    void logsInWithValidCredentials() {
+        User user = fptUser();
+        when(userRepository.findByUsername("hau.st")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("secret", "hashed")).thenReturn(true);
+        when(jwtService.generateAccessToken(user.getEmail(), user.getRole().name())).thenReturn("access");
+        when(jwtService.generateRefreshToken(user.getEmail())).thenReturn("refresh");
+        when(jwtService.getAccessExpiration()).thenReturn(900000L);
+        when(jwtService.getRefreshExpiration()).thenReturn(604800000L);
+
+        RefreshResponse response = authService.login(loginRequest("hau.st", "secret"));
+
+        assertEquals("access", response.getAccessToken());
+        assertEquals("refresh", response.getRefreshToken());
+
+        // The refresh token is persisted hashed, never in the clear.
+        ArgumentCaptor<RefreshToken> tokenCaptor = ArgumentCaptor.forClass(RefreshToken.class);
         verify(refreshTokenRepository).save(tokenCaptor.capture());
-        assertEquals(TokenHashUtil.sha256Hex("new-refresh"), tokenCaptor.getValue().getToken());
-        assertEquals(user.getUserId(), tokenCaptor.getValue().getUser().getUserId());
+        assertEquals(TokenHashUtil.sha256Hex("refresh"), tokenCaptor.getValue().getToken());
+    }
+
+    @Test
+    void rejectsWrongPassword() {
+        User user = fptUser();
+        when(userRepository.findByUsername("hau.st")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("wrong", "hashed")).thenReturn(false);
+
+        assertThrows(ResponseStatusException.class, () -> authService.login(loginRequest("hau.st", "wrong")));
+        verify(refreshTokenRepository, never()).save(any());
+    }
+
+    @Test
+    void rejectsUnknownUsernameWithSameErrorAsWrongPassword() {
+        when(userRepository.findByUsername("ghost")).thenReturn(Optional.empty());
+
+        ResponseStatusException unknown = assertThrows(ResponseStatusException.class,
+                () -> authService.login(loginRequest("ghost", "secret")));
+
+        User user = fptUser();
+        when(userRepository.findByUsername("hau.st")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("wrong", "hashed")).thenReturn(false);
+        ResponseStatusException wrongPassword = assertThrows(ResponseStatusException.class,
+                () -> authService.login(loginRequest("hau.st", "wrong")));
+
+        // Identical status and message, so neither reveals which accounts exist.
+        assertEquals(wrongPassword.getStatusCode(), unknown.getStatusCode());
+        assertEquals(wrongPassword.getReason(), unknown.getReason());
+    }
+
+    @Test
+    void rejectsOauthAccountWithoutPassword() {
+        User oauthUser = user(); // no passwordHash: arrived through GitHub
+        when(userRepository.findByUsername("oauth.user")).thenReturn(Optional.of(oauthUser));
+
+        assertThrows(ResponseStatusException.class, () -> authService.login(loginRequest("oauth.user", "secret")));
+        // Never reaches the encoder: a null hash is rejected outright.
+        verifyNoInteractions(passwordEncoder);
+    }
+
+    @Test
+    void rejectsSuspendedAccount() {
+        User user = fptUser();
+        user.setUserStatus(UserStatus.SUSPENDED);
+        when(userRepository.findByUsername("hau.st")).thenReturn(Optional.of(user));
+        when(passwordEncoder.matches("secret", "hashed")).thenReturn(true);
+
+        ResponseStatusException thrown = assertThrows(ResponseStatusException.class,
+                () -> authService.login(loginRequest("hau.st", "secret")));
+
+        assertEquals(HttpStatus.FORBIDDEN, thrown.getStatusCode());
+        verify(refreshTokenRepository, never()).save(any());
     }
 
     @Test
@@ -123,6 +208,23 @@ class AuthServiceTest {
                 .email("student@example.com")
                 .role(UserRole.STUDENT)
                 .build();
+    }
+
+    /** A counselor-provisioned FPT account: has a username and a local credential. */
+    private User fptUser() {
+        User user = user();
+        user.setUsername("hau.st");
+        user.setPasswordHash("hashed");
+        user.setAccountType(AccountType.FPT);
+        user.setUserStatus(UserStatus.ACTIVE);
+        return user;
+    }
+
+    private LoginRequest loginRequest(String username, String password) {
+        LoginRequest request = new LoginRequest();
+        request.setUsername(username);
+        request.setPassword(password);
+        return request;
     }
 
     private RefreshToken storedToken(User user, LocalDateTime expiredAt) {

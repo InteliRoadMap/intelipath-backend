@@ -160,17 +160,17 @@ public class MentorServiceImpl implements MentorService {
             User studentUser = userRepository.findById(req.getStudent().getUserId()).orElse(null);
             
             String name = studentUser != null ? studentUser.getFullName() : "Unknown";
-            String yob = studentUser != null && studentUser.getYob() != null ? String.valueOf(studentUser.getYob()) : "Unknown";
-            String major = student != null && student.getUniversity() != null ? student.getUniversity().getName() : "Unknown";
+            String yob = studentUser != null && studentUser.getYob() != null ? String.valueOf(studentUser.getYob().getYear()) : "Unknown";
+            String university = student != null && student.getUniversityName() != null ? student.getUniversityName() : "Unknown";
             String career = student != null && student.getCareerRole() != null ? student.getCareerRole().getCareerName() : "Unknown";
-            
+
             return MentorPendingReviewResponse.builder()
                     .id(req.getRequestId().toString())
                     .studentId(req.getStudent().getUserId().toString())
                     .studentName(name)
                     .yob(yob)
                     .targetCareer(career)
-                    .university(major)
+                    .university(university)
                     .build();
         }).collect(Collectors.toList());
         
@@ -194,7 +194,7 @@ public class MentorServiceImpl implements MentorService {
             Student student = studentMap.get(userSt.getUserId());
             if (student == null) continue;
 
-            String university = student.getUniversity() != null ? student.getUniversity().getName() : "Unknown";
+            String university = student.getUniversityName() != null ? student.getUniversityName() : "Unknown";
             String career = student.getCareerRole() != null ? student.getCareerRole().getCareerName() : "Unknown";
 
             dtos.add(MentorStudentResponse.builder()

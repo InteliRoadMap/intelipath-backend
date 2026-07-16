@@ -28,6 +28,13 @@ public class AiServiceProperties {
     private Duration readTimeout = Duration.ofSeconds(300);
 
     /**
+     * Read timeout for job-board scrapes. A scrape walks many detail pages with
+     * polite per-request delays and then AI-summarises every row, so it routinely
+     * runs several minutes — far longer than a normal work call.
+     */
+    private Duration scrapeTimeout = Duration.ofSeconds(900);
+
+    /**
      * Short timeout used only by the liveness probe, so a slow or down service
      * never hangs the admin dashboard.
      */
@@ -63,6 +70,14 @@ public class AiServiceProperties {
 
     public void setReadTimeout(Duration readTimeout) {
         this.readTimeout = readTimeout;
+    }
+
+    public Duration getScrapeTimeout() {
+        return scrapeTimeout;
+    }
+
+    public void setScrapeTimeout(Duration scrapeTimeout) {
+        this.scrapeTimeout = scrapeTimeout;
     }
 
     public Duration getHealthTimeout() {

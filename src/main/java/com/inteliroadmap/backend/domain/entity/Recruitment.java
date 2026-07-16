@@ -41,6 +41,9 @@ public class Recruitment {
     @Column(name = "descriptions", columnDefinition = "jsonb")
     private Map<String, Object> descriptions;
 
+    @Column(name = "posted_date")
+    private LocalDate postedDate;
+
     @Column(name = "application_deadline")
     private LocalDate applicationDeadline;
 }

@@ -1,5 +1,6 @@
 package com.inteliroadmap.backend.domain.dto.response.student;
 
+import com.inteliroadmap.backend.domain.enums.AccountType;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -19,8 +20,9 @@ public class StudentResponse {
     private Integer yob;
     private String bio;
     private String university;
-    private UUID universityId;
     private String universityName;
+    /** Read-only: set from the User record, never accepted from a request. */
+    private AccountType accountType;
     private Integer yearOfAdmission;
     private String major;
     private String githubProfile;

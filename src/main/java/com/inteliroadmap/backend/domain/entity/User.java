@@ -2,7 +2,8 @@ package com.inteliroadmap.backend.domain.entity;
 
 //import com.inteliroadmap.backend.domain.entity.Assessment;
 //import com.inteliroadmap.backend.domain.entity.CareerRole;
-//import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.inteliroadmap.backend.domain.enums.AccountType;
 import com.inteliroadmap.backend.domain.enums.UserRole;
 import com.inteliroadmap.backend.domain.enums.UserStatus;
 import jakarta.persistence.Column;
@@ -44,6 +45,15 @@ public class User {
     @Column(nullable = false, unique = true)
     private String email;
 
+    /** Login name for provisioned accounts (staff, FPT students); null for OAuth accounts. */
+    @Column(name = "username", length = 100, unique = true)
+    private String username;
+
+    /** BCrypt hash; null for OAuth accounts, which have no local credential. */
+    @JsonIgnore
+    @Column(name = "password_hash", length = 100)
+    private String passwordHash;
+
     @Column(name = "full_name")
     private String fullName;
 
@@ -68,6 +78,13 @@ public class User {
     @Enumerated(EnumType.STRING)
     @Column(name = "account_status")
     private UserStatus userStatus = UserStatus.ACTIVE;
+
+    // @Builder.Default because the column is NOT NULL: without it Lombok's builder
+    // ignores this initializer and inserts null.
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "account_type", nullable = false)
+    private AccountType accountType = AccountType.OTHER;
 
 //    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
 //    @com.fasterxml.jackson.annotation.JsonIgnore

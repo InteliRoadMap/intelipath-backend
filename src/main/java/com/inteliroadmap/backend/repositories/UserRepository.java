@@ -17,6 +17,9 @@ public interface UserRepository extends JpaRepository<User, UUID> {
     User findByUserId(UUID userId);
     User findByEmail(String email);
 
+    /** Login lookup for counselor-provisioned FPT accounts; OAuth accounts have no username. */
+    Optional<User> findByUsername(String username);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select user from User user where user.email = :email")
     Optional<User> findByEmailForUpdate(String email);

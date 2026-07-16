@@ -37,31 +37,52 @@ public class JobScrapingScheduler {
     private final RecruitmentPostRepository recruitmentPostRepository;
     private final TransactionTemplate transactionTemplate;
 
+    /** Job board the scrape should target. Both feed the same source-agnostic tables. */
+    public enum Source { TOPCV, ITVIEC }
+
     // Runs daily at 9:00 AM
     @Scheduled(cron = "0 0 9 * * *")
     public void fetchJobsFromPython() {
-        int limit = scraperLimit;
-        log.info("JobScrapingScheduler: Triggering TopCV scrape via AI service (limit={})", limit);
-
+        // Scheduled runs must never propagate — just log and move on.
         try {
-            // Network I/O (can take minutes) runs OUTSIDE any transaction so a DB
-            // connection is not held from the pool during the whole scrape.
-            ScraperResponse response = aiServiceClient.triggerTopCvScrape(limit);
-            if (response == null) {
-                log.warn("JobScrapingScheduler: Received empty response from Scraper API");
-                return;
-            }
-
-            log.info("JobScrapingScheduler: Received {} companies, {} recruitments, {} posts",
-                response.getCompanies().size(), response.getRecruitments().size(), response.getRecruitmentPosts().size());
-
-            // Persist the fetched data in a single short transaction.
-            transactionTemplate.executeWithoutResult(status -> persistScrapedData(response));
-            log.info("JobScrapingScheduler: Successfully persisted scraped data into the database.");
-
+            fetchJobs(Source.TOPCV);
         } catch (Exception e) {
-            log.error("JobScrapingScheduler: Failed to scrape jobs from Python API: ", e);
+            log.error("JobScrapingScheduler: Scheduled scrape failed: ", e);
         }
+    }
+
+    /**
+     * Trigger a scrape for the given source, then persist the processed rows.
+     * TopCV and ITviec share the raw tables (ids are prefixed {@code topcv.*} /
+     * {@code itviec.*}), so persistence is identical — only the AI-service call differs.
+     *
+     * <p>Failures (timeouts, Cloudflare blocks, ...) are propagated so a manual
+     * caller learns the scrape did not complete instead of getting a false "success".
+     *
+     * @return number of recruitment posts persisted.
+     */
+    public int fetchJobs(Source source) {
+        int limit = scraperLimit;
+        log.info("JobScrapingScheduler: Triggering {} scrape via AI service (limit={})", source, limit);
+
+        // Network I/O (can take minutes) runs OUTSIDE any transaction so a DB
+        // connection is not held from the pool during the whole scrape.
+        ScraperResponse response = switch (source) {
+            case TOPCV -> aiServiceClient.triggerTopCvScrape(limit);
+            case ITVIEC -> aiServiceClient.triggerItviecScrape(limit);
+        };
+        if (response == null) {
+            log.warn("JobScrapingScheduler: Received empty response from Scraper API");
+            return 0;
+        }
+
+        log.info("JobScrapingScheduler: Received {} companies, {} recruitments, {} posts",
+            response.getCompanies().size(), response.getRecruitments().size(), response.getRecruitmentPosts().size());
+
+        // Persist the fetched data in a single short transaction.
+        transactionTemplate.executeWithoutResult(status -> persistScrapedData(response));
+        log.info("JobScrapingScheduler: Successfully persisted scraped data into the database.");
+        return response.getRecruitmentPosts().size();
     }
 
     private void persistScrapedData(ScraperResponse response) {
@@ -82,6 +103,9 @@ public class JobScrapingScheduler {
                 recruitment.setRecruitmentInfos(rDto.getRecruitmentInfos());
                 recruitment.setDescriptions(rDto.getDescriptions());
 
+                if (rDto.getPostedDate() != null) {
+                    recruitment.setPostedDate(LocalDate.parse(rDto.getPostedDate(), formatter));
+                }
                 if (rDto.getApplicationDeadline() != null) {
                     recruitment.setApplicationDeadline(LocalDate.parse(rDto.getApplicationDeadline(), formatter));
                 }

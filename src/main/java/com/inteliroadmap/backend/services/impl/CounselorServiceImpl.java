@@ -10,7 +10,7 @@ import com.inteliroadmap.backend.domain.entity.AcademicCounselor;
 import com.inteliroadmap.backend.domain.entity.CareerRole;
 import com.inteliroadmap.backend.domain.entity.Feedback;
 import com.inteliroadmap.backend.domain.entity.Student;
-import com.inteliroadmap.backend.domain.entity.University;
+import com.inteliroadmap.backend.domain.enums.AccountType;
 import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.exceptions.UnauthorizedException;
@@ -22,7 +22,6 @@ import com.inteliroadmap.backend.repositories.SkillNodeRepository;
 import com.inteliroadmap.backend.repositories.StudentProgressRepository;
 import com.inteliroadmap.backend.repositories.StudentRepository;
 import com.inteliroadmap.backend.repositories.StudentSkillRepository;
-import com.inteliroadmap.backend.repositories.UniversityRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.services.CounselorService;
 import org.springframework.transaction.annotation.Transactional;
@@ -66,7 +65,6 @@ public class CounselorServiceImpl implements CounselorService {
     private final StudentRepository studentRepository;
     private final AcademicCounselorRepository academicCounselorRepository;
     private final StudentSkillRepository studentSkillRepository;
-    private final UniversityRepository universityRepository;
 
 
     /**
@@ -203,7 +201,7 @@ public class CounselorServiceImpl implements CounselorService {
     }
 
     /**
-     * Retrieves paginated information about students associated with the counselor's university.
+     * Retrieves paginated information about students of the counselor's own account type.
      *
      * @param search an optional search term to filter students
      * @param page the page number to retrieve
@@ -216,18 +214,16 @@ public class CounselorServiceImpl implements CounselorService {
         log.info("CounselorServiceImpl: Get students info request received");
         if (search == null) search = "";
 
-        // Filter students to only include those at the counselor's university
-        AcademicCounselor counselor = getAuthenticatedCounselor();
-        if (counselor.getUniversity() == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Counselor university is not configured.");
-        }
+        // Students are scoped to the counselor's own account type, so an FPT counselor
+        // sees every FPT student and no OTHER ones.
+        AccountType accountType = getAuthenticatedUser().getAccountType();
 
         // Offset = page * size | page count begins form 0
         // Ex: Load page 3 with size = 10 --> Offset = 30
         // Pageable get Student from (Offset + 1) to (Offset + size)
         Pageable pageable = PageRequest.of(page, size);
         // Fetch the specific page of students from the database using projection
-        Page<StudentInfoProjection> studentPage = studentRepository.findStudentInfos(search, counselor.getUniversity().getUniversityId(), pageable);
+        Page<StudentInfoProjection> studentPage = studentRepository.findStudentInfos(search, accountType, pageable);
         
         List<Map<String, Object>> stInfos = new ArrayList<>();
 
@@ -323,11 +319,6 @@ public class CounselorServiceImpl implements CounselorService {
         if(request.getFullName() != null) user.setFullName(request.getFullName());
         if(request.getYob() != null) user.setYob(request.getYob());
         if(request.getBio() != null) user.setBio(request.getBio());
-        if(request.getUniversityId() != null) {
-            University university = universityRepository.findById(request.getUniversityId())
-                    .orElseThrow(() -> new ResourceNotFoundException("University not found"));
-            counselor.setUniversity(university);
-        }
         if(request.getDepartment() != null) counselor.setDepartment(request.getDepartment());
 
         user = userRepository.save(user);
@@ -390,7 +381,7 @@ public class CounselorServiceImpl implements CounselorService {
                 Row row = sheet.createRow(rowNum++);
                 row.createCell(0).setCellValue(user.getFullName());
                 row.createCell(1).setCellValue(user.getEmail());
-                row.createCell(2).setCellValue(student.getUniversity() != null ? student.getUniversity().getName() : "");
+                row.createCell(2).setCellValue(student.getUniversityName() != null ? student.getUniversityName() : "");
                 row.createCell(3).setCellValue(student.getMajor());
                 row.createCell(4).setCellValue(student.getCareerRole().getCareerName());
                 row.createCell(5).setCellValue(progress + "%");

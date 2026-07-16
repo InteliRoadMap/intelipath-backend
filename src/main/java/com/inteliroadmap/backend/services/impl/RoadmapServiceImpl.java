@@ -1,11 +1,18 @@
 package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.components.RoadmapProgressCalculator;
+import com.inteliroadmap.backend.components.RoadmapSelectionResolver;
+import com.inteliroadmap.backend.components.SelectionView;
 import com.inteliroadmap.backend.domain.dto.request.UpdateNodeProgressRequest;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.FptNodeCoverageResponse;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.FptNodeResourceResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapNodeResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.StudentRoadmapResponse;
 import com.inteliroadmap.backend.domain.entity.CareerRequiredSkill;
 import com.inteliroadmap.backend.domain.entity.CareerRole;
+import com.inteliroadmap.backend.domain.entity.FptSubject;
+import com.inteliroadmap.backend.domain.entity.FptSubjectResource;
+import com.inteliroadmap.backend.domain.entity.FptSubjectSkill;
 import com.inteliroadmap.backend.domain.entity.Skill;
 import com.inteliroadmap.backend.domain.entity.RoadmapNodeLayout;
 import com.inteliroadmap.backend.domain.entity.SkillNode;
@@ -13,9 +20,13 @@ import com.inteliroadmap.backend.domain.entity.Student;
 import com.inteliroadmap.backend.domain.entity.StudentProgress;
 import com.inteliroadmap.backend.domain.entity.StudentSkill;
 import com.inteliroadmap.backend.domain.entity.User;
+import com.inteliroadmap.backend.domain.enums.AccountType;
 import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
 import com.inteliroadmap.backend.repositories.CareerRequiredSkillRepository;
 import com.inteliroadmap.backend.repositories.CareerRoleRepository;
+import com.inteliroadmap.backend.repositories.FptSubjectRepository;
+import com.inteliroadmap.backend.repositories.FptSubjectResourceRepository;
+import com.inteliroadmap.backend.repositories.FptSubjectSkillRepository;
 import com.inteliroadmap.backend.repositories.RoadmapNodeLayoutRepository;
 import com.inteliroadmap.backend.repositories.SkillNodeRepository;
 import com.inteliroadmap.backend.repositories.SkillRepository;
@@ -27,6 +38,7 @@ import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.exceptions.ForbiddenException;
 import com.inteliroadmap.backend.security.SecurityUtils;
 import com.inteliroadmap.backend.services.AuthenticatedStudentService;
+import com.inteliroadmap.backend.services.RoadmapSelectionService;
 import com.inteliroadmap.backend.services.RoadmapService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -66,12 +78,20 @@ public class RoadmapServiceImpl implements RoadmapService {
     private final StudentSkillRepository studentSkillRepository;
     private final CareerRequiredSkillRepository careerRequiredSkillRepository;
     private final SkillRepository skillRepository;
+    private final FptSubjectRepository fptSubjectRepository;
+    private final FptSubjectSkillRepository fptSubjectSkillRepository;
+    private final FptSubjectResourceRepository fptSubjectResourceRepository;
+    private final RoadmapSelectionService roadmapSelectionService;
+    private final RoadmapSelectionResolver roadmapSelectionResolver;
 
     private static final String COMPLETED_STATUS = "COMPLETED";
     private static final String FRONTEND_COMPLETED_STATUS = "completed";
     private static final String FRONTEND_IN_PROGRESS_STATUS = "in_progress";
     private static final String FRONTEND_CURRENT_STATUS = "current";
     private static final String FRONTEND_LOCKED_STATUS = "locked";
+    // An alternative in a CHOOSE_ONE group the student did not pick: shown greyed
+    // out, not part of the active path, and not counted toward progress.
+    private static final String FRONTEND_ALTERNATIVE_STATUS = "alternative";
     private final AuthenticatedStudentService authenticatedStudentService;
 
     /**
@@ -119,6 +139,15 @@ public class RoadmapServiceImpl implements RoadmapService {
                     .build();
         }
 
+        // Seed any obvious CHOOSE_ONE picks from the student's skill profile before
+        // reading the roadmap, so a Java student sees Java pre-selected on first load.
+        // Runs in its own transaction; a failure here must not break the read.
+        try {
+            roadmapSelectionService.autoDefaultSelections();
+        } catch (RuntimeException e) {
+            log.warn("RoadmapServiceImpl: auto-default selections skipped: {}", e.getMessage());
+        }
+
         // Look up the career role and associated skill nodes
         CareerRole careerRole = careerRoleRepository.findByCareerId(student.getCareerRole().getCareerId());
         List<SkillNode> nodes = skillNodeRepository
@@ -140,15 +169,24 @@ public class RoadmapServiceImpl implements RoadmapService {
                 )
         );
 
-        // Compute frontend statuses (e.g., locked, current, completed) and overall progress
-        Map<UUID, String> statusByNodeId = buildFrontendStatusMap(nodes, progressByNodeId);
-        int progress = calculateProgress(nodes, progressByNodeId);
+        // Resolve the student's CHOOSE_ONE picks: which alternatives are off-path.
+        SelectionView selectionView = roadmapSelectionResolver.resolve(student.getUserId(), nodes);
+
+        // Compute frontend statuses (e.g., locked, current, completed) and overall progress.
+        // Progress counts the active path only, so picking a language never dilutes the %.
+        Map<UUID, String> statusByNodeId = buildFrontendStatusMap(nodes, progressByNodeId, selectionView);
+        int progress = calculateProgress(selectionView.activePathNodes(nodes), progressByNodeId);
+
+        // FPT material is only offered to FPT accounts; everyone else gets the public
+        // roadmap.sh links that every node already carries.
+        User user = userRepository.findByUserId(student.getUserId());
+        boolean fptAccount = user != null && user.getAccountType() == AccountType.FPT;
 
         // Build the hierarchical roadmap tree
         return StudentRoadmapResponse.builder()
                 .targetCareerRole(careerRole.getCareerName())
                 .progress(progress)
-                .nodes(buildRoadmapTree(nodes, statusByNodeId, progressByNodeId))
+                .nodes(buildRoadmapTree(nodes, statusByNodeId, progressByNodeId, selectionView, fptAccount))
                 .build();
     }
 
@@ -204,9 +242,10 @@ public class RoadmapServiceImpl implements RoadmapService {
                         nodeIds
                 );
 
-        // Delegate to the shared weight-based calculator so this endpoint reports the
-        // same percentage as /roadmaps/student and the dashboard (single source of truth).
-        return roadmapProgressCalculator.calculateProgress(nodes, progressList);
+        // Count only the student's active path (chosen alternatives), matching
+        // /roadmaps/student. Delegate to the shared calculator (single source of truth).
+        SelectionView selectionView = roadmapSelectionResolver.resolve(student.getUserId(), nodes);
+        return roadmapProgressCalculator.calculateProgress(selectionView.activePathNodes(nodes), progressList);
     }
 
     /**
@@ -242,6 +281,21 @@ public class RoadmapServiceImpl implements RoadmapService {
         }
 
         SkillNode node = nodeOptional.get();
+
+        // Resolve the student's CHOOSE_ONE picks over this career once; used both to
+        // block writes on off-path nodes and to gate topic auto-completion below.
+        List<SkillNode> careerNodes = (node.getCareerRole() != null && node.getCareerRole().getCareerId() != null)
+                ? skillNodeRepository.findByCareerRole_CareerIdOrderByNodeLevelAscNodeNameAsc(node.getCareerRole().getCareerId())
+                : List.of();
+        SelectionView selectionView = roadmapSelectionResolver.resolve(student.getUserId(), careerNodes);
+
+        // An alternative the student has not chosen (or any alternative while the
+        // CHOOSE_ONE group is still undecided) is off the active path: the student
+        // must pick it first before tracking progress on it.
+        if (selectionView.isExcludedFromProgress(node.getNodeId())) {
+            throw new ForbiddenException("Select this alternative for your roadmap before tracking progress on it.");
+        }
+
         Optional<StudentProgress> progressOptional =
                 studentProgressRepository.findByStudent_UserIdAndSkillNode_NodeId(student.getUserId(), node.getNodeId());
 
@@ -267,14 +321,12 @@ public class RoadmapServiceImpl implements RoadmapService {
         // locked (prerequisite/stage/parent not satisfied) cannot be advanced. This keeps
         // the write path from completing nodes out of order and feeding bad auto-completion.
         if ((newStatus == RoadmapStepStatus.IN_PROGRESS || newStatus == RoadmapStepStatus.COMPLETED)
-                && node.getCareerRole() != null && node.getCareerRole().getCareerId() != null) {
-            List<SkillNode> careerNodes = skillNodeRepository
-                    .findByCareerRole_CareerIdOrderByNodeLevelAscNodeNameAsc(node.getCareerRole().getCareerId());
+                && !careerNodes.isEmpty()) {
             Map<UUID, StudentProgress> progressByNode = mapProgressByNodeId(
                     studentProgressRepository.findByStudent_UserIdAndSkillNode_NodeIdIn(
                             student.getUserId(),
                             careerNodes.stream().map(SkillNode::getNodeId).toList()));
-            String computedStatus = buildFrontendStatusMap(careerNodes, progressByNode).get(node.getNodeId());
+            String computedStatus = buildFrontendStatusMap(careerNodes, progressByNode, selectionView).get(node.getNodeId());
             if (FRONTEND_LOCKED_STATUS.equals(computedStatus)) {
                 throw new ForbiddenException("This node is locked; complete its prerequisites first.");
             }
@@ -327,7 +379,7 @@ public class RoadmapServiceImpl implements RoadmapService {
 
         // A topic (spine) node auto-completes from its children, so whenever a child's
         // status changes, re-evaluate every ancestor topic and complete/revert it.
-        syncTopicAutoCompletion(student, node);
+        syncTopicAutoCompletion(student, node, selectionView);
     }
 
     /**
@@ -336,7 +388,7 @@ public class RoadmapServiceImpl implements RoadmapService {
      * its child weight crosses {@link #parentCompletionThreshold}, and reverted back to
      * IN_PROGRESS if a child is later un-completed and drags it below the threshold.
      */
-    private void syncTopicAutoCompletion(Student student, SkillNode changedNode) {
+    private void syncTopicAutoCompletion(Student student, SkillNode changedNode, SelectionView selectionView) {
         SkillNode topic = changedNode.getParentNode();
         while (topic != null) {
             final SkillNode currentTopic = topic;
@@ -344,6 +396,11 @@ public class RoadmapServiceImpl implements RoadmapService {
             long totalWeight = 0;
             long doneWeight = 0;
             for (SkillNode child : children) {
+                // Off-path alternatives never count toward a topic's completion, so
+                // e.g. "Pick a Language" completes from the single chosen language.
+                if (selectionView.isExcludedFromProgress(child.getNodeId())) {
+                    continue;
+                }
                 int weight = nodeWeight(child);
                 totalWeight += weight;
                 StudentProgress childProgress = studentProgressRepository
@@ -458,7 +515,8 @@ public class RoadmapServiceImpl implements RoadmapService {
 
     private Map<UUID, String> buildFrontendStatusMap(
             List<SkillNode> nodes,
-            Map<UUID, StudentProgress> progressByNodeId
+            Map<UUID, StudentProgress> progressByNodeId,
+            SelectionView selectionView
     ) {
         Map<UUID, String> statusByNodeId = new HashMap<>();
         Set<String> passedStages = findPassedStages(nodes, progressByNodeId);
@@ -468,6 +526,13 @@ public class RoadmapServiceImpl implements RoadmapService {
         // Parents/previous nodes must be classified before their dependants,
         // regardless of the level/name order the nodes were fetched in.
         for (SkillNode node : orderDependenciesFirst(nodes)) {
+            // Unchosen alternative of a decided CHOOSE_ONE group (and its subtree):
+            // greyed out, off the active path — bypass the normal gating rules.
+            if (selectionView.isGreyedAlternative(node.getNodeId())) {
+                statusByNodeId.put(node.getNodeId(), FRONTEND_ALTERNATIVE_STATUS);
+                continue;
+            }
+
             StudentProgress progress = progressByNodeId.get(node.getNodeId());
             if (progress != null && RoadmapStepStatus.COMPLETED == progress.getStatus()) {
                 statusByNodeId.put(node.getNodeId(), FRONTEND_COMPLETED_STATUS);
@@ -487,7 +552,7 @@ public class RoadmapServiceImpl implements RoadmapService {
                         || isSequentialGateLocked(node.getPreviousNode(), statusByNodeId);
                 if (gateLocked) {
                     statusByNodeId.put(node.getNodeId(), FRONTEND_LOCKED_STATUS);
-                } else if (childCompletionRatio(node, childrenByParent, progressByNodeId) >= parentCompletionThreshold) {
+                } else if (childCompletionRatio(node, childrenByParent, progressByNodeId, selectionView) >= parentCompletionThreshold) {
                     statusByNodeId.put(node.getNodeId(), FRONTEND_COMPLETED_STATUS);
                 } else {
                     statusByNodeId.put(node.getNodeId(), FRONTEND_CURRENT_STATUS);
@@ -523,16 +588,25 @@ public class RoadmapServiceImpl implements RoadmapService {
                 .collect(Collectors.groupingBy(n -> n.getParentNode().getNodeId()));
     }
 
-    /** Completed-child weight over total-child weight for a topic (0.0 when it has no children). */
+    /**
+     * Completed-child weight over total-child weight for a topic (0.0 when it has no
+     * counted children). Children off the active path (unchosen alternatives, or all
+     * alternatives while a CHOOSE_ONE group is undecided) are excluded from both sides,
+     * so e.g. "Pick a Language" completes once the single chosen language is done.
+     */
     private double childCompletionRatio(
             SkillNode topic,
             Map<UUID, List<SkillNode>> childrenByParent,
-            Map<UUID, StudentProgress> progressByNodeId
+            Map<UUID, StudentProgress> progressByNodeId,
+            SelectionView selectionView
     ) {
         List<SkillNode> children = childrenByParent.getOrDefault(topic.getNodeId(), List.of());
         long totalWeight = 0;
         long doneWeight = 0;
         for (SkillNode child : children) {
+            if (selectionView.isExcludedFromProgress(child.getNodeId())) {
+                continue;
+            }
             int weight = nodeWeight(child);
             totalWeight += weight;
             StudentProgress p = progressByNodeId.get(child.getNodeId());
@@ -671,10 +745,16 @@ public class RoadmapServiceImpl implements RoadmapService {
     }
 
 
+    /**
+     * @param fptAccount when false the FLM overlay is skipped entirely, so nodes carry no
+     *                   fptCoverage/fptResources and the two overlay queries never run
+     */
     private List<RoadmapNodeResponse> buildRoadmapTree(
             List<SkillNode> nodes,
             Map<UUID, String> statusByNodeId,
-            Map<UUID, StudentProgress> progressByNodeId
+            Map<UUID, StudentProgress> progressByNodeId,
+            SelectionView selectionView,
+            boolean fptAccount
     ) {
         // Presentation-only placement, joined in from the layout table.
         Map<UUID, RoadmapNodeLayout> layoutsByNodeId = new HashMap<>();
@@ -686,6 +766,28 @@ public class RoadmapServiceImpl implements RoadmapService {
         Set<UUID> topicIds = topicParentIds(nodes);
         Map<UUID, List<SkillNode>> childrenByParent = childrenByParent(nodes);
 
+        // FLM overlay: skill name -> teaching FPT subjects, and subject -> lesson resources.
+        // Left empty for non-FPT accounts, which also skips both overlay queries.
+        Map<String, List<FptSubject>> subjectsBySkill = new HashMap<>();
+        Map<String, List<FptSubjectResource>> resourcesByCode = new HashMap<>();
+        List<FptSubjectSkill> fptLinks = fptAccount ? fptSubjectSkillRepository.findAll() : List.of();
+        if (!fptLinks.isEmpty()) {
+            Set<String> codes = fptLinks.stream().map(FptSubjectSkill::getSubjectCode).collect(Collectors.toSet());
+            Map<String, FptSubject> subjectByCode = fptSubjectRepository.findAllById(codes).stream()
+                    .collect(Collectors.toMap(FptSubject::getCode, s -> s));
+            for (FptSubjectSkill link : fptLinks) {
+                FptSubject subject = subjectByCode.get(link.getSubjectCode());
+                if (subject != null && link.getSkillName() != null) {
+                    subjectsBySkill.computeIfAbsent(link.getSkillName().toLowerCase(), k -> new ArrayList<>()).add(subject);
+                }
+            }
+            resourcesByCode = fptSubjectResourceRepository
+                    .findBySubjectCodeInOrderBySubjectCodeAscOrderIndexAsc(codes).stream()
+                    .collect(Collectors.groupingBy(FptSubjectResource::getSubjectCode));
+        }
+        final Map<String, List<FptSubject>> subjectsBySkillFinal = subjectsBySkill;
+        final Map<String, List<FptSubjectResource>> resourcesByCodeFinal = resourcesByCode;
+
         return nodes.stream()
                 .map(node -> {
                     RoadmapNodeLayout layout = layoutsByNodeId.get(node.getNodeId());
@@ -693,10 +795,47 @@ public class RoadmapServiceImpl implements RoadmapService {
                     List<SkillNode> children = isTopic
                             ? childrenByParent.getOrDefault(node.getNodeId(), List.of())
                             : List.of();
-                    int childCompleted = (int) children.stream()
+                    // Only children on the student's active path count toward the topic
+                    // bar. For a CHOOSE_ONE group that means the single chosen alternative,
+                    // so a picked-and-finished "Pick a Database" reads 1/1, not 1/6.
+                    List<SkillNode> countedChildren = children.stream()
+                            .filter(c -> !selectionView.isExcludedFromProgress(c.getNodeId()))
+                            .toList();
+                    int childCompleted = (int) countedChildren.stream()
                             .map(c -> progressByNodeId.get(c.getNodeId()))
                             .filter(p -> p != null && RoadmapStepStatus.COMPLETED == p.getStatus())
                             .count();
+                    StudentProgress nodeProgress = progressByNodeId.get(node.getNodeId());
+                    String completedAt = nodeProgress != null && nodeProgress.getCompletedAt() != null
+                            ? nodeProgress.getCompletedAt().toString()
+                            : null;
+
+                    // FLM coverage/resources for this node, joined by its skill name.
+                    String skillName = node.getSkill() != null && node.getSkill().getSkillName() != null
+                            ? node.getSkill().getSkillName() : node.getNodeName();
+                    List<FptSubject> coverSubjects = skillName != null
+                            ? subjectsBySkillFinal.getOrDefault(skillName.toLowerCase(), List.of())
+                            : List.of();
+                    boolean covered = !coverSubjects.isEmpty();
+                    // Only flag self-study on concrete leaf skill nodes, so the canvas isn't noisy.
+                    boolean selfStudy = !covered && node.getSkill() != null && !isTopic;
+                    // Non-FPT accounts get null, not a selfStudy=true stub: with an empty
+                    // overlay every leaf would otherwise claim FPT doesn't teach it.
+                    FptNodeCoverageResponse fptCoverage = (fptAccount && (covered || selfStudy))
+                            ? FptNodeCoverageResponse.builder()
+                                    .covered(covered)
+                                    .selfStudy(selfStudy)
+                                    .subjects(coverSubjects.stream()
+                                            // Term is per-curriculum now; omit it on the shared node view.
+                                            .map(s -> FptNodeCoverageResponse.FptSubjectRefResponse.builder()
+                                                    .code(s.getCode()).name(s.getName()).build())
+                                            .toList())
+                                    .build()
+                            : null;
+                    List<FptNodeResourceResponse> fptResources = fptAccount
+                            ? buildNodeResources(coverSubjects, resourcesByCodeFinal)
+                            : null;
+
                     return RoadmapNodeResponse.builder()
                             .nodeId(node.getNodeId())
                             .nodeName(node.getNodeName())
@@ -709,8 +848,14 @@ public class RoadmapServiceImpl implements RoadmapService {
                             .weight(node.getType() != null ? node.getType().getWeight() : null)
                             .requiredProficiency(node.getRequiredProficiency())
                             .parentTopic(isTopic)
-                            .childTotal(children.size())
+                            .childTotal(countedChildren.size())
                             .childCompleted(childCompleted)
+                            .selection(node.getSelection())
+                            .chooseCount(node.getChooseCount())
+                            .nodeKind(node.getNodeKind())
+                            .axis(node.getAxis())
+                            .isOptional(node.getIsOptional())
+                            .isCheckpoint(node.getIsCheckpoint())
                             .positionX(layout != null ? layout.getPositionX() : null)
                             .positionY(layout != null ? layout.getPositionY() : null)
                             .lane(layout != null ? layout.getLane() : null)
@@ -718,8 +863,77 @@ public class RoadmapServiceImpl implements RoadmapService {
                             .description(node.getDescription())
                             .resource(node.getResource())
                             .status(statusByNodeId.getOrDefault(node.getNodeId(), FRONTEND_LOCKED_STATUS))
+                            .completedAt(completedAt)
+                            .fptCoverage(fptCoverage)
+                            .fptResources(fptResources)
                             .build();
                 })
                 .toList();
+    }
+
+    // Session topics that are class logistics, not learning content — never worth
+    // surfacing on a skill node.
+    private static final List<String> SESSION_TOPIC_SKIP = List.of(
+            "orientation", "lab room", "regulation", "review", "revision", "revison",
+            "exam", "final", "project evaluation", "progress test", "mock", "guideline",
+            "holiday", "quiz", "assignment submission");
+
+    private static final int MAX_SESSIONS_PER_SUBJECT = 6;
+    private static final int MAX_NODE_RESOURCES = 24;
+
+    /**
+     * Pick the resources actually worth showing on one skill node. A subject's syllabus
+     * has ~60 session rows, most of them just a weekly schedule entry with nothing to
+     * open; dumping them all is noise. So: keep every material (textbook / online course
+     * link), but for sessions keep only ones that link to something, drop pure logistics
+     * (orientation / exam / project evaluation …), and collapse repeated chapters — then
+     * cap so a node with several covering subjects stays readable. Materials come first.
+     */
+    private List<FptNodeResourceResponse> buildNodeResources(
+            List<FptSubject> subjects, Map<String, List<FptSubjectResource>> resourcesByCode) {
+        List<FptNodeResourceResponse> materials = new ArrayList<>();
+        List<FptNodeResourceResponse> sessions = new ArrayList<>();
+        Set<String> seenMaterialTitles = new HashSet<>();
+        Set<String> seenSessionTopics = new HashSet<>();
+
+        for (FptSubject subject : subjects) {
+            int keptSessions = 0;
+            for (FptSubjectResource r : resourcesByCode.getOrDefault(subject.getCode(), List.of())) {
+                boolean isSession = "SESSION".equals(r.getKind().name());
+                String url = r.getUrl() != null ? r.getUrl().trim() : "";
+
+                if (!isSession) {
+                    String key = (r.getTitle() == null ? "" : r.getTitle().trim().toLowerCase());
+                    if (!key.isEmpty() && !seenMaterialTitles.add(key)) continue;
+                    materials.add(toResource(r));
+                    continue;
+                }
+
+                // Sessions: only ones you can actually open, minus logistics, deduped by topic.
+                if (url.isEmpty()) continue;
+                if (keptSessions >= MAX_SESSIONS_PER_SUBJECT) continue;
+                String topic = (r.getTopic() == null ? "" : r.getTopic().trim().toLowerCase());
+                if (topic.isEmpty()) continue;
+                if (SESSION_TOPIC_SKIP.stream().anyMatch(topic::contains)) continue;
+                String norm = subject.getCode() + "|" + topic.replace("(cnt)", "").replace("(cont)", "").trim();
+                if (!seenSessionTopics.add(norm)) continue;
+                sessions.add(toResource(r));
+                keptSessions++;
+            }
+        }
+
+        List<FptNodeResourceResponse> out = new ArrayList<>(materials);
+        out.addAll(sessions);
+        return out.size() > MAX_NODE_RESOURCES ? out.subList(0, MAX_NODE_RESOURCES) : out;
+    }
+
+    private static FptNodeResourceResponse toResource(FptSubjectResource r) {
+        return FptNodeResourceResponse.builder()
+                .subjectCode(r.getSubjectCode())
+                .kind(r.getKind().name())
+                .title(r.getTitle())
+                .url(r.getUrl())
+                .topic(r.getTopic())
+                .build();
     }
 }

@@ -17,6 +17,9 @@ public class ScrapedRecruitmentResponse {
     // { tags, descriptions, general_infos, related_tags }  (AI-summarised)
     private Map<String, Object> descriptions;
 
+    @JsonProperty("posted_date")
+    private String postedDate;
+
     @JsonProperty("application_deadline")
     private String applicationDeadline;
 }

@@ -27,17 +27,13 @@ CREATE TABLE IF NOT EXISTS skills (
     skill_name      VARCHAR(255) NOT NULL UNIQUE
 );
 
-CREATE TABLE IF NOT EXISTS universities (
-    university_id   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    code            VARCHAR(50) UNIQUE,
-    name            VARCHAR(255) NOT NULL,
-    logo_url        TEXT,
-    domain_email    VARCHAR(100)
-);
-
 CREATE TABLE IF NOT EXISTS users (
     user_id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email           VARCHAR(255) UNIQUE NOT NULL,
+    -- Login name for provisioned accounts (staff, FPT students); NULL for OAuth accounts.
+    username        VARCHAR(100) UNIQUE,
+    -- BCrypt hash; NULL for OAuth accounts, which have no local credential.
+    password_hash   VARCHAR(100),
     full_name       VARCHAR(255),
     yob             INT,
     bio             TEXT,
@@ -46,39 +42,38 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at      TIMESTAMP NOT NULL DEFAULT NOW(),
     role            VARCHAR(30) NOT NULL DEFAULT 'STUDENT',
     account_status  VARCHAR(30) NOT NULL DEFAULT 'ACTIVE',
+    account_type    VARCHAR(20) NOT NULL DEFAULT 'OTHER',
     CONSTRAINT ck_users_role
         CHECK (role IN ('STUDENT', 'COUNSELOR', 'MENTOR', 'ADMIN')),
     CONSTRAINT ck_users_account_status
-        CHECK (account_status IN ('ACTIVE', 'INACTIVE', 'SUSPENDED'))
+        CHECK (account_status IN ('ACTIVE', 'INACTIVE', 'SUSPENDED')),
+    CONSTRAINT ck_users_account_type
+        CHECK (account_type IN ('FPT', 'OTHER'))
 );
 
 CREATE TABLE IF NOT EXISTS students (
     user_id             UUID PRIMARY KEY,
     career_id           UUID,
-    university_id       UUID,
+    -- Free text, display only. FPT material access is decided by users.account_type.
     university_name     VARCHAR(255),
     year_of_admission   INT,
     major               VARCHAR(255),
     github_profile      VARCHAR(255),
     transcript_url      TEXT,
     portfolio_slug      VARCHAR(100) UNIQUE,
+    fpt_curriculum_id   UUID,
     CONSTRAINT fk_st_user
         FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE,
     CONSTRAINT fk_st_career
-        FOREIGN KEY (career_id) REFERENCES career_roles (career_id) ON DELETE SET NULL,
-    CONSTRAINT fk_st_university
-        FOREIGN KEY (university_id) REFERENCES universities (university_id) ON DELETE SET NULL
+        FOREIGN KEY (career_id) REFERENCES career_roles (career_id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS academic_counselor (
     user_id             UUID PRIMARY KEY,
-    university_id       UUID,
     department          VARCHAR(255),
     year_of_admission   INT,
     CONSTRAINT fk_ac_user
-        FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE,
-    CONSTRAINT fk_ac_university
-        FOREIGN KEY (university_id) REFERENCES universities (university_id) ON DELETE SET NULL
+        FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS industry_mentor (
@@ -130,10 +125,22 @@ CREATE TABLE IF NOT EXISTS skill_nodes (
     description          TEXT,
     resource             JSONB,
     completion_policy    VARCHAR(50) DEFAULT 'NEVER_COMPLETE',
+    selection            VARCHAR(20) DEFAULT 'ALL',
+    choose_count         INT,
+    node_kind            VARCHAR(20) DEFAULT 'CORE',
+    axis                 VARCHAR(20) DEFAULT 'MAIN',
+    is_optional          BOOLEAN DEFAULT FALSE,
+    is_checkpoint        BOOLEAN DEFAULT FALSE,
     required_proficiency INT,
     evidence_keywords    JSONB,
     CONSTRAINT ck_skill_nodes_completion_policy
         CHECK (completion_policy IS NULL OR completion_policy IN ('NEVER_COMPLETE', 'MANUAL_ONLY', 'EVIDENCE_ALLOWED')),
+    CONSTRAINT ck_skill_nodes_selection
+        CHECK (selection IS NULL OR selection IN ('ALL', 'CHOOSE_ONE')),
+    CONSTRAINT ck_skill_nodes_node_kind
+        CHECK (node_kind IS NULL OR node_kind IN ('CORE', 'ALTERNATIVE', 'OPTIONAL')),
+    CONSTRAINT ck_skill_nodes_axis
+        CHECK (axis IS NULL OR axis IN ('MAIN', 'BRANCH')),
     CONSTRAINT fk_sn_career
         FOREIGN KEY (career_id) REFERENCES career_roles (career_id) ON DELETE CASCADE,
     CONSTRAINT fk_sn_skill
@@ -198,6 +205,25 @@ CREATE TABLE IF NOT EXISTS student_progress (
         FOREIGN KEY (user_id) REFERENCES students (user_id) ON DELETE CASCADE,
     CONSTRAINT fk_sp_node
         FOREIGN KEY (node_id) REFERENCES skill_nodes (node_id) ON DELETE CASCADE
+);
+
+-- Which alternative a student picked inside a CHOOSE_ONE group. The roadmap
+-- template is shared across all students; this per-student overlay records the
+-- choice (e.g. "for Pick a Language, this student chose Java") so a Java student
+-- is never forced to complete C#. One row per (student, group).
+CREATE TABLE IF NOT EXISTS student_node_selections (
+    selection_id   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id        UUID NOT NULL,
+    group_node_id  UUID NOT NULL,
+    chosen_node_id UUID NOT NULL,
+    created_at     TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT uq_student_node_selection UNIQUE (user_id, group_node_id),
+    CONSTRAINT fk_sns_student
+        FOREIGN KEY (user_id) REFERENCES students (user_id) ON DELETE CASCADE,
+    CONSTRAINT fk_sns_group
+        FOREIGN KEY (group_node_id) REFERENCES skill_nodes (node_id) ON DELETE CASCADE,
+    CONSTRAINT fk_sns_chosen
+        FOREIGN KEY (chosen_node_id) REFERENCES skill_nodes (node_id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS skill_trends (
@@ -410,6 +436,7 @@ CREATE TABLE IF NOT EXISTS recruitments (
     recruitment_id       VARCHAR(255) PRIMARY KEY,
     recruitment_infos    JSONB,
     descriptions         JSONB,
+    posted_date          DATE,
     application_deadline DATE
 );
 
@@ -471,7 +498,6 @@ CREATE TABLE IF NOT EXISTS chat_messages (
 -- ============================================================
 
 CREATE INDEX IF NOT EXISTS idx_students_career_id                ON students (career_id);
-CREATE INDEX IF NOT EXISTS idx_students_university_id            ON students (university_id);
 CREATE INDEX IF NOT EXISTS idx_students_portfolio_slug           ON students (portfolio_slug);
 CREATE INDEX IF NOT EXISTS idx_crs_career_id                     ON career_required_skills (career_id);
 CREATE INDEX IF NOT EXISTS idx_crs_skill_id                      ON career_required_skills (skill_id);
@@ -555,3 +581,136 @@ CREATE TABLE IF NOT EXISTS course_enrollments (
     CONSTRAINT fk_enroll_student FOREIGN KEY (student_id) REFERENCES students (user_id) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_enroll_student ON course_enrollments (student_id);
+
+-- ============================================================
+-- FLM (FPT curriculum) overlay: subjects, their skill coverage & lesson
+-- resources, and each student's declared FPT subjects. Powers the per-student
+-- dynamic roadmap (passed subject -> covered skill -> transcript evidence) and
+-- the "learn at FPT" resources shown on each roadmap node.
+-- ============================================================
+-- The subject catalog is cohort-independent: one row per subject code, holding the
+-- shared syllabus facts (name, credits, prerequisite, CLOs/skills, resources). The
+-- per-cohort term placement lives in fpt_curriculum_subjects, NOT here, so the same
+-- subject shared by many curricula is stored once (no redundant duplication).
+CREATE TABLE IF NOT EXISTS fpt_subjects (
+    code          VARCHAR(20) PRIMARY KEY,
+    name          TEXT NOT NULL,
+    credits       INT,
+    prerequisite  TEXT,
+    description   TEXT
+);
+
+-- One row per FLM curriculum version (per cohort/program), e.g. BIT_SE_K21B. Multiple
+-- versions coexist; a sync of one never overwrites another.
+CREATE TABLE IF NOT EXISTS fpt_curricula (
+    id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    code           VARCHAR(60) NOT NULL UNIQUE,   -- BIT_SE_K21B
+    curid          VARCHAR(20),                   -- FLM numeric id used to scrape it
+    program        VARCHAR(20),                   -- SE, IA, AI, ...
+    cohort         INT,                           -- K number, e.g. 21
+    batch          VARCHAR(20),                   -- B / C / D_K20A ...
+    effective_date DATE,
+    is_default     BOOLEAN NOT NULL DEFAULT FALSE,
+    synced_at      TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_fc_program_cohort ON fpt_curricula (program, cohort);
+
+-- Maps a subject into a curriculum at a given term. Same subject_code, different
+-- semester across curricula — this is where "trùng môn khác kỳ" is resolved.
+CREATE TABLE IF NOT EXISTS fpt_curriculum_subjects (
+    curriculum_id UUID NOT NULL,
+    subject_code  VARCHAR(20) NOT NULL,
+    semester      INT,
+    PRIMARY KEY (curriculum_id, subject_code),
+    CONSTRAINT fk_fcs_curriculum FOREIGN KEY (curriculum_id) REFERENCES fpt_curricula (id) ON DELETE CASCADE,
+    CONSTRAINT fk_fcs_subject FOREIGN KEY (subject_code) REFERENCES fpt_subjects (code) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_fcs_curriculum ON fpt_curriculum_subjects (curriculum_id);
+
+CREATE TABLE IF NOT EXISTS fpt_subject_skills (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    subject_code  VARCHAR(20) NOT NULL,
+    skill_id      UUID,
+    skill_name    VARCHAR(255) NOT NULL,
+    CONSTRAINT fk_fss_subject FOREIGN KEY (subject_code) REFERENCES fpt_subjects (code) ON DELETE CASCADE,
+    CONSTRAINT fk_fss_skill FOREIGN KEY (skill_id) REFERENCES skills (skill_id) ON DELETE SET NULL,
+    CONSTRAINT uq_fss UNIQUE (subject_code, skill_name)
+);
+CREATE INDEX IF NOT EXISTS idx_fss_skill_name ON fpt_subject_skills (LOWER(skill_name));
+
+CREATE TABLE IF NOT EXISTS fpt_subject_resources (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    subject_code  VARCHAR(20) NOT NULL,
+    kind          VARCHAR(20) NOT NULL,
+    title         TEXT NOT NULL,
+    url           TEXT,
+    topic         TEXT,
+    clo_ref       TEXT,
+    order_index   INT NOT NULL DEFAULT 0,
+    CONSTRAINT fk_fsr_subject FOREIGN KEY (subject_code) REFERENCES fpt_subjects (code) ON DELETE CASCADE,
+    CONSTRAINT ck_fsr_kind CHECK (kind IN ('MATERIAL', 'SESSION'))
+);
+CREATE INDEX IF NOT EXISTS idx_fsr_subject ON fpt_subject_resources (subject_code);
+
+CREATE TABLE IF NOT EXISTS student_fpt_subjects (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id       UUID NOT NULL,
+    subject_code  VARCHAR(20) NOT NULL,
+    curriculum_id UUID,
+    status        VARCHAR(20) NOT NULL DEFAULT 'PASSED',
+    source        VARCHAR(20) NOT NULL DEFAULT 'MANUAL',
+    updated_at    TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_sfs_user FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE,
+    CONSTRAINT fk_sfs_subject FOREIGN KEY (subject_code) REFERENCES fpt_subjects (code) ON DELETE CASCADE,
+    CONSTRAINT fk_sfs_curriculum FOREIGN KEY (curriculum_id) REFERENCES fpt_curricula (id) ON DELETE SET NULL,
+    CONSTRAINT ck_sfs_status CHECK (status IN ('PASSED', 'IN_PROGRESS', 'PLANNED')),
+    CONSTRAINT ck_sfs_source CHECK (source IN ('CURRICULUM_TERM', 'MANUAL')),
+    CONSTRAINT uq_sfs UNIQUE (user_id, subject_code)
+);
+CREATE INDEX IF NOT EXISTS idx_sfs_user ON student_fpt_subjects (user_id);
+
+-- ============================================================
+-- In-place migrations for databases created before this revision
+-- ============================================================
+-- CREATE TABLE IF NOT EXISTS above never adds columns to a pre-existing table,
+-- so bring skill_nodes up to date with the new roadmap-selection columns.
+ALTER TABLE skill_nodes ADD COLUMN IF NOT EXISTS selection     VARCHAR(20) DEFAULT 'ALL';
+ALTER TABLE skill_nodes ADD COLUMN IF NOT EXISTS choose_count  INT;
+ALTER TABLE skill_nodes ADD COLUMN IF NOT EXISTS node_kind     VARCHAR(20) DEFAULT 'CORE';
+ALTER TABLE skill_nodes ADD COLUMN IF NOT EXISTS axis          VARCHAR(20) DEFAULT 'MAIN';
+ALTER TABLE skill_nodes ADD COLUMN IF NOT EXISTS is_optional   BOOLEAN DEFAULT FALSE;
+ALTER TABLE skill_nodes ADD COLUMN IF NOT EXISTS is_checkpoint BOOLEAN DEFAULT FALSE;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_skill_nodes_selection') THEN
+        ALTER TABLE skill_nodes ADD CONSTRAINT ck_skill_nodes_selection
+            CHECK (selection IS NULL OR selection IN ('ALL', 'CHOOSE_ONE'));
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_skill_nodes_node_kind') THEN
+        ALTER TABLE skill_nodes ADD CONSTRAINT ck_skill_nodes_node_kind
+            CHECK (node_kind IS NULL OR node_kind IN ('CORE', 'ALTERNATIVE', 'OPTIONAL'));
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_skill_nodes_axis') THEN
+        ALTER TABLE skill_nodes ADD CONSTRAINT ck_skill_nodes_axis
+            CHECK (axis IS NULL OR axis IN ('MAIN', 'BRANCH'));
+    END IF;
+END $$;
+
+-- Multi-curriculum: subject term placement moves out of fpt_subjects into
+-- fpt_curriculum_subjects so per-cohort curricula can coexist without overwriting.
+ALTER TABLE fpt_subjects        DROP COLUMN IF EXISTS semester;
+ALTER TABLE student_fpt_subjects ADD COLUMN IF NOT EXISTS curriculum_id UUID;
+ALTER TABLE students             ADD COLUMN IF NOT EXISTS fpt_curriculum_id UUID;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_sfs_curriculum') THEN
+        ALTER TABLE student_fpt_subjects ADD CONSTRAINT fk_sfs_curriculum
+            FOREIGN KEY (curriculum_id) REFERENCES fpt_curricula (id) ON DELETE SET NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_st_fpt_curriculum') THEN
+        ALTER TABLE students ADD CONSTRAINT fk_st_fpt_curriculum
+            FOREIGN KEY (fpt_curriculum_id) REFERENCES fpt_curricula (id) ON DELETE SET NULL;
+    END IF;
+END $$;

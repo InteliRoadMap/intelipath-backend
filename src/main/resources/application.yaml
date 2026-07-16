@@ -111,6 +111,23 @@ mentor:
   # not using ingested knowledge. Tune here.
   rag-enabled: ${MENTOR_RAG_ENABLED:true}
 
+# Credentials for the seeded dev accounts. Supplied from .env, never defaulted:
+# a password in the repo is a password everyone with repo access knows. Leave a
+# pair unset and that account seeds without a local credential (OAuth only).
+seed:
+  admin:
+    username: ${SEED_ADMIN_USERNAME:}
+    password: ${SEED_ADMIN_PASSWORD:}
+  counselor:
+    username: ${SEED_COUNSELOR_USERNAME:}
+    password: ${SEED_COUNSELOR_PASSWORD:}
+  student:
+    username: ${SEED_STUDENT_USERNAME:}
+    password: ${SEED_STUDENT_PASSWORD:}
+  mentor:
+    password: ${SEED_MENTOR_PASSWORD:}
+    username: ${SEED_MENTOR_USERNAME:}
+
 roadmap:
   # A topic (spine) node auto-completes once this fraction of its child sub-skills'
   # weight is COMPLETED (0.6 = 60%). Children unlock as soon as the topic is reached,
