@@ -62,6 +62,7 @@ CREATE TABLE IF NOT EXISTS students (
     github_profile      VARCHAR(255),
     transcript_url      TEXT,
     portfolio_slug      VARCHAR(100) UNIQUE,
+    fpt_curriculum_id   UUID,
     CONSTRAINT fk_st_user
         FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE,
     CONSTRAINT fk_st_career
@@ -441,6 +442,7 @@ CREATE TABLE IF NOT EXISTS recruitments (
     recruitment_id       VARCHAR(255) PRIMARY KEY,
     recruitment_infos    JSONB,
     descriptions         JSONB,
+    posted_date          DATE,
     application_deadline DATE
 );
 
@@ -588,6 +590,93 @@ CREATE TABLE IF NOT EXISTS course_enrollments (
 CREATE INDEX IF NOT EXISTS idx_enroll_student ON course_enrollments (student_id);
 
 -- ============================================================
+-- FLM (FPT curriculum) overlay: subjects, their skill coverage & lesson
+-- resources, and each student's declared FPT subjects. Powers the per-student
+-- dynamic roadmap (passed subject -> covered skill -> transcript evidence) and
+-- the "learn at FPT" resources shown on each roadmap node.
+-- ============================================================
+-- The subject catalog is cohort-independent: one row per subject code, holding the
+-- shared syllabus facts (name, credits, prerequisite, CLOs/skills, resources). The
+-- per-cohort term placement lives in fpt_curriculum_subjects, NOT here, so the same
+-- subject shared by many curricula is stored once (no redundant duplication).
+CREATE TABLE IF NOT EXISTS fpt_subjects (
+    code          VARCHAR(20) PRIMARY KEY,
+    name          TEXT NOT NULL,
+    credits       INT,
+    prerequisite  TEXT,
+    description   TEXT
+);
+
+-- One row per FLM curriculum version (per cohort/program), e.g. BIT_SE_K21B. Multiple
+-- versions coexist; a sync of one never overwrites another.
+CREATE TABLE IF NOT EXISTS fpt_curricula (
+    id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    code           VARCHAR(60) NOT NULL UNIQUE,   -- BIT_SE_K21B
+    curid          VARCHAR(20),                   -- FLM numeric id used to scrape it
+    program        VARCHAR(20),                   -- SE, IA, AI, ...
+    cohort         INT,                           -- K number, e.g. 21
+    batch          VARCHAR(20),                   -- B / C / D_K20A ...
+    effective_date DATE,
+    is_default     BOOLEAN NOT NULL DEFAULT FALSE,
+    synced_at      TIMESTAMP
+);
+CREATE INDEX IF NOT EXISTS idx_fc_program_cohort ON fpt_curricula (program, cohort);
+
+-- Maps a subject into a curriculum at a given term. Same subject_code, different
+-- semester across curricula — this is where "trùng môn khác kỳ" is resolved.
+CREATE TABLE IF NOT EXISTS fpt_curriculum_subjects (
+    curriculum_id UUID NOT NULL,
+    subject_code  VARCHAR(20) NOT NULL,
+    semester      INT,
+    PRIMARY KEY (curriculum_id, subject_code),
+    CONSTRAINT fk_fcs_curriculum FOREIGN KEY (curriculum_id) REFERENCES fpt_curricula (id) ON DELETE CASCADE,
+    CONSTRAINT fk_fcs_subject FOREIGN KEY (subject_code) REFERENCES fpt_subjects (code) ON DELETE CASCADE
+);
+CREATE INDEX IF NOT EXISTS idx_fcs_curriculum ON fpt_curriculum_subjects (curriculum_id);
+
+CREATE TABLE IF NOT EXISTS fpt_subject_skills (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    subject_code  VARCHAR(20) NOT NULL,
+    skill_id      UUID,
+    skill_name    VARCHAR(255) NOT NULL,
+    CONSTRAINT fk_fss_subject FOREIGN KEY (subject_code) REFERENCES fpt_subjects (code) ON DELETE CASCADE,
+    CONSTRAINT fk_fss_skill FOREIGN KEY (skill_id) REFERENCES skills (skill_id) ON DELETE SET NULL,
+    CONSTRAINT uq_fss UNIQUE (subject_code, skill_name)
+);
+CREATE INDEX IF NOT EXISTS idx_fss_skill_name ON fpt_subject_skills (LOWER(skill_name));
+
+CREATE TABLE IF NOT EXISTS fpt_subject_resources (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    subject_code  VARCHAR(20) NOT NULL,
+    kind          VARCHAR(20) NOT NULL,
+    title         TEXT NOT NULL,
+    url           TEXT,
+    topic         TEXT,
+    clo_ref       TEXT,
+    order_index   INT NOT NULL DEFAULT 0,
+    CONSTRAINT fk_fsr_subject FOREIGN KEY (subject_code) REFERENCES fpt_subjects (code) ON DELETE CASCADE,
+    CONSTRAINT ck_fsr_kind CHECK (kind IN ('MATERIAL', 'SESSION'))
+);
+CREATE INDEX IF NOT EXISTS idx_fsr_subject ON fpt_subject_resources (subject_code);
+
+CREATE TABLE IF NOT EXISTS student_fpt_subjects (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id       UUID NOT NULL,
+    subject_code  VARCHAR(20) NOT NULL,
+    curriculum_id UUID,
+    status        VARCHAR(20) NOT NULL DEFAULT 'PASSED',
+    source        VARCHAR(20) NOT NULL DEFAULT 'MANUAL',
+    updated_at    TIMESTAMP NOT NULL DEFAULT NOW(),
+    CONSTRAINT fk_sfs_user FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE,
+    CONSTRAINT fk_sfs_subject FOREIGN KEY (subject_code) REFERENCES fpt_subjects (code) ON DELETE CASCADE,
+    CONSTRAINT fk_sfs_curriculum FOREIGN KEY (curriculum_id) REFERENCES fpt_curricula (id) ON DELETE SET NULL,
+    CONSTRAINT ck_sfs_status CHECK (status IN ('PASSED', 'IN_PROGRESS', 'PLANNED')),
+    CONSTRAINT ck_sfs_source CHECK (source IN ('CURRICULUM_TERM', 'MANUAL')),
+    CONSTRAINT uq_sfs UNIQUE (user_id, subject_code)
+);
+CREATE INDEX IF NOT EXISTS idx_sfs_user ON student_fpt_subjects (user_id);
+
+-- ============================================================
 -- In-place migrations for databases created before this revision
 -- ============================================================
 -- CREATE TABLE IF NOT EXISTS above never adds columns to a pre-existing table,
@@ -612,5 +701,23 @@ BEGIN
     IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'ck_skill_nodes_axis') THEN
         ALTER TABLE skill_nodes ADD CONSTRAINT ck_skill_nodes_axis
             CHECK (axis IS NULL OR axis IN ('MAIN', 'BRANCH'));
+    END IF;
+END $$;
+
+-- Multi-curriculum: subject term placement moves out of fpt_subjects into
+-- fpt_curriculum_subjects so per-cohort curricula can coexist without overwriting.
+ALTER TABLE fpt_subjects        DROP COLUMN IF EXISTS semester;
+ALTER TABLE student_fpt_subjects ADD COLUMN IF NOT EXISTS curriculum_id UUID;
+ALTER TABLE students             ADD COLUMN IF NOT EXISTS fpt_curriculum_id UUID;
+
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_sfs_curriculum') THEN
+        ALTER TABLE student_fpt_subjects ADD CONSTRAINT fk_sfs_curriculum
+            FOREIGN KEY (curriculum_id) REFERENCES fpt_curricula (id) ON DELETE SET NULL;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'fk_st_fpt_curriculum') THEN
+        ALTER TABLE students ADD CONSTRAINT fk_st_fpt_curriculum
+            FOREIGN KEY (fpt_curriculum_id) REFERENCES fpt_curricula (id) ON DELETE SET NULL;
     END IF;
 END $$;

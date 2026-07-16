@@ -13,4 +13,7 @@ import java.util.UUID;
 public interface StudentSkillEvidenceRepository extends JpaRepository<StudentSkillEvidence, UUID> {
 
     List<StudentSkillEvidence> findByUserIdAndStatusIn(UUID userId, Collection<EvidenceStatus> statuses);
+
+    /** FLM-sourced evidence for a student (detectedBy is "FLM:<subjectCode>"). */
+    List<StudentSkillEvidence> findByUserIdAndDetectedByStartingWith(UUID userId, String detectedByPrefix);
 }

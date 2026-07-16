@@ -1,6 +1,7 @@
 package com.inteliroadmap.backend.ai.client;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.inteliroadmap.backend.domain.dto.response.scraper.ScraperResponse;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
@@ -68,6 +69,44 @@ public class AiServiceClient {
                 .uri("/api/v1/scraper/scrape/topcv/{limit}", limit)
                 .retrieve()
                 .body(ScraperResponse.class);
+    }
+
+    /**
+     * Trigger an ITviec scrape and return the processed companies, recruitments
+     * and posts. Same response shape as {@link #triggerTopCvScrape(int)} — the raw
+     * tables are source-agnostic, only the id prefix ({@code itviec.*}) differs.
+     */
+    public ScraperResponse triggerItviecScrape(int limit) {
+        return restClient.get()
+                .uri("/api/v1/scraper/scrape/itviec/{limit}", limit)
+                .retrieve()
+                .body(ScraperResponse.class);
+    }
+
+    public record FlmSyncStartResponse(String jobId) {}
+
+    /**
+     * Kick off an FLM sync on the AI service. {@code body} carries the admin-supplied
+     * cookie, the curriculum id / prefixes and the catalog skill names; it is a plain
+     * map so the (sensitive) cookie never becomes a typed, loggable field here.
+     *
+     * @return the job id to poll, or {@code null} if the service returned nothing.
+     */
+    public String startFlmSync(Object body) {
+        FlmSyncStartResponse response = restClient.post()
+                .uri("/api/v1/flm/sync")
+                .body(body)
+                .retrieve()
+                .body(FlmSyncStartResponse.class);
+        return response != null ? response.jobId() : null;
+    }
+
+    /** Poll an FLM sync job. Returns the raw status node (state/phase/progress/overlay). */
+    public JsonNode getFlmSyncStatus(String jobId) {
+        return restClient.get()
+                .uri("/api/v1/flm/sync/{jobId}", jobId)
+                .retrieve()
+                .body(JsonNode.class);
     }
 
     /** Lightweight liveness probe against the service root (short timeout). */

@@ -4,10 +4,15 @@ import com.inteliroadmap.backend.components.RoadmapProgressCalculator;
 import com.inteliroadmap.backend.components.RoadmapSelectionResolver;
 import com.inteliroadmap.backend.components.SelectionView;
 import com.inteliroadmap.backend.domain.dto.request.UpdateNodeProgressRequest;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.FptNodeCoverageResponse;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.FptNodeResourceResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapNodeResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.StudentRoadmapResponse;
 import com.inteliroadmap.backend.domain.entity.CareerRequiredSkill;
 import com.inteliroadmap.backend.domain.entity.CareerRole;
+import com.inteliroadmap.backend.domain.entity.FptSubject;
+import com.inteliroadmap.backend.domain.entity.FptSubjectResource;
+import com.inteliroadmap.backend.domain.entity.FptSubjectSkill;
 import com.inteliroadmap.backend.domain.entity.Skill;
 import com.inteliroadmap.backend.domain.entity.RoadmapNodeLayout;
 import com.inteliroadmap.backend.domain.entity.SkillNode;
@@ -18,6 +23,9 @@ import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
 import com.inteliroadmap.backend.repositories.CareerRequiredSkillRepository;
 import com.inteliroadmap.backend.repositories.CareerRoleRepository;
+import com.inteliroadmap.backend.repositories.FptSubjectRepository;
+import com.inteliroadmap.backend.repositories.FptSubjectResourceRepository;
+import com.inteliroadmap.backend.repositories.FptSubjectSkillRepository;
 import com.inteliroadmap.backend.repositories.RoadmapNodeLayoutRepository;
 import com.inteliroadmap.backend.repositories.SkillNodeRepository;
 import com.inteliroadmap.backend.repositories.SkillRepository;
@@ -69,6 +77,9 @@ public class RoadmapServiceImpl implements RoadmapService {
     private final StudentSkillRepository studentSkillRepository;
     private final CareerRequiredSkillRepository careerRequiredSkillRepository;
     private final SkillRepository skillRepository;
+    private final FptSubjectRepository fptSubjectRepository;
+    private final FptSubjectSkillRepository fptSubjectSkillRepository;
+    private final FptSubjectResourceRepository fptSubjectResourceRepository;
     private final RoadmapSelectionService roadmapSelectionService;
     private final RoadmapSelectionResolver roadmapSelectionResolver;
 
@@ -169,7 +180,7 @@ public class RoadmapServiceImpl implements RoadmapService {
         return StudentRoadmapResponse.builder()
                 .targetCareerRole(careerRole.getCareerName())
                 .progress(progress)
-                .nodes(buildRoadmapTree(nodes, statusByNodeId, progressByNodeId))
+                .nodes(buildRoadmapTree(nodes, statusByNodeId, progressByNodeId, selectionView))
                 .build();
     }
 
@@ -731,7 +742,8 @@ public class RoadmapServiceImpl implements RoadmapService {
     private List<RoadmapNodeResponse> buildRoadmapTree(
             List<SkillNode> nodes,
             Map<UUID, String> statusByNodeId,
-            Map<UUID, StudentProgress> progressByNodeId
+            Map<UUID, StudentProgress> progressByNodeId,
+            SelectionView selectionView
     ) {
         // Presentation-only placement, joined in from the layout table.
         Map<UUID, RoadmapNodeLayout> layoutsByNodeId = new HashMap<>();
@@ -743,6 +755,27 @@ public class RoadmapServiceImpl implements RoadmapService {
         Set<UUID> topicIds = topicParentIds(nodes);
         Map<UUID, List<SkillNode>> childrenByParent = childrenByParent(nodes);
 
+        // FLM overlay: skill name -> teaching FPT subjects, and subject -> lesson resources.
+        Map<String, List<FptSubject>> subjectsBySkill = new HashMap<>();
+        Map<String, List<FptSubjectResource>> resourcesByCode = new HashMap<>();
+        List<FptSubjectSkill> fptLinks = fptSubjectSkillRepository.findAll();
+        if (!fptLinks.isEmpty()) {
+            Set<String> codes = fptLinks.stream().map(FptSubjectSkill::getSubjectCode).collect(Collectors.toSet());
+            Map<String, FptSubject> subjectByCode = fptSubjectRepository.findAllById(codes).stream()
+                    .collect(Collectors.toMap(FptSubject::getCode, s -> s));
+            for (FptSubjectSkill link : fptLinks) {
+                FptSubject subject = subjectByCode.get(link.getSubjectCode());
+                if (subject != null && link.getSkillName() != null) {
+                    subjectsBySkill.computeIfAbsent(link.getSkillName().toLowerCase(), k -> new ArrayList<>()).add(subject);
+                }
+            }
+            resourcesByCode = fptSubjectResourceRepository
+                    .findBySubjectCodeInOrderBySubjectCodeAscOrderIndexAsc(codes).stream()
+                    .collect(Collectors.groupingBy(FptSubjectResource::getSubjectCode));
+        }
+        final Map<String, List<FptSubject>> subjectsBySkillFinal = subjectsBySkill;
+        final Map<String, List<FptSubjectResource>> resourcesByCodeFinal = resourcesByCode;
+
         return nodes.stream()
                 .map(node -> {
                     RoadmapNodeLayout layout = layoutsByNodeId.get(node.getNodeId());
@@ -750,7 +783,13 @@ public class RoadmapServiceImpl implements RoadmapService {
                     List<SkillNode> children = isTopic
                             ? childrenByParent.getOrDefault(node.getNodeId(), List.of())
                             : List.of();
-                    int childCompleted = (int) children.stream()
+                    // Only children on the student's active path count toward the topic
+                    // bar. For a CHOOSE_ONE group that means the single chosen alternative,
+                    // so a picked-and-finished "Pick a Database" reads 1/1, not 1/6.
+                    List<SkillNode> countedChildren = children.stream()
+                            .filter(c -> !selectionView.isExcludedFromProgress(c.getNodeId()))
+                            .toList();
+                    int childCompleted = (int) countedChildren.stream()
                             .map(c -> progressByNodeId.get(c.getNodeId()))
                             .filter(p -> p != null && RoadmapStepStatus.COMPLETED == p.getStatus())
                             .count();
@@ -758,6 +797,30 @@ public class RoadmapServiceImpl implements RoadmapService {
                     String completedAt = nodeProgress != null && nodeProgress.getCompletedAt() != null
                             ? nodeProgress.getCompletedAt().toString()
                             : null;
+
+                    // FLM coverage/resources for this node, joined by its skill name.
+                    String skillName = node.getSkill() != null && node.getSkill().getSkillName() != null
+                            ? node.getSkill().getSkillName() : node.getNodeName();
+                    List<FptSubject> coverSubjects = skillName != null
+                            ? subjectsBySkillFinal.getOrDefault(skillName.toLowerCase(), List.of())
+                            : List.of();
+                    boolean covered = !coverSubjects.isEmpty();
+                    // Only flag self-study on concrete leaf skill nodes, so the canvas isn't noisy.
+                    boolean selfStudy = !covered && node.getSkill() != null && !isTopic;
+                    FptNodeCoverageResponse fptCoverage = (covered || selfStudy)
+                            ? FptNodeCoverageResponse.builder()
+                                    .covered(covered)
+                                    .selfStudy(selfStudy)
+                                    .subjects(coverSubjects.stream()
+                                            // Term is per-curriculum now; omit it on the shared node view.
+                                            .map(s -> FptNodeCoverageResponse.FptSubjectRefResponse.builder()
+                                                    .code(s.getCode()).name(s.getName()).build())
+                                            .toList())
+                                    .build()
+                            : null;
+                    List<FptNodeResourceResponse> fptResources =
+                            buildNodeResources(coverSubjects, resourcesByCodeFinal);
+
                     return RoadmapNodeResponse.builder()
                             .nodeId(node.getNodeId())
                             .nodeName(node.getNodeName())
@@ -770,7 +833,7 @@ public class RoadmapServiceImpl implements RoadmapService {
                             .weight(node.getType() != null ? node.getType().getWeight() : null)
                             .requiredProficiency(node.getRequiredProficiency())
                             .parentTopic(isTopic)
-                            .childTotal(children.size())
+                            .childTotal(countedChildren.size())
                             .childCompleted(childCompleted)
                             .selection(node.getSelection())
                             .chooseCount(node.getChooseCount())
@@ -786,8 +849,76 @@ public class RoadmapServiceImpl implements RoadmapService {
                             .resource(node.getResource())
                             .status(statusByNodeId.getOrDefault(node.getNodeId(), FRONTEND_LOCKED_STATUS))
                             .completedAt(completedAt)
+                            .fptCoverage(fptCoverage)
+                            .fptResources(fptResources)
                             .build();
                 })
                 .toList();
+    }
+
+    // Session topics that are class logistics, not learning content — never worth
+    // surfacing on a skill node.
+    private static final List<String> SESSION_TOPIC_SKIP = List.of(
+            "orientation", "lab room", "regulation", "review", "revision", "revison",
+            "exam", "final", "project evaluation", "progress test", "mock", "guideline",
+            "holiday", "quiz", "assignment submission");
+
+    private static final int MAX_SESSIONS_PER_SUBJECT = 6;
+    private static final int MAX_NODE_RESOURCES = 24;
+
+    /**
+     * Pick the resources actually worth showing on one skill node. A subject's syllabus
+     * has ~60 session rows, most of them just a weekly schedule entry with nothing to
+     * open; dumping them all is noise. So: keep every material (textbook / online course
+     * link), but for sessions keep only ones that link to something, drop pure logistics
+     * (orientation / exam / project evaluation …), and collapse repeated chapters — then
+     * cap so a node with several covering subjects stays readable. Materials come first.
+     */
+    private List<FptNodeResourceResponse> buildNodeResources(
+            List<FptSubject> subjects, Map<String, List<FptSubjectResource>> resourcesByCode) {
+        List<FptNodeResourceResponse> materials = new ArrayList<>();
+        List<FptNodeResourceResponse> sessions = new ArrayList<>();
+        Set<String> seenMaterialTitles = new HashSet<>();
+        Set<String> seenSessionTopics = new HashSet<>();
+
+        for (FptSubject subject : subjects) {
+            int keptSessions = 0;
+            for (FptSubjectResource r : resourcesByCode.getOrDefault(subject.getCode(), List.of())) {
+                boolean isSession = "SESSION".equals(r.getKind().name());
+                String url = r.getUrl() != null ? r.getUrl().trim() : "";
+
+                if (!isSession) {
+                    String key = (r.getTitle() == null ? "" : r.getTitle().trim().toLowerCase());
+                    if (!key.isEmpty() && !seenMaterialTitles.add(key)) continue;
+                    materials.add(toResource(r));
+                    continue;
+                }
+
+                // Sessions: only ones you can actually open, minus logistics, deduped by topic.
+                if (url.isEmpty()) continue;
+                if (keptSessions >= MAX_SESSIONS_PER_SUBJECT) continue;
+                String topic = (r.getTopic() == null ? "" : r.getTopic().trim().toLowerCase());
+                if (topic.isEmpty()) continue;
+                if (SESSION_TOPIC_SKIP.stream().anyMatch(topic::contains)) continue;
+                String norm = subject.getCode() + "|" + topic.replace("(cnt)", "").replace("(cont)", "").trim();
+                if (!seenSessionTopics.add(norm)) continue;
+                sessions.add(toResource(r));
+                keptSessions++;
+            }
+        }
+
+        List<FptNodeResourceResponse> out = new ArrayList<>(materials);
+        out.addAll(sessions);
+        return out.size() > MAX_NODE_RESOURCES ? out.subList(0, MAX_NODE_RESOURCES) : out;
+    }
+
+    private static FptNodeResourceResponse toResource(FptSubjectResource r) {
+        return FptNodeResourceResponse.builder()
+                .subjectCode(r.getSubjectCode())
+                .kind(r.getKind().name())
+                .title(r.getTitle())
+                .url(r.getUrl())
+                .topic(r.getTopic())
+                .build();
     }
 }

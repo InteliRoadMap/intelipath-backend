@@ -9,6 +9,8 @@ import com.inteliroadmap.backend.repositories.AcademicCounselorRepository;
 import com.inteliroadmap.backend.repositories.CareerRequiredSkillRepository;
 import com.inteliroadmap.backend.repositories.CareerRoleRepository;
 import com.inteliroadmap.backend.repositories.FeedbackRepository;
+import com.inteliroadmap.backend.repositories.FptSubjectRepository;
+import com.inteliroadmap.backend.repositories.FptSubjectSkillRepository;
 import com.inteliroadmap.backend.repositories.NodeTypeRepository;
 import com.inteliroadmap.backend.repositories.SkillNodeRepository;
 import com.inteliroadmap.backend.repositories.SkillRepository;
@@ -17,6 +19,7 @@ import com.inteliroadmap.backend.repositories.StudentRepository;
 import com.inteliroadmap.backend.repositories.StudentSkillRepository;
 import com.inteliroadmap.backend.repositories.UniversityRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
+import com.inteliroadmap.backend.services.FptOverlayImportService;
 import com.opencsv.CSVReader;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -52,12 +55,17 @@ public class DatabaseSeeder implements CommandLineRunner {
     private final StudentProgressRepository studentProgressRepository;
     private final NodeTypeRepository nodeTypeRepository;
     private final UniversityRepository universityRepository;
+    private final FptSubjectRepository fptSubjectRepository;
+    private final FptSubjectSkillRepository fptSubjectSkillRepository;
+    private final FptOverlayImportService fptOverlayImportService;
 
     // v2 seed data: id-based tree + selection semantics (see intelipath-service/scripts/migrate_roadmap.py).
     private static final String ROADMAP_TEMPLATE = "data/v2/roadmap_nodes.csv";
     private static final String SKILL_TEMPLATE = "data/v2/skills.csv";
     private static final String CAREER_TEMPLATE = "data/v2/careers.csv";
     private static final String UNIVERSITY_TEMPLATE = "data/vietnam_universities_en.csv";
+    // FLM curriculum overlay (subjects + skill coverage + lesson resources).
+    private static final String FLM_OVERLAY = "data/flm_overlay.json";
 
     // Resolves a roadmap row's career_id slug (e.g. "backend") to the persisted
     // CareerRole. Populated by importCareerData, consumed by importSkillData and
@@ -74,6 +82,7 @@ public class DatabaseSeeder implements CommandLineRunner {
         importCareerData();
         importSkillData();
         importRoadmapData();
+        importFptSubjectData();
         importMockUsersData();
 
         log.info("DatabaseSeeder: =====================================================");
@@ -83,8 +92,39 @@ public class DatabaseSeeder implements CommandLineRunner {
         log.info("DatabaseSeeder:  - Skills loaded: {}", skillRepository.count());
         log.info("DatabaseSeeder:  - Career Required Skills loaded: {}", careerRequiredSkillRepository.count());
         log.info("DatabaseSeeder:  - Skill Nodes loaded: {}", skillNodeRepository.count());
+        log.info("DatabaseSeeder:  - FPT Subjects loaded: {}", fptSubjectRepository.count());
+        log.info("DatabaseSeeder:  - FPT Subject Skills loaded: {}", fptSubjectSkillRepository.count());
         log.info("DatabaseSeeder:  - Mock Students loaded: {}", studentRepository.count());
         log.info("DatabaseSeeder: =====================================================");
+    }
+
+    /**
+     * Import the FLM curriculum overlay (data/flm_overlay.json): each subject plus the
+     * catalog skills it covers and its lesson resources. Reference tables only — never
+     * touches student_fpt_subjects, so student declarations survive re-seeds. Idempotent:
+     * subjects are upserted by code; a subject's skills/resources are cleared and rebuilt.
+     */
+    private void importFptSubjectData() {
+        File overlayFile = new File(FLM_OVERLAY);
+        if (!overlayFile.exists()) {
+            log.warn("DatabaseSeeder: {} not found. Skipping FPT subject import.", FLM_OVERLAY);
+            return;
+        }
+
+        log.info("DatabaseSeeder: Starting FPT subject import from {}...", FLM_OVERLAY);
+        try {
+            JsonNode root = new ObjectMapper().readTree(overlayFile);
+            // The offline seed is the SE technical curriculum (curid 2507). Register it as
+            // the default curriculum so students whose cohort has no synced version fall back
+            // to it.
+            FptOverlayImportService.CurriculumRef ref =
+                    new FptOverlayImportService.CurriculumRef("BIT_SE", "2507", true);
+            FptOverlayImportService.ImportSummary summary = fptOverlayImportService.importOverlay(root, ref);
+            log.info("DatabaseSeeder: FPT import done — {} subjects, {} skill links ({} unmatched names), {} resources.",
+                    summary.subjects(), summary.skillLinks(), summary.unmatchedSkills(), summary.resources());
+        } catch (Exception e) {
+            log.error("DatabaseSeeder: Error occurred while importing {}", FLM_OVERLAY, e);
+        }
     }
 
     private void importUniversityData() {

@@ -53,5 +53,9 @@ public class Student {
 
     @Column(name = "portfolio_slug", length = 100, unique = true)
     private String portfolioSlug;
+
+    /** The FLM curriculum version this student follows (their cohort's program). */
+    @Column(name = "fpt_curriculum_id")
+    private UUID fptCurriculumId;
 }
 

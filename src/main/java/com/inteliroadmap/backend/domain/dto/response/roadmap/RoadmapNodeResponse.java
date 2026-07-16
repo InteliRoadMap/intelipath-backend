@@ -45,4 +45,8 @@ public class RoadmapNodeResponse {
     private String status;
     // ISO-8601 timestamp of when the student completed this node (null if not completed).
     private String completedAt;
+    // FLM (FPT curriculum) overlay: which FPT subjects teach this node's skill, and the
+    // concrete lesson resources for it. Null/empty when the node maps to no catalog skill.
+    private FptNodeCoverageResponse fptCoverage;
+    private java.util.List<FptNodeResourceResponse> fptResources;
 }

@@ -37,16 +37,31 @@ public class JobScrapingScheduler {
     private final RecruitmentPostRepository recruitmentPostRepository;
     private final TransactionTemplate transactionTemplate;
 
+    /** Job board the scrape should target. Both feed the same source-agnostic tables. */
+    public enum Source { TOPCV, ITVIEC }
+
     // Runs daily at 9:00 AM
     @Scheduled(cron = "0 0 9 * * *")
     public void fetchJobsFromPython() {
+        fetchJobs(Source.TOPCV);
+    }
+
+    /**
+     * Trigger a scrape for the given source, then persist the processed rows.
+     * TopCV and ITviec share the raw tables (ids are prefixed {@code topcv.*} /
+     * {@code itviec.*}), so persistence is identical — only the AI-service call differs.
+     */
+    public void fetchJobs(Source source) {
         int limit = scraperLimit;
-        log.info("JobScrapingScheduler: Triggering TopCV scrape via AI service (limit={})", limit);
+        log.info("JobScrapingScheduler: Triggering {} scrape via AI service (limit={})", source, limit);
 
         try {
             // Network I/O (can take minutes) runs OUTSIDE any transaction so a DB
             // connection is not held from the pool during the whole scrape.
-            ScraperResponse response = aiServiceClient.triggerTopCvScrape(limit);
+            ScraperResponse response = switch (source) {
+                case TOPCV -> aiServiceClient.triggerTopCvScrape(limit);
+                case ITVIEC -> aiServiceClient.triggerItviecScrape(limit);
+            };
             if (response == null) {
                 log.warn("JobScrapingScheduler: Received empty response from Scraper API");
                 return;
@@ -82,6 +97,9 @@ public class JobScrapingScheduler {
                 recruitment.setRecruitmentInfos(rDto.getRecruitmentInfos());
                 recruitment.setDescriptions(rDto.getDescriptions());
 
+                if (rDto.getPostedDate() != null) {
+                    recruitment.setPostedDate(LocalDate.parse(rDto.getPostedDate(), formatter));
+                }
                 if (rDto.getApplicationDeadline() != null) {
                     recruitment.setApplicationDeadline(LocalDate.parse(rDto.getApplicationDeadline(), formatter));
                 }

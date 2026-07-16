@@ -85,9 +85,12 @@ public class SkillExtractionServiceImpl implements SkillExtractionService {
                 }
             }
             
-            // Clean up the description string and determine the relevant date
+            // Clean up the description string and determine the relevant date.
+            // Use the posting date so the trend reflects real demand-over-time;
+            // fall back to the deadline, then today, when it's missing.
             String desc = descBuilder.toString().trim();
-            LocalDate date = r.getApplicationDeadline() != null ? r.getApplicationDeadline() : LocalDate.now();
+            LocalDate date = r.getPostedDate() != null ? r.getPostedDate()
+                    : (r.getApplicationDeadline() != null ? r.getApplicationDeadline() : LocalDate.now());
             descriptions.add(desc);
             dates.add(date);
         }

@@ -28,6 +28,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -72,15 +73,25 @@ public class AdminController {
     }
 
     /**
-     * POST /admin/dashboard/trigger-job-scraper - Manually trigger TopCV scraping job.
+     * POST /admin/dashboard/trigger-job-scraper - Manually trigger a scraping job.
+     * {@code source} selects the board (topcv | itviec); defaults to topcv for
+     * backward compatibility. ITviec is IT-focused and doesn't need a proxy;
+     * TopCV sits behind Cloudflare and may require SCRAPER_PROXY.
      */
     @PostMapping("/trigger-job-scraper")
-    @Operation(summary = "Trigger Job Scraper", description = "Manually triggers the Python AI scraper job to fetch new recruitments.")
-    public ResponseEntity<String> triggerJobScraper() {
-        log.info("AdminController: Manual trigger for job scraper received");
+    @Operation(summary = "Trigger Job Scraper", description = "Manually triggers the Python AI scraper job to fetch new recruitments. Use source=topcv or source=itviec.")
+    public ResponseEntity<String> triggerJobScraper(
+            @RequestParam(name = "source", defaultValue = "topcv") String source) {
+        log.info("AdminController: Manual trigger for job scraper received (source={})", source);
+        final JobScrapingScheduler.Source target;
         try {
-            jobScrapingScheduler.fetchJobsFromPython();
-            return ResponseEntity.ok("Job Scraper via AI Service completed successfully.");
+            target = JobScrapingScheduler.Source.valueOf(source.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body("Unknown source '" + source + "'. Use 'topcv' or 'itviec'.");
+        }
+        try {
+            jobScrapingScheduler.fetchJobs(target);
+            return ResponseEntity.ok(target + " Job Scraper via AI Service completed successfully.");
         } catch (Exception e) {
             log.error("AdminController: Error triggering job scraper", e);
             return ResponseEntity.internalServerError().body("Error during trigger: " + e.getMessage());
