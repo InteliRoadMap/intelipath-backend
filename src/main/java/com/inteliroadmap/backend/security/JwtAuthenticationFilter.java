@@ -5,6 +5,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import com.inteliroadmap.backend.domain.entity.User;
+import com.inteliroadmap.backend.domain.enums.AccountType;
 import com.inteliroadmap.backend.domain.enums.UserStatus;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -18,6 +19,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.List;
 
 @Component
@@ -25,6 +27,8 @@ import java.util.List;
 @Slf4j
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
+    /** Granted to FPT accounts; gates the FPT curriculum and its material. */
+    public static final String ACCOUNT_FPT_AUTHORITY = "ACCOUNT_FPT";
 
     private final JwtService jwtService;
     private final UserRepository userRepository;
@@ -108,8 +112,14 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 return;
             }
 
-            List<GrantedAuthority> authorityList
-                    = List.of(new SimpleGrantedAuthority("ROLE_" + role));
+            List<GrantedAuthority> authorityList = new ArrayList<>();
+            authorityList.add(new SimpleGrantedAuthority("ROLE_" + role));
+            // Account type is read from the User row rather than a JWT claim: the row is
+            // already loaded above, and a claim would stay stale until the access token
+            // expires. Endpoints gate FPT material with hasAuthority('ACCOUNT_FPT').
+            if (user != null && user.getAccountType() == AccountType.FPT) {
+                authorityList.add(new SimpleGrantedAuthority(ACCOUNT_FPT_AUTHORITY));
+            }
             UsernamePasswordAuthenticationToken authentication
                     = new UsernamePasswordAuthenticationToken(email, null, authorityList);
 

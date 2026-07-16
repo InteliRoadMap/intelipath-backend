@@ -10,4 +10,6 @@ import java.util.List;
 public interface FptSubjectRepository extends JpaRepository<FptSubject, String> {
 
     List<FptSubject> findAllByOrderByCodeAsc();
+
+    List<FptSubject> findByCodeStartingWithOrderByCodeAsc(String prefix);
 }

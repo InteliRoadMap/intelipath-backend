@@ -10,8 +10,6 @@ import java.util.UUID;
 @Data
 public class SetupStudentProfileRequest {
 
-    private UUID universityId;
-
     @Size(max = 200, message = "University name must not exceed 200 characters")
     private String universityName;
 

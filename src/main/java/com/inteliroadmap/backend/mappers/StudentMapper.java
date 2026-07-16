@@ -44,9 +44,9 @@ public class StudentMapper {
                 .email(user.getEmail())
                 .yob(user.getYob())
                 .bio(user.getBio())
-                .university(resolveUniversityDisplayName(student))
-                .universityId(student.getUniversity() != null ? student.getUniversity().getUniversityId() : null)
+                .university(student.getUniversityName())
                 .universityName(student.getUniversityName())
+                .accountType(user.getAccountType())
                 .yearOfAdmission(student.getYearOfAdmission())
                 .major(student.getMajor())
                 .githubProfile(student.getGithubProfile())
@@ -54,12 +54,5 @@ public class StudentMapper {
                 .careerId(student.getCareerRole() != null ? student.getCareerRole().getCareerId() : null)
                 .careerName(careerName)
                 .build();
-    }
-
-    private String resolveUniversityDisplayName(Student student) {
-        if (student.getUniversityName() != null && !student.getUniversityName().isBlank()) {
-            return student.getUniversityName();
-        }
-        return student.getUniversity() != null ? student.getUniversity().getName() : null;
     }
 }

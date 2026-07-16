@@ -43,40 +43,46 @@ public class JobScrapingScheduler {
     // Runs daily at 9:00 AM
     @Scheduled(cron = "0 0 9 * * *")
     public void fetchJobsFromPython() {
-        fetchJobs(Source.TOPCV);
+        // Scheduled runs must never propagate — just log and move on.
+        try {
+            fetchJobs(Source.TOPCV);
+        } catch (Exception e) {
+            log.error("JobScrapingScheduler: Scheduled scrape failed: ", e);
+        }
     }
 
     /**
      * Trigger a scrape for the given source, then persist the processed rows.
      * TopCV and ITviec share the raw tables (ids are prefixed {@code topcv.*} /
      * {@code itviec.*}), so persistence is identical — only the AI-service call differs.
+     *
+     * <p>Failures (timeouts, Cloudflare blocks, ...) are propagated so a manual
+     * caller learns the scrape did not complete instead of getting a false "success".
+     *
+     * @return number of recruitment posts persisted.
      */
-    public void fetchJobs(Source source) {
+    public int fetchJobs(Source source) {
         int limit = scraperLimit;
         log.info("JobScrapingScheduler: Triggering {} scrape via AI service (limit={})", source, limit);
 
-        try {
-            // Network I/O (can take minutes) runs OUTSIDE any transaction so a DB
-            // connection is not held from the pool during the whole scrape.
-            ScraperResponse response = switch (source) {
-                case TOPCV -> aiServiceClient.triggerTopCvScrape(limit);
-                case ITVIEC -> aiServiceClient.triggerItviecScrape(limit);
-            };
-            if (response == null) {
-                log.warn("JobScrapingScheduler: Received empty response from Scraper API");
-                return;
-            }
-
-            log.info("JobScrapingScheduler: Received {} companies, {} recruitments, {} posts",
-                response.getCompanies().size(), response.getRecruitments().size(), response.getRecruitmentPosts().size());
-
-            // Persist the fetched data in a single short transaction.
-            transactionTemplate.executeWithoutResult(status -> persistScrapedData(response));
-            log.info("JobScrapingScheduler: Successfully persisted scraped data into the database.");
-
-        } catch (Exception e) {
-            log.error("JobScrapingScheduler: Failed to scrape jobs from Python API: ", e);
+        // Network I/O (can take minutes) runs OUTSIDE any transaction so a DB
+        // connection is not held from the pool during the whole scrape.
+        ScraperResponse response = switch (source) {
+            case TOPCV -> aiServiceClient.triggerTopCvScrape(limit);
+            case ITVIEC -> aiServiceClient.triggerItviecScrape(limit);
+        };
+        if (response == null) {
+            log.warn("JobScrapingScheduler: Received empty response from Scraper API");
+            return 0;
         }
+
+        log.info("JobScrapingScheduler: Received {} companies, {} recruitments, {} posts",
+            response.getCompanies().size(), response.getRecruitments().size(), response.getRecruitmentPosts().size());
+
+        // Persist the fetched data in a single short transaction.
+        transactionTemplate.executeWithoutResult(status -> persistScrapedData(response));
+        log.info("JobScrapingScheduler: Successfully persisted scraped data into the database.");
+        return response.getRecruitmentPosts().size();
     }
 
     private void persistScrapedData(ScraperResponse response) {

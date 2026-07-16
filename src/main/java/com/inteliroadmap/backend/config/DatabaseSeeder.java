@@ -17,13 +17,13 @@ import com.inteliroadmap.backend.repositories.SkillRepository;
 import com.inteliroadmap.backend.repositories.StudentProgressRepository;
 import com.inteliroadmap.backend.repositories.StudentRepository;
 import com.inteliroadmap.backend.repositories.StudentSkillRepository;
-import com.inteliroadmap.backend.repositories.UniversityRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.services.FptOverlayImportService;
 import com.opencsv.CSVReader;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 
 import java.io.FileReader;
@@ -54,16 +54,17 @@ public class DatabaseSeeder implements CommandLineRunner {
     private final FeedbackRepository feedbackRepository;
     private final StudentProgressRepository studentProgressRepository;
     private final NodeTypeRepository nodeTypeRepository;
-    private final UniversityRepository universityRepository;
     private final FptSubjectRepository fptSubjectRepository;
     private final FptSubjectSkillRepository fptSubjectSkillRepository;
     private final FptOverlayImportService fptOverlayImportService;
+    private final PasswordEncoder passwordEncoder;
+    private final SeedAccountsProperties seedAccounts;
 
     // v2 seed data: id-based tree + selection semantics (see intelipath-service/scripts/migrate_roadmap.py).
     private static final String ROADMAP_TEMPLATE = "data/v2/roadmap_nodes.csv";
     private static final String SKILL_TEMPLATE = "data/v2/skills.csv";
     private static final String CAREER_TEMPLATE = "data/v2/careers.csv";
-    private static final String UNIVERSITY_TEMPLATE = "data/vietnam_universities_en.csv";
+    private static final String FPT_UNIVERSITY_NAME = "FPT University";
     // FLM curriculum overlay (subjects + skill coverage + lesson resources).
     private static final String FLM_OVERLAY = "data/flm_overlay.json";
 
@@ -78,7 +79,6 @@ public class DatabaseSeeder implements CommandLineRunner {
         log.info("DatabaseSeeder: =====================================================");
         log.info("DatabaseSeeder:  CHECKING DATABASE SEED DATA... ");
 
-        importUniversityData();
         importCareerData();
         importSkillData();
         importRoadmapData();
@@ -87,7 +87,6 @@ public class DatabaseSeeder implements CommandLineRunner {
 
         log.info("DatabaseSeeder: =====================================================");
         log.info("DatabaseSeeder:  SEEDING SUMMARY NOTIFICATION ");
-        log.info("DatabaseSeeder:  - Universities loaded: {}", universityRepository.count());
         log.info("DatabaseSeeder:  - Career Roles loaded: {}", careerRoleRepository.count());
         log.info("DatabaseSeeder:  - Skills loaded: {}", skillRepository.count());
         log.info("DatabaseSeeder:  - Career Required Skills loaded: {}", careerRequiredSkillRepository.count());
@@ -124,42 +123,6 @@ public class DatabaseSeeder implements CommandLineRunner {
                     summary.subjects(), summary.skillLinks(), summary.unmatchedSkills(), summary.resources());
         } catch (Exception e) {
             log.error("DatabaseSeeder: Error occurred while importing {}", FLM_OVERLAY, e);
-        }
-    }
-
-    private void importUniversityData() {
-        File universityDataFile = new File(UNIVERSITY_TEMPLATE);
-        if (!universityDataFile.exists()) {
-            log.warn("DatabaseSeeder: {} not found. Skipping university import.", UNIVERSITY_TEMPLATE);
-            return;
-        }
-
-        log.info("DatabaseSeeder: Starting CSV Import for Universities...");
-        try (CSVReader reader = new CSVReader(
-                new InputStreamReader(new FileInputStream(universityDataFile), StandardCharsets.UTF_8))) {
-            String[] line;
-            int rowNum = 0;
-            int imported = 0;
-
-            while ((line = reader.readNext()) != null) {
-                rowNum++;
-                if (rowNum <= 1) continue;
-                if (line.length < 2) continue;
-
-                String code = line[0] == null ? "" : line[0].trim();
-                String name = line[1] == null ? "" : line[1].trim();
-                if (code.isEmpty() || name.isEmpty()) continue;
-
-                University university = universityRepository.findByCode(code)
-                        .orElseGet(() -> University.builder().code(code).build());
-                university.setName(name);
-                universityRepository.save(university);
-                imported++;
-            }
-
-            log.info("DatabaseSeeder: Universities import completed. Processed {} rows.", imported);
-        } catch (Exception e) {
-            log.error("DatabaseSeeder: Error occurred while importing {}", UNIVERSITY_TEMPLATE, e);
         }
     }
 
@@ -474,6 +437,26 @@ public class DatabaseSeeder implements CommandLineRunner {
         }
     }
 
+    /**
+     * Applies a seeded account's local credential from configuration.
+     *
+     * When the pair is absent the account keeps whatever it already had, so an
+     * unconfigured environment simply leaves it OAuth-only rather than seeding a
+     * password that everyone reading the repo would know.
+     *
+     * @param user the account being seeded
+     * @param account the configured username/password pair
+     * @param role label used in the skip log
+     */
+    private void applySeedCredentials(User user, SeedAccountsProperties.Account account, String role) {
+        if (!account.isUsable()) {
+            log.info("DatabaseSeeder: No seed credential configured for the {} account; leaving it OAuth-only.", role);
+            return;
+        }
+        user.setUsername(account.getUsername());
+        user.setPasswordHash(passwordEncoder.encode(account.getPassword()));
+    }
+
     public void importMockUsersData(){
         log.info("DatabaseSeeder: Seeding Mock Data (Students, Counselors, Feedbacks, Progress)...");
 
@@ -484,10 +467,9 @@ public class DatabaseSeeder implements CommandLineRunner {
         }
         admin.setFullName("Hau Admin");
         admin.setRole(UserRole.ADMIN);
+        admin.setAccountType(AccountType.FPT);
+        applySeedCredentials(admin, seedAccounts.getAdmin(), "admin");
         userRepository.save(admin);
-
-        // ------------------------------- Get University ------------------------------- //
-        University uni = universityRepository.findByCode("FPTU").orElse(null);
 
         // -------------------------- Import Counselor Account -------------------------- //
         User userCou = userRepository.findByEmail("mainclone1@gmail.com");
@@ -496,13 +478,15 @@ public class DatabaseSeeder implements CommandLineRunner {
         }
         userCou.setFullName("Hau Counselor");
         userCou.setRole(UserRole.COUNSELOR);
+        // FPT so this counselor's student list resolves to the FPT students below.
+        userCou.setAccountType(AccountType.FPT);
+        applySeedCredentials(userCou, seedAccounts.getCounselor(), "counselor");
         userCou = userRepository.save(userCou);
 
         AcademicCounselor counselor = academicCounselorRepository.findByUserId(userCou.getUserId());
         if (counselor == null) {
             counselor = AcademicCounselor.builder().userId(userCou.getUserId()).build();
         }
-        counselor.setUniversity(uni);
         counselor.setDepartment("Software Engineer");
         academicCounselorRepository.save(counselor);
 
@@ -515,14 +499,16 @@ public class DatabaseSeeder implements CommandLineRunner {
         userSt.setFullName("Hau ST");
         userSt.setYob(LocalDate.now().minusYears(10));
         userSt.setRole(UserRole.STUDENT);
+        // Stands in for a counselor-provisioned FPT student: local credential + FPT material.
+        userSt.setAccountType(AccountType.FPT);
+        applySeedCredentials(userSt, seedAccounts.getStudent(), "student");
         userSt = userRepository.save(userSt);
 
         Student st = studentRepository.findByUserId(userSt.getUserId());
         if (st == null) {
             st = Student.builder().userId(userSt.getUserId()).build();
         }
-        st.setUniversity(uni);
-        st.setUniversityName(uni.getName());
+        st.setUniversityName(FPT_UNIVERSITY_NAME);
         st.setCareerRole(careerRoleRepository.findByCareerName("Frontend"));
         st.setMajor("Software Engineer");
         studentRepository.save(st);
@@ -553,14 +539,15 @@ public class DatabaseSeeder implements CommandLineRunner {
                     .email("fe_student" + i + "@example.com")
                     .fullName("Frontend Student " + i)
                     .role(UserRole.STUDENT)
+                    // Non-FPT bulk students: they see roadmap.sh resources only.
+                    .accountType(AccountType.OTHER)
                     .build();
             sUser = userRepository.save(sUser);
 
             Student stu = Student.builder()
                     .userId(sUser.getUserId())
                     .careerRole(frontend)
-                    .university(uni)
-                    .universityName(uni.getName())
+                    .universityName("Example University")
                     .yearOfAdmission(LocalDate.now().getYear() - random.nextInt(4))
                     .major("Software Engineer")
                     .build();

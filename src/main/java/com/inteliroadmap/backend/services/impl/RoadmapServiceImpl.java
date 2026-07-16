@@ -20,6 +20,7 @@ import com.inteliroadmap.backend.domain.entity.Student;
 import com.inteliroadmap.backend.domain.entity.StudentProgress;
 import com.inteliroadmap.backend.domain.entity.StudentSkill;
 import com.inteliroadmap.backend.domain.entity.User;
+import com.inteliroadmap.backend.domain.enums.AccountType;
 import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
 import com.inteliroadmap.backend.repositories.CareerRequiredSkillRepository;
 import com.inteliroadmap.backend.repositories.CareerRoleRepository;
@@ -176,11 +177,16 @@ public class RoadmapServiceImpl implements RoadmapService {
         Map<UUID, String> statusByNodeId = buildFrontendStatusMap(nodes, progressByNodeId, selectionView);
         int progress = calculateProgress(selectionView.activePathNodes(nodes), progressByNodeId);
 
+        // FPT material is only offered to FPT accounts; everyone else gets the public
+        // roadmap.sh links that every node already carries.
+        User user = userRepository.findByUserId(student.getUserId());
+        boolean fptAccount = user != null && user.getAccountType() == AccountType.FPT;
+
         // Build the hierarchical roadmap tree
         return StudentRoadmapResponse.builder()
                 .targetCareerRole(careerRole.getCareerName())
                 .progress(progress)
-                .nodes(buildRoadmapTree(nodes, statusByNodeId, progressByNodeId, selectionView))
+                .nodes(buildRoadmapTree(nodes, statusByNodeId, progressByNodeId, selectionView, fptAccount))
                 .build();
     }
 
@@ -739,11 +745,16 @@ public class RoadmapServiceImpl implements RoadmapService {
     }
 
 
+    /**
+     * @param fptAccount when false the FLM overlay is skipped entirely, so nodes carry no
+     *                   fptCoverage/fptResources and the two overlay queries never run
+     */
     private List<RoadmapNodeResponse> buildRoadmapTree(
             List<SkillNode> nodes,
             Map<UUID, String> statusByNodeId,
             Map<UUID, StudentProgress> progressByNodeId,
-            SelectionView selectionView
+            SelectionView selectionView,
+            boolean fptAccount
     ) {
         // Presentation-only placement, joined in from the layout table.
         Map<UUID, RoadmapNodeLayout> layoutsByNodeId = new HashMap<>();
@@ -756,9 +767,10 @@ public class RoadmapServiceImpl implements RoadmapService {
         Map<UUID, List<SkillNode>> childrenByParent = childrenByParent(nodes);
 
         // FLM overlay: skill name -> teaching FPT subjects, and subject -> lesson resources.
+        // Left empty for non-FPT accounts, which also skips both overlay queries.
         Map<String, List<FptSubject>> subjectsBySkill = new HashMap<>();
         Map<String, List<FptSubjectResource>> resourcesByCode = new HashMap<>();
-        List<FptSubjectSkill> fptLinks = fptSubjectSkillRepository.findAll();
+        List<FptSubjectSkill> fptLinks = fptAccount ? fptSubjectSkillRepository.findAll() : List.of();
         if (!fptLinks.isEmpty()) {
             Set<String> codes = fptLinks.stream().map(FptSubjectSkill::getSubjectCode).collect(Collectors.toSet());
             Map<String, FptSubject> subjectByCode = fptSubjectRepository.findAllById(codes).stream()
@@ -807,7 +819,9 @@ public class RoadmapServiceImpl implements RoadmapService {
                     boolean covered = !coverSubjects.isEmpty();
                     // Only flag self-study on concrete leaf skill nodes, so the canvas isn't noisy.
                     boolean selfStudy = !covered && node.getSkill() != null && !isTopic;
-                    FptNodeCoverageResponse fptCoverage = (covered || selfStudy)
+                    // Non-FPT accounts get null, not a selfStudy=true stub: with an empty
+                    // overlay every leaf would otherwise claim FPT doesn't teach it.
+                    FptNodeCoverageResponse fptCoverage = (fptAccount && (covered || selfStudy))
                             ? FptNodeCoverageResponse.builder()
                                     .covered(covered)
                                     .selfStudy(selfStudy)
@@ -818,8 +832,9 @@ public class RoadmapServiceImpl implements RoadmapService {
                                             .toList())
                                     .build()
                             : null;
-                    List<FptNodeResourceResponse> fptResources =
-                            buildNodeResources(coverSubjects, resourcesByCodeFinal);
+                    List<FptNodeResourceResponse> fptResources = fptAccount
+                            ? buildNodeResources(coverSubjects, resourcesByCodeFinal)
+                            : null;
 
                     return RoadmapNodeResponse.builder()
                             .nodeId(node.getNodeId())

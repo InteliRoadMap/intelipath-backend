@@ -15,8 +15,6 @@ public class UpdateProfileRequest {
     @Size(max = 2000, message = "Bio must not exceed 2000 characters")
     private String bio;
 
-    private java.util.UUID universityId;
-
     @Size(max = 200, message = "Department must not exceed 200 characters")
     private String department;
 }

@@ -18,10 +18,16 @@ import org.springframework.web.client.RestClient;
 @EnableConfigurationProperties(AiServiceProperties.class)
 public class AiClientConfig {
 
-    /** Main client for work calls (skill extraction, markdown, scraping). */
+    /** Main client for work calls (skill extraction, markdown). */
     @Bean
     public RestClient aiServiceRestClient(AiServiceProperties properties) {
         return buildClient(properties, properties.getReadTimeout());
+    }
+
+    /** Long-timeout client for job-board scrapes, which run for several minutes. */
+    @Bean
+    public RestClient aiServiceScraperClient(AiServiceProperties properties) {
+        return buildClient(properties, properties.getScrapeTimeout());
     }
 
     /** Short-timeout client used only by the liveness probe. */

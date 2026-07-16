@@ -21,10 +21,12 @@ import java.util.Map;
 public class AiServiceClient {
 
     private final RestClient restClient;
+    private final RestClient scraperClient;
     private final RestClient healthClient;
 
-    public AiServiceClient(RestClient aiServiceRestClient, RestClient aiServiceHealthClient) {
+    public AiServiceClient(RestClient aiServiceRestClient, RestClient aiServiceScraperClient, RestClient aiServiceHealthClient) {
         this.restClient = aiServiceRestClient;
+        this.scraperClient = aiServiceScraperClient;
         this.healthClient = aiServiceHealthClient;
     }
 
@@ -37,7 +39,10 @@ public class AiServiceClient {
      * input document, in the same order.
      */
     public List<List<String>> extractSkills(List<String> descriptions) {
-        SkillExtractionResponse response = restClient.post()
+        // Batch skill extraction runs one LLM pass per description, so a full
+        // recruitment set easily exceeds the normal read timeout — use the
+        // long-timeout scraper client (same class of long-running AI work).
+        SkillExtractionResponse response = scraperClient.post()
                 .uri("/api/extract-skills")
                 .body(new SkillExtractionRequest(descriptions))
                 .retrieve()
@@ -65,7 +70,7 @@ public class AiServiceClient {
      * and posts.
      */
     public ScraperResponse triggerTopCvScrape(int limit) {
-        return restClient.get()
+        return scraperClient.get()
                 .uri("/api/v1/scraper/scrape/topcv/{limit}", limit)
                 .retrieve()
                 .body(ScraperResponse.class);
@@ -77,7 +82,7 @@ public class AiServiceClient {
      * tables are source-agnostic, only the id prefix ({@code itviec.*}) differs.
      */
     public ScraperResponse triggerItviecScrape(int limit) {
-        return restClient.get()
+        return scraperClient.get()
                 .uri("/api/v1/scraper/scrape/itviec/{limit}", limit)
                 .retrieve()
                 .body(ScraperResponse.class);

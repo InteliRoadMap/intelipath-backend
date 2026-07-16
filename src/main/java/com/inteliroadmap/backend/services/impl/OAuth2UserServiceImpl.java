@@ -5,6 +5,7 @@ import com.inteliroadmap.backend.domain.dto.internal.info.GitHubOauth2UserInfo;
 import com.inteliroadmap.backend.domain.dto.internal.info.GoogleOAuth2UserInfo;
 import com.inteliroadmap.backend.domain.entity.OauthAccount;
 import com.inteliroadmap.backend.domain.entity.User;
+import com.inteliroadmap.backend.domain.enums.AccountType;
 import com.inteliroadmap.backend.domain.enums.UserRole;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.exceptions.BadRequestException;
@@ -174,6 +175,9 @@ public class OAuth2UserServiceImpl extends DefaultOAuth2UserService {
                 .fullName(userInfo.getFullName())
                 .bio(userInfo.getBio())
                 .role(UserRole.STUDENT) // Defaulting all new OAuth users to STUDENT role
+                // Arriving through OAuth means this is not a counselor-provisioned FPT
+                // account, so no FPT material. Existing users keep whatever type they have.
+                .accountType(AccountType.OTHER)
                 .build();
 
         // Save the new User entity to the database

@@ -28,6 +28,9 @@ import org.springframework.web.bind.annotation.RestController;
  * Student-facing FPT curriculum declaration. Declaring finished subjects (by term or
  * individually) seeds transcript evidence and returns any freshly generated roadmap
  * recommendations so the UI can prompt to apply them.
+ *
+ * Restricted to FPT accounts: the whole flow is about a student's own FPT coursework,
+ * so it has nothing to offer anyone else.
  */
 @RestController
 @RequestMapping("/api/v1/students/me")
@@ -35,7 +38,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Slf4j
 @Tag(name = "Student Curriculum", description = "Declare completed FPT subjects to personalize the roadmap")
 @SecurityRequirement(name = "Bearer Authentication")
-@PreAuthorize("hasRole('STUDENT')")
+@PreAuthorize("hasRole('STUDENT') and hasAuthority('ACCOUNT_FPT')")
 public class StudentCurriculumController {
 
     private final StudentCurriculumService studentCurriculumService;

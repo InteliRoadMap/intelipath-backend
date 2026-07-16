@@ -27,17 +27,13 @@ CREATE TABLE IF NOT EXISTS skills (
     skill_name      VARCHAR(255) NOT NULL UNIQUE
 );
 
-CREATE TABLE IF NOT EXISTS universities (
-    university_id   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    code            VARCHAR(50) UNIQUE,
-    name            VARCHAR(255) NOT NULL,
-    logo_url        TEXT,
-    domain_email    VARCHAR(100)
-);
-
 CREATE TABLE IF NOT EXISTS users (
     user_id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     email           VARCHAR(255) UNIQUE NOT NULL,
+    -- Login name for provisioned accounts (staff, FPT students); NULL for OAuth accounts.
+    username        VARCHAR(100) UNIQUE,
+    -- BCrypt hash; NULL for OAuth accounts, which have no local credential.
+    password_hash   VARCHAR(100),
     full_name       VARCHAR(255),
     yob             DATE,
     bio             TEXT,
@@ -46,16 +42,19 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at      TIMESTAMP NOT NULL DEFAULT NOW(),
     role            VARCHAR(30) NOT NULL DEFAULT 'STUDENT',
     account_status  VARCHAR(30) NOT NULL DEFAULT 'ACTIVE',
+    account_type    VARCHAR(20) NOT NULL DEFAULT 'OTHER',
     CONSTRAINT ck_users_role
         CHECK (role IN ('STUDENT', 'COUNSELOR', 'MENTOR', 'ADMIN')),
     CONSTRAINT ck_users_account_status
-        CHECK (account_status IN ('ACTIVE', 'INACTIVE', 'SUSPENDED'))
+        CHECK (account_status IN ('ACTIVE', 'INACTIVE', 'SUSPENDED')),
+    CONSTRAINT ck_users_account_type
+        CHECK (account_type IN ('FPT', 'OTHER'))
 );
 
 CREATE TABLE IF NOT EXISTS students (
     user_id             UUID PRIMARY KEY,
     career_id           UUID,
-    university_id        UUID,
+    -- Free text, display only. FPT material access is decided by users.account_type.
     university_name      VARCHAR(255),
     year_of_admission   INT,
     major               VARCHAR(255),
@@ -66,20 +65,15 @@ CREATE TABLE IF NOT EXISTS students (
     CONSTRAINT fk_st_user
         FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE,
     CONSTRAINT fk_st_career
-        FOREIGN KEY (career_id) REFERENCES career_roles (career_id) ON DELETE SET NULL,
-    CONSTRAINT fk_st_university
-        FOREIGN KEY (university_id) REFERENCES universities (university_id) ON DELETE SET NULL
+        FOREIGN KEY (career_id) REFERENCES career_roles (career_id) ON DELETE SET NULL
 );
 
 CREATE TABLE IF NOT EXISTS academic_counselor (
     user_id             UUID PRIMARY KEY,
-    university_id        UUID,
     department          VARCHAR(255),
     year_of_admission   INT,
     CONSTRAINT fk_ac_user
-        FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE,
-    CONSTRAINT fk_ac_university
-        FOREIGN KEY (university_id) REFERENCES universities (university_id) ON DELETE SET NULL
+        FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS industry_mentor (
@@ -504,7 +498,6 @@ CREATE TABLE IF NOT EXISTS chat_messages (
 -- ============================================================
 
 CREATE INDEX IF NOT EXISTS idx_students_career_id                ON students (career_id);
-CREATE INDEX IF NOT EXISTS idx_students_university_id            ON students (university_id);
 CREATE INDEX IF NOT EXISTS idx_students_portfolio_slug           ON students (portfolio_slug);
 CREATE INDEX IF NOT EXISTS idx_crs_career_id                     ON career_required_skills (career_id);
 CREATE INDEX IF NOT EXISTS idx_crs_skill_id                      ON career_required_skills (skill_id);

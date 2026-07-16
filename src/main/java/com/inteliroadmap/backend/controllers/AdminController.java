@@ -90,8 +90,21 @@ public class AdminController {
             return ResponseEntity.badRequest().body("Unknown source '" + source + "'. Use 'topcv' or 'itviec'.");
         }
         try {
-            jobScrapingScheduler.fetchJobs(target);
-            return ResponseEntity.ok(target + " Job Scraper via AI Service completed successfully.");
+            int posts = jobScrapingScheduler.fetchJobs(target);
+            return ResponseEntity.ok(target + " scraper finished — imported " + posts + " job post(s).");
+        } catch (org.springframework.web.client.ResourceAccessException e) {
+            // Timeouts / connection issues to the AI service surface here.
+            log.error("AdminController: Job scraper timed out or could not reach the AI service", e);
+            return ResponseEntity.status(504).body(
+                target + " scraper timed out. The scrape may still be running on the AI service — "
+                + "try a smaller SCRAPER_LIMIT or check the ai-service logs.");
+        } catch (org.springframework.web.client.RestClientResponseException e) {
+            // The AI service answered with an error (e.g. 502 Cloudflare block for TopCV).
+            // Surface its message cleanly instead of dumping a stack trace.
+            log.warn("AdminController: {} scraper rejected by AI service ({}): {}",
+                target, e.getStatusCode(), e.getResponseBodyAsString());
+            return ResponseEntity.status(e.getStatusCode().value()).body(
+                target + " scraper could not run: " + e.getResponseBodyAsString());
         } catch (Exception e) {
             log.error("AdminController: Error triggering job scraper", e);
             return ResponseEntity.internalServerError().body("Error during trigger: " + e.getMessage());

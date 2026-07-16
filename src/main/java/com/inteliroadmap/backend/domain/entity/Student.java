@@ -32,10 +32,7 @@ public class Student {
     @JoinColumn(name = "career_id", foreignKey = @ForeignKey(name = "fk_st_career"))
     private CareerRole careerRole;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "university_id", foreignKey = @ForeignKey(name = "fk_st_university"))
-    private University university;
-
+    /** Free text, for display only. Whether FPT material is offered is decided by User.accountType. */
     @Column(name = "university_name")
     private String universityName;
 

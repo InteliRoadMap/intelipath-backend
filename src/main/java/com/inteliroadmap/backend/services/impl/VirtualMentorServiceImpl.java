@@ -262,7 +262,7 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
         var promptSpec = chatClient.prompt()
                 .messages(messageHistory)
                 .user(userPrompt)
-                .toolNames("jobMarketTool", "studentProgressTool", "markItDownTool");
+                .toolNames("jobMarketTool", "studentProgressTool", "fptCurriculumTool", "markItDownTool");
 
         // Attach vector-store retrieval only when RAG is enabled (embedding +
         // search add latency; skipping is much faster when knowledge is unused).
@@ -325,11 +325,14 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
     }
 
     private String buildSystemPrompt(User user, Student student) {
-        String university = student != null && student.getUniversity() != null ? student.getUniversity().getName() : "N/A";
+        String university = student != null && student.getUniversityName() != null ? student.getUniversityName() : "N/A";
         String major = student != null && student.getMajor() != null ? student.getMajor() : "N/A";
+        String career = student != null && student.getCareerRole() != null
+                ? student.getCareerRole().getCareerName() : "not selected yet";
         String github = student != null && student.getGithubProfile() != null ? student.getGithubProfile() : "N/A";
         String transcript = student != null && student.getTranscriptUrl() != null ? student.getTranscriptUrl() : "N/A";
-        return String.format(systemPromptTemplate, user.getFullName(), university, major, github, transcript);
+        return String.format(systemPromptTemplate,
+                user.getFullName(), user.getUserId(), university, major, career, github, transcript);
     }
 
     /**

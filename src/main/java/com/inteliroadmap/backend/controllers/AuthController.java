@@ -1,5 +1,6 @@
 package com.inteliroadmap.backend.controllers;
 
+import com.inteliroadmap.backend.domain.dto.request.LoginRequest;
 import com.inteliroadmap.backend.domain.dto.response.auth.RefreshResponse;
 import com.inteliroadmap.backend.security.AuthenticationCookieService;
 import com.inteliroadmap.backend.services.AuthService;
@@ -10,6 +11,7 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletResponse;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -17,12 +19,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Controller - Authentication API Endpoints
  * Provides endpoints:
+ * - POST /api/v1/auth/login   - Sign in with an FPT account's username and password
  * - POST /api/v1/auth/refresh - Rotate a refresh token and issue new tokens
  */
 @RestController
@@ -34,6 +38,46 @@ public class AuthController {
 
     private final AuthService authService;
     private final AuthenticationCookieService authenticationCookieService;
+
+    /**
+     * Signs in an FPT account provisioned by a counselor.
+     *
+     * @param request the submitted username and password
+     * @param servletResponse response the refresh token cookie is attached to
+     * @return response containing the newly issued access token
+     */
+    @PostMapping("/login")
+    @Operation(
+            summary = "Log in with username and password",
+            description = "Authenticate an FPT account and issue a JWT access token plus a refreshToken HttpOnly cookie"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "Logged in successfully",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = RefreshResponse.class)
+                    )
+            ),
+            @ApiResponse(
+                    responseCode = "401",
+                    description = "Invalid username or password"
+            ),
+            @ApiResponse(
+                    responseCode = "403",
+                    description = "Account is not active"
+            )
+    })
+    public ResponseEntity<RefreshResponse> login(
+            @Valid @RequestBody LoginRequest request,
+            HttpServletResponse servletResponse
+    ) {
+        log.info("AuthController: Login request received");
+        RefreshResponse loginResponse = authService.login(request);
+        authenticationCookieService.addRefreshTokenCookie(servletResponse, loginResponse.getRefreshToken());
+        return ResponseEntity.ok(loginResponse);
+    }
 
     /**
      * Rotates a valid refresh token stored in an HttpOnly cookie and returns a new access token.

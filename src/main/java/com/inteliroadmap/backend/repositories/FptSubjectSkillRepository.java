@@ -17,6 +17,8 @@ public interface FptSubjectSkillRepository extends JpaRepository<FptSubjectSkill
 
     List<FptSubjectSkill> findBySubjectCodeIn(Collection<String> subjectCodes);
 
+    List<FptSubjectSkill> findBySkillNameIgnoreCase(String skillName);
+
     // Bulk delete runs immediately, so a re-import can insert the same
     // (subject_code, skill_name) without clashing with uq_fss.
     @Modifying
