@@ -3,6 +3,7 @@ package com.inteliroadmap.backend.controllers;
 import com.inteliroadmap.backend.domain.dto.request.AdminFlmSyncRequest;
 import com.inteliroadmap.backend.domain.dto.response.admin.FlmSyncStartResponse;
 import com.inteliroadmap.backend.domain.dto.response.admin.FlmSyncStatusResponse;
+import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.services.AdminFlmSyncService;
 import com.inteliroadmap.backend.services.FptMaterialMirrorService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -21,6 +22,8 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Map;
 
 /**
  * Admin FLM-sync endpoints. The admin pastes a live FLM session cookie and triggers
@@ -49,15 +52,29 @@ public class AdminFlmController {
      * No cookie is involved — the source files are public.
      */
     @PostMapping("/mirror-materials")
-    @Operation(summary = "Mirror FPT course materials into storage",
-            description = "Downloads the files referenced by synced syllabi and stores our own copy. "
-                    + "Runs inline and may take a while; omit subjectCode to do every un-mirrored file.")
-    public ResponseEntity<FptMaterialMirrorService.MirrorSummary> mirrorMaterials(
+    @Operation(summary = "Start mirroring FPT course materials into storage",
+            description = "Kicks off a background copy of the files referenced by synced syllabi. "
+                    + "Returns a jobId to poll. Omit subjectCode to do every un-mirrored file.")
+    public ResponseEntity<Map<String, String>> mirrorMaterials(
             @RequestParam(required = false) String subjectCode,
             @RequestParam(defaultValue = "false") boolean force) {
         log.info("AdminFlmController: material mirror requested (subjectCode={}, force={})",
                 subjectCode, force);
-        return ResponseEntity.ok(fptMaterialMirrorService.mirrorMaterials(subjectCode, force));
+        String jobId = fptMaterialMirrorService.start(subjectCode, force);
+        return ResponseEntity.accepted().body(Map.of("jobId", jobId));
+    }
+
+    @GetMapping("/mirror-materials/{jobId}")
+    @Operation(summary = "Poll a material mirror",
+            description = "Returns progress; the terminal 'done' state carries the summary.")
+    public ResponseEntity<FptMaterialMirrorService.MirrorJobStatus> pollMirror(@PathVariable String jobId) {
+        FptMaterialMirrorService.MirrorJobStatus status = fptMaterialMirrorService.poll(jobId);
+        if (status == null) {
+            // Jobs live in memory, so an unknown id usually means a restart rather than a
+            // bad id; say so instead of implying the mirror failed.
+            throw new ResourceNotFoundException("No mirror job " + jobId + " (the server may have restarted)");
+        }
+        return ResponseEntity.ok(status);
     }
 
     @PostMapping("/sync")

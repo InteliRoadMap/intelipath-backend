@@ -11,10 +11,26 @@ package com.inteliroadmap.backend.services;
 public interface FptMaterialMirrorService {
 
     /**
+     * Starts a mirror in the background and returns its job id.
+     *
+     * Not inline: a full run is ~419 MB across 63 files, which no HTTP request should be
+     * made to sit through. Callers poll {@link #poll}.
+     *
      * @param subjectCode mirror only this subject, or null for every un-mirrored file
      * @param force       re-download files that were already mirrored
      */
-    MirrorSummary mirrorMaterials(String subjectCode, boolean force);
+    String start(String subjectCode, boolean force);
+
+    /** Progress for a job id, or null once it is unknown (restart clears them). */
+    MirrorJobStatus poll(String jobId);
+
+    /**
+     * @param state   pending | running | done | error
+     * @param summary populated only in the terminal done state
+     */
+    record MirrorJobStatus(String state, String phase, int done, int total,
+                           String message, MirrorSummary summary, String error) {
+    }
 
     /**
      * @param attempted files that had a source to fetch

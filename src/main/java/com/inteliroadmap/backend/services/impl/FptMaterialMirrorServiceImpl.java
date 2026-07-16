@@ -8,68 +8,109 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.RestTemplate;
 
 import java.net.URI;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class FptMaterialMirrorServiceImpl implements FptMaterialMirrorService {
 
-    /** Guards against a redirect to something enormous; the largest real file seen is ~14 MB. */
-    private static final int MAX_FILE_BYTES = 64 * 1024 * 1024;
+    /**
+     * Upper bound on a single file. The largest real syllabus file measured is 79 MB, so
+     * this must stay well clear of it — a limit tuned to the "typical" ~5 MB file silently
+     * drops exactly the biggest, most useful bundles.
+     */
+    private static final int MAX_FILE_BYTES = 128 * 1024 * 1024;
+
+    /**
+     * In-memory job store. Jobs are short-lived and polled by one admin screen, so this
+     * matches the FLM sync it sits next to; a restart forgets them, which is why poll()
+     * returning null must read as "unknown", not "failed".
+     */
+    private final Map<String, MirrorJobStatus> jobs = new ConcurrentHashMap<>();
 
     private final FptSubjectResourceRepository fptSubjectResourceRepository;
     private final SupabaseStorageService supabaseStorageService;
     private final RestTemplate externalApiRestTemplate;
 
     @Override
-    @Transactional
-    public MirrorSummary mirrorMaterials(String subjectCode, boolean force) {
-        List<FptSubjectResource> candidates = subjectCode == null || subjectCode.isBlank()
-                ? fptSubjectResourceRepository.findMirrorCandidates()
-                : fptSubjectResourceRepository.findMirrorCandidatesBySubject(subjectCode.trim());
+    public String start(String subjectCode, boolean force) {
+        String jobId = UUID.randomUUID().toString().replace("-", "");
+        jobs.put(jobId, new MirrorJobStatus("pending", "queued", 0, 0, "Queued", null, null));
+        Thread worker = new Thread(() -> run(jobId, subjectCode, force), "flm-mirror-" + jobId);
+        worker.setDaemon(true);
+        worker.start();
+        return jobId;
+    }
 
-        int attempted = 0;
-        int mirrored = 0;
-        int skipped = 0;
-        int failed = 0;
-        long bytes = 0;
+    @Override
+    public MirrorJobStatus poll(String jobId) {
+        return jobs.get(jobId);
+    }
 
-        for (FptSubjectResource resource : candidates) {
-            attempted++;
-            if (!force && resource.getStoragePath() != null) {
-                skipped++;
-                continue;
+    private void run(String jobId, String subjectCode, boolean force) {
+        try {
+            List<FptSubjectResource> candidates = subjectCode == null || subjectCode.isBlank()
+                    ? fptSubjectResourceRepository.findMirrorCandidates()
+                    : fptSubjectResourceRepository.findMirrorCandidatesBySubject(subjectCode.trim());
+
+            int total = candidates.size();
+            jobs.put(jobId, new MirrorJobStatus("running", "mirroring", 0, total,
+                    "Found " + total + " files with a source.", null, null));
+
+            int mirrored = 0;
+            int skipped = 0;
+            int failed = 0;
+            long bytes = 0;
+
+            for (int i = 0; i < total; i++) {
+                FptSubjectResource resource = candidates.get(i);
+                jobs.put(jobId, new MirrorJobStatus("running", "mirroring", i, total,
+                        "Fetching " + resource.getSubjectCode() + " (" + (i + 1) + "/" + total + ")…",
+                        null, null));
+
+                if (!force && resource.getStoragePath() != null) {
+                    skipped++;
+                    continue;
+                }
+                try {
+                    byte[] content = download(resource.getSourceUrl());
+                    String path = objectPath(resource);
+                    supabaseStorageService.uploadCourseMaterial(content, path, contentTypeFor(path));
+
+                    resource.setStoragePath(path);
+                    resource.setSizeBytes((long) content.length);
+                    resource.setMirroredAt(LocalDateTime.now());
+                    fptSubjectResourceRepository.save(resource);
+
+                    mirrored++;
+                    bytes += content.length;
+                } catch (Exception e) {
+                    // Expect failures: FLM's /file/download?scheduleId= handler currently
+                    // 500s for every id, even for a logged-in browser. One dead source must
+                    // not abandon the rest, and the row keeps its state so a later run retries.
+                    log.warn("FptMaterialMirror: {} — failed to mirror: {}",
+                            resource.getSubjectCode(), e.getMessage());
+                    failed++;
+                }
             }
-            try {
-                byte[] content = download(resource.getSourceUrl());
-                String path = objectPath(resource);
-                supabaseStorageService.uploadCourseMaterial(content, path, contentTypeFor(path));
 
-                resource.setStoragePath(path);
-                resource.setSizeBytes((long) content.length);
-                resource.setMirroredAt(LocalDateTime.now());
-                fptSubjectResourceRepository.save(resource);
-
-                mirrored++;
-                bytes += content.length;
-            } catch (Exception e) {
-                // One dead link must not abandon the rest; the row keeps its previous state
-                // so a later run retries it.
-                log.warn("FptMaterialMirror: {} — failed to mirror: {}",
-                        resource.getSubjectCode(), e.getMessage());
-                failed++;
-            }
+            MirrorSummary summary = new MirrorSummary(total, mirrored, skipped, failed, bytes);
+            jobs.put(jobId, new MirrorJobStatus("done", "done", total, total,
+                    "Mirrored " + mirrored + " of " + total + " files.", summary, null));
+            log.info("FptMaterialMirror {}: mirrored {}, skipped {}, failed {} ({} bytes)",
+                    jobId, mirrored, skipped, failed, bytes);
+        } catch (Exception e) {
+            log.error("FptMaterialMirror {} failed", jobId, e);
+            jobs.put(jobId, new MirrorJobStatus("error", "done", 0, 0, null, null, e.getMessage()));
         }
-
-        log.info("FptMaterialMirror: attempted {}, mirrored {}, skipped {}, failed {} ({} bytes)",
-                attempted, mirrored, skipped, failed, bytes);
-        return new MirrorSummary(attempted, mirrored, skipped, failed, bytes);
     }
 
     private byte[] download(String sourceUrl) {
