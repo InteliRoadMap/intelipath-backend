@@ -4,15 +4,18 @@ import com.inteliroadmap.backend.domain.dto.request.DeclareCurriculumTermRequest
 import com.inteliroadmap.backend.domain.dto.request.SetStudentCurriculumRequest;
 import com.inteliroadmap.backend.domain.dto.request.UpdateFptSubjectsRequest;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.CurriculumOptionResponse;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.FptSubjectDetailResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.FptSubjectResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.StudentCurriculumResponse;
 import com.inteliroadmap.backend.domain.entity.FptCurriculum;
 import com.inteliroadmap.backend.domain.entity.FptCurriculumSubject;
 import com.inteliroadmap.backend.domain.entity.FptSubject;
+import com.inteliroadmap.backend.domain.entity.FptSubjectResource;
 import com.inteliroadmap.backend.domain.entity.FptSubjectSkill;
 import com.inteliroadmap.backend.domain.entity.Student;
 import com.inteliroadmap.backend.domain.entity.StudentFptSubject;
 import com.inteliroadmap.backend.domain.entity.StudentSkillEvidence;
+import com.inteliroadmap.backend.domain.enums.FptResourceKind;
 import com.inteliroadmap.backend.domain.enums.EvidenceStatus;
 import com.inteliroadmap.backend.domain.enums.EvidenceType;
 import com.inteliroadmap.backend.domain.enums.StudentSubjectSource;
@@ -20,6 +23,8 @@ import com.inteliroadmap.backend.domain.enums.StudentSubjectStatus;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.repositories.FptCurriculumRepository;
 import com.inteliroadmap.backend.repositories.FptCurriculumSubjectRepository;
+import com.inteliroadmap.backend.repositories.FptSubjectCloRepository;
+import com.inteliroadmap.backend.repositories.FptSubjectResourceRepository;
 import com.inteliroadmap.backend.repositories.FptSubjectRepository;
 import com.inteliroadmap.backend.repositories.FptSubjectSkillRepository;
 import com.inteliroadmap.backend.repositories.StudentFptSubjectRepository;
@@ -74,6 +79,8 @@ public class StudentCurriculumServiceImpl implements StudentCurriculumService {
     private final FptCurriculumSubjectRepository fptCurriculumSubjectRepository;
     private final StudentFptSubjectRepository studentFptSubjectRepository;
     private final StudentSkillEvidenceRepository evidenceRepository;
+    private final FptSubjectCloRepository fptSubjectCloRepository;
+    private final FptSubjectResourceRepository fptSubjectResourceRepository;
 
     @Override
     @Transactional
@@ -81,6 +88,60 @@ public class StudentCurriculumServiceImpl implements StudentCurriculumService {
         Student student = authenticatedStudentService.getRequiredStudent();
         FptCurriculum curriculum = resolveCurriculum(student);
         return buildCurriculumResponse(student, curriculum);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public FptSubjectDetailResponse getSubjectDetail(String subjectCode) {
+        String code = subjectCode == null ? "" : subjectCode.trim();
+        FptSubject subject = fptSubjectRepository.findById(code)
+                .orElseThrow(() -> new ResourceNotFoundException("Subject not found: " + code));
+
+        List<String> skills = fptSubjectSkillRepository.findBySubjectCodeIn(List.of(code)).stream()
+                .map(FptSubjectSkill::getSkillName)
+                .toList();
+
+        List<FptSubjectDetailResponse.CloResponse> clos =
+                fptSubjectCloRepository.findBySubjectCodeOrderByOrderIndexAsc(code).stream()
+                        .map(c -> FptSubjectDetailResponse.CloResponse.builder()
+                                .code(c.getCode())
+                                .outcome(c.getOutcome())
+                                .build())
+                        .toList();
+
+        // Split by kind rather than making the page do it: MATERIAL rows are references
+        // with nothing to download, SESSION rows are where files live.
+        Map<FptResourceKind, List<FptSubjectDetailResponse.MaterialResponse>> byKind =
+                fptSubjectResourceRepository
+                        .findBySubjectCodeInOrderBySubjectCodeAscOrderIndexAsc(List.of(code)).stream()
+                        .collect(Collectors.groupingBy(
+                                FptSubjectResource::getKind,
+                                Collectors.mapping(StudentCurriculumServiceImpl::toMaterial, Collectors.toList())));
+
+        return FptSubjectDetailResponse.builder()
+                .code(subject.getCode())
+                .name(subject.getName())
+                .credits(subject.getCredits())
+                .prerequisite(subject.getPrerequisite())
+                .description(subject.getDescription())
+                .skills(skills)
+                .clos(clos)
+                .materials(byKind.getOrDefault(FptResourceKind.MATERIAL, List.of()))
+                .sessions(byKind.getOrDefault(FptResourceKind.SESSION, List.of()))
+                .build();
+    }
+
+    /** Never exposes sourceUrl or storagePath: downloads go through the signed-URL endpoint. */
+    private static FptSubjectDetailResponse.MaterialResponse toMaterial(FptSubjectResource r) {
+        return FptSubjectDetailResponse.MaterialResponse.builder()
+                .id(r.getId())
+                .title(r.getTitle())
+                .topic(r.getTopic())
+                .cloRef(r.getCloRef())
+                .url(r.getUrl())
+                .sizeBytes(r.getSizeBytes())
+                .downloadable(r.getStoragePath() != null && !r.getStoragePath().isBlank())
+                .build();
     }
 
     @Override

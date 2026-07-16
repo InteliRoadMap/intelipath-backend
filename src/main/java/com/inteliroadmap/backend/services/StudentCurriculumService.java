@@ -3,6 +3,7 @@ package com.inteliroadmap.backend.services;
 import com.inteliroadmap.backend.domain.dto.request.DeclareCurriculumTermRequest;
 import com.inteliroadmap.backend.domain.dto.request.SetStudentCurriculumRequest;
 import com.inteliroadmap.backend.domain.dto.request.UpdateFptSubjectsRequest;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.FptSubjectDetailResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.StudentCurriculumResponse;
 
 /**
@@ -15,6 +16,14 @@ public interface StudentCurriculumService {
 
     /** The full FPT-subject checklist annotated with the current student's declared status. */
     StudentCurriculumResponse getCurriculum();
+
+    /**
+     * Full syllabus detail for one subject: outcomes, references and the files we hold.
+     *
+     * Not scoped to the student's combo — the lookup page is for browsing what the school
+     * teaches, and being an FPT account is the rule that matters.
+     */
+    FptSubjectDetailResponse getSubjectDetail(String subjectCode);
 
     /** Mark every subject up to the given term as PASSED, then re-sync evidence. */
     StudentCurriculumResponse applyCurriculumTerm(DeclareCurriculumTermRequest request);
