@@ -671,7 +671,16 @@ public class DatabaseSeeder implements CommandLineRunner {
                     .email("fe_student" + i + "@example.com")
                     .fullName("Frontend Student " + i)
                     .role(UserRole.STUDENT)
-                    // Non-FPT bulk students: they see roadmap.sh resources only.
+                    // FPT on purpose, despite the plan once calling for OTHER here.
+                    //
+                    // These rows are fixtures, not accounts: they get no username and no
+                    // password, and login goes through findByUsername, so nobody can ever
+                    // sign in as one. That makes accountType irrelevant to FPT resource
+                    // gating for them -- there is no session to gate -- and leaves it
+                    // meaning exactly one thing: whether the FPT counselor can see them
+                    // (StudentRepository.findStudentInfos scopes on accountType).
+                    // Flipping these to OTHER would empty the counselor's list down to the
+                    // single credentialed seed student.
                     .accountType(AccountType.FPT)
                     .build();
             sUser = userRepository.save(sUser);
