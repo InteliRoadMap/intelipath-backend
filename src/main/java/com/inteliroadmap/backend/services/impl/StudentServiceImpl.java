@@ -14,7 +14,6 @@ import com.inteliroadmap.backend.domain.entity.Student;
 import com.inteliroadmap.backend.domain.entity.StudentProgress;
 import com.inteliroadmap.backend.domain.entity.StudentSkill;
 import com.inteliroadmap.backend.domain.entity.User;
-import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.services.AuthenticatedStudentService;
 import com.inteliroadmap.backend.services.DocumentIngestionService;
@@ -103,7 +102,7 @@ public class StudentServiceImpl implements StudentService {
             student.setUniversityName(universityName.isEmpty() ? null : universityName);
         }
         if (request.getYearOfAdmission() != null) {
-            student.setYearOfAdmission(request.getYearOfAdmission());
+            student.setAdmissionDate(LocalDate.of(request.getYearOfAdmission(), 1, 1));
         }
 
         if (request.getMajor() != null) {

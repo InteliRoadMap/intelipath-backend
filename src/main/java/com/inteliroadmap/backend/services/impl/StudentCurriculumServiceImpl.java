@@ -194,8 +194,8 @@ public class StudentCurriculumServiceImpl implements StudentCurriculumService {
 
     /** Auto-match a curriculum from the student's cohort (admission year) and program (major). */
     private FptCurriculum deriveCurriculum(Student student) {
-        Integer cohort = student.getYearOfAdmission() != null
-                ? student.getYearOfAdmission() - COHORT_BASE_YEAR : null;
+        Integer cohort = student.getAdmissionDate() != null
+                ? student.getAdmissionDate().getYear() - COHORT_BASE_YEAR : null;
         String program = programFromMajor(student.getMajor());
         if (program != null && cohort != null) {
             List<FptCurriculum> matches = fptCurriculumRepository
