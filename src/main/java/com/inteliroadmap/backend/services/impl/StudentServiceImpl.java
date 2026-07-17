@@ -322,7 +322,7 @@ public class StudentServiceImpl implements StudentService {
         RagDocument document = ragDocumentService.startStudentTranscript(user, transcriptUrl, file);
 
         try {
-            documentIngestionService.ingestPdfDocument(file);
+            documentIngestionService.ingestPdfDocument(file, document);
             ragDocumentService.markCompleted(document.getDocumentId());
         } catch (Exception exception) {
             ragDocumentService.markFailed(document.getDocumentId(), exception);

@@ -7,7 +7,9 @@ import com.inteliroadmap.backend.domain.dto.response.mentor.VirtualMentorMessage
 import com.inteliroadmap.backend.domain.dto.response.mentor.VirtualMentorSessionResponse;
 import com.inteliroadmap.backend.domain.entity.ChatMessage;
 import com.inteliroadmap.backend.domain.entity.ChatSession;
+import com.inteliroadmap.backend.domain.entity.RagDocument;
 import com.inteliroadmap.backend.services.DocumentIngestionService;
+import com.inteliroadmap.backend.services.RagDocumentService;
 import com.inteliroadmap.backend.services.SupabaseStorageService;
 import com.inteliroadmap.backend.services.VirtualMentorService;
 import com.inteliroadmap.backend.utils.FileValidationUtil;
@@ -50,6 +52,7 @@ public class VirtualMentorController {
     private final VirtualMentorService virtualMentorService;
     private final SupabaseStorageService supabaseStorageService;
     private final DocumentIngestionService documentIngestionService;
+    private final RagDocumentService ragDocumentService;
 
     @PostMapping("/sessions")
     @Operation(summary = "Create a new chat session")
@@ -127,12 +130,16 @@ public class VirtualMentorController {
     public ResponseEntity<Map<String, String>> ingestKnowledge(
             @RequestParam("file") MultipartFile file) {
         FileValidationUtil.validatePdf(file);
+        // GLOBAL scope: admin knowledge is meant for every student, unlike a transcript.
+        RagDocument document = ragDocumentService.startGlobalKnowledge(file);
         try {
             log.info("VirtualMentorController: Ingesting knowledge file: {}", file.getOriginalFilename());
-            documentIngestionService.ingestPdfDocument(file);
+            documentIngestionService.ingestPdfDocument(file, document);
+            ragDocumentService.markCompleted(document.getDocumentId());
             return ResponseEntity.ok(Map.of("message", "Successfully ingested document into Vector Database."));
         } catch (Exception e) {
             log.error("VirtualMentorController: Failed to ingest document", e);
+            ragDocumentService.markFailed(document.getDocumentId(), e);
             return ResponseEntity.internalServerError().body(Map.of("error", e.getMessage()));
         }
     }

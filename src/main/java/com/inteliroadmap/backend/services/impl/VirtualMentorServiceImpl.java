@@ -6,6 +6,7 @@ import com.inteliroadmap.backend.domain.entity.ChatMessage;
 import com.inteliroadmap.backend.domain.entity.ChatSession;
 import com.inteliroadmap.backend.domain.entity.Student;
 import com.inteliroadmap.backend.domain.entity.User;
+import com.inteliroadmap.backend.domain.enums.RagDocumentScope;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.exceptions.ForbiddenException;
 import com.inteliroadmap.backend.repositories.ChatMessageRepository;
@@ -24,6 +25,8 @@ import org.springframework.ai.chat.messages.UserMessage;
 import org.springframework.ai.chat.prompt.PromptTemplate;
 import org.springframework.ai.vectorstore.SearchRequest;
 import org.springframework.ai.vectorstore.VectorStore;
+import org.springframework.ai.vectorstore.filter.Filter;
+import org.springframework.ai.vectorstore.filter.FilterExpressionBuilder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
@@ -268,7 +271,9 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
         // search add latency; skipping is much faster when knowledge is unused).
         if (ragEnabled) {
             promptSpec = promptSpec.advisors(QuestionAnswerAdvisor.builder(vectorStore)
-                    .searchRequest(SearchRequest.builder().build())
+                    .searchRequest(SearchRequest.builder()
+                            .filterExpression(retrievableBy(user))
+                            .build())
                     .promptTemplate(new PromptTemplate(ragPromptTemplate))
                     .build());
         }
@@ -296,6 +301,19 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
      * @param student the student profile associated with the user, if any
      * @return the constructed system prompt string
      */
+    /**
+     * Which chunks this user may retrieve: the shared knowledge an admin ingested, plus
+     * their own documents — never another student's. Without this the store is one pool
+     * and a transcript can surface in a stranger's answer.
+     */
+    static Filter.Expression retrievableBy(User user) {
+        FilterExpressionBuilder b = new FilterExpressionBuilder();
+        return b.or(
+                b.eq("scope", RagDocumentScope.GLOBAL.name()),
+                b.eq("userId", user.getUserId().toString())
+        ).build();
+    }
+
     /**
      * If a document was attached, read its text via the AI service once and append
      * it to the user's message so the model can answer about the real content.
