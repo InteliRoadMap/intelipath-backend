@@ -7,7 +7,6 @@ import com.inteliroadmap.backend.domain.dto.response.counselor.CounselorDashboar
 import com.inteliroadmap.backend.domain.dto.response.counselor.CounselorFeedbackResponse;
 import com.inteliroadmap.backend.domain.dto.response.counselor.CurriculumResponse;
 import com.inteliroadmap.backend.domain.dto.response.student.UpdateProfileResponse;
-import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
 
@@ -30,6 +29,8 @@ public interface CounselorService {
     byte[] exportStudentList(ExportStudentListRequest request);
 
     CurriculumResponse getCurriculums();
+
+    void checkStudentEmail(String email);
 
     byte[] importStudentAccounts(ImportStudentAccountsRequest request);
 }

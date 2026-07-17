@@ -306,6 +306,18 @@ public class CounselorController {
         return ResponseEntity.ok(counselorService.getCurriculums());
     }
 
+    @GetMapping("/import-student/{email}")
+    @Operation(summary = "Validate email", description = "Validate student email")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Student email is valid"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized or invalid token")
+    })
+    public ResponseEntity<HttpStatus> checkStudentEmail(@PathVariable String email) {
+        log.info("CounselorController: Check student email request received");
+        counselorService.checkStudentEmail(email);
+        return ResponseEntity.ok(HttpStatus.OK);
+    }
+
     @PostMapping("/import-students")
     @Operation(summary = "Import student accounts", description = "Import new student accounts"
     )

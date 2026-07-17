@@ -13,6 +13,7 @@ import com.inteliroadmap.backend.domain.dto.response.student.UpdateProfileRespon
 import com.inteliroadmap.backend.domain.enums.AccountType;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.exceptions.UnauthorizedException;
+import com.inteliroadmap.backend.exceptions.BadRequestException;
 import com.inteliroadmap.backend.mappers.CounselorMapper;
 import com.inteliroadmap.backend.repositories.*;
 import com.inteliroadmap.backend.services.CounselorService;
@@ -418,6 +419,15 @@ public class CounselorServiceImpl implements CounselorService {
 
     @Transactional
     @Override
+    public void checkStudentEmail(String email) {
+        log.info("CounselorServiceImpl: Check student email request received");
+        User user = userRepository.findByEmail(email);
+        if (user != null) throw new BadRequestException("Student email already exists");
+        log.info("CounselorServiceImpl: Student email is valid to create account");
+    }
+
+    @Transactional
+    @Override
     public byte[] importStudentAccounts(ImportStudentAccountsRequest request) {
         log.info("CounselorServiceImpl: Import student accounts request received");
         AcademicCounselor counselor = getAuthenticatedCounselor();
@@ -437,8 +447,8 @@ public class CounselorServiceImpl implements CounselorService {
                 log.info("CounselorServiceImpl: User account for student {} found, skip importing", account.getEmail());
                 username = stUser.getUsername();
             } else {
-                // Generate username as "Curriculum program + @ + fullName(trim + lowercase)"
-                username = curriculum.getProgram() + "@" + account.getFullName().trim().replaceAll("\\s+", "").toLowerCase();
+                // Generate username as "Curriculum program + @ + email"
+                username = curriculum.getProgram() + "@" + account.getEmail().replaceAll("@\\s+", "");
 
                 // Generates random password from the last set of strings in UUID (12 char)
                 String randomPassword = UUID.randomUUID().toString().split("-")[4];
