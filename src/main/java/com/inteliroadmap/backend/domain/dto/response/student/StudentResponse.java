@@ -23,7 +23,7 @@ public class StudentResponse {
     private String universityName;
     /** Read-only: set from the User record, never accepted from a request. */
     private AccountType accountType;
-    private Integer yearOfAdmission;
+    private LocalDate admissionDate;
     private String major;
     private String githubProfile;
     private String transcriptUrl;

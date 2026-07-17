@@ -513,7 +513,9 @@ public class DatabaseSeeder implements CommandLineRunner {
             userSt = User.builder().email("mainclone2@gmail.com").build();
         }
         userSt.setFullName("Hau ST");
-        userSt.setYob(LocalDate.now().minusYears(10));
+        // A plausible undergraduate age: at 10 the profile form rightly rejects every
+        // admission date, which made the seed account untestable.
+        userSt.setYob(LocalDate.now().minusYears(20));
         userSt.setRole(UserRole.STUDENT);
         // Stands in for a counselor-provisioned FPT student: local credential + FPT material.
         userSt.setAccountType(AccountType.FPT);
@@ -564,7 +566,7 @@ public class DatabaseSeeder implements CommandLineRunner {
                     .userId(sUser.getUserId())
                     .careerRole(frontend)
                     .universityName(FPT_UNIVERSITY_NAME)
-                    .yearOfAdmission(LocalDate.now().getYear() - random.nextInt(4))
+                    .admissionDate(LocalDate.now().minusYears(random.nextInt(4)).withMonth(9).withDayOfMonth(1))
                     .major("Software Engineer")
                     .build();
             stu = studentRepository.save(stu);

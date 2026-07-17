@@ -1,10 +1,10 @@
 package com.inteliroadmap.backend.domain.dto.request;
 
-import jakarta.validation.constraints.Max;
-import jakarta.validation.constraints.Min;
+import jakarta.validation.constraints.PastOrPresent;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
 
+import java.time.LocalDate;
 import java.util.UUID;
 
 @Data
@@ -13,9 +13,9 @@ public class SetupStudentProfileRequest {
     @Size(max = 200, message = "University name must not exceed 200 characters")
     private String universityName;
 
-    @Min(value = 1950, message = "Year of admission is out of range")
-    @Max(value = 2100, message = "Year of admission is out of range")
-    private Integer yearOfAdmission;
+    /** ISO date, e.g. 2023-09-05. */
+    @PastOrPresent(message = "Admission date cannot be in the future")
+    private LocalDate admissionDate;
 
     @Size(max = 200, message = "Major must not exceed 200 characters")
     private String major;

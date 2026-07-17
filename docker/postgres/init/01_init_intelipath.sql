@@ -56,7 +56,8 @@ CREATE TABLE IF NOT EXISTS students (
     career_id           UUID,
     -- Free text, display only. FPT material access is decided by users.account_type.
     university_name      VARCHAR(255),
-    year_of_admission   INT,
+    -- A full date, not a year: the counselor enters it from the admission record.
+    admission_date      DATE,
     major               VARCHAR(255),
     github_profile      VARCHAR(255),
     transcript_url      TEXT,
@@ -71,7 +72,7 @@ CREATE TABLE IF NOT EXISTS students (
 CREATE TABLE IF NOT EXISTS academic_counselor (
     user_id             UUID PRIMARY KEY,
     department          VARCHAR(255),
-    year_of_admission   INT,
+    admission_date      DATE,
     CONSTRAINT fk_ac_user
         FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE
 );
@@ -748,6 +749,28 @@ ALTER TABLE fpt_curriculum_subjects ADD COLUMN IF NOT EXISTS combo_code VARCHAR(
 ALTER TABLE fpt_curriculum_subjects ADD COLUMN IF NOT EXISTS combo_name TEXT;
 ALTER TABLE students                ADD COLUMN IF NOT EXISTS fpt_combo_code VARCHAR(40);
 CREATE INDEX IF NOT EXISTS idx_fcs_curriculum_combo ON fpt_curriculum_subjects (curriculum_id, combo_code);
+
+-- Admission moves from a bare year to a full date: the counselor enters it from the
+-- admission record, so the day and month are real data rather than something the form
+-- had to invent. Existing years become 1 January of that year; the counselor can enter
+-- the exact date later.
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns
+               WHERE table_name = 'students' AND column_name = 'year_of_admission') THEN
+        ALTER TABLE students
+            ALTER COLUMN year_of_admission TYPE DATE
+            USING make_date(year_of_admission, 1, 1);
+        ALTER TABLE students RENAME COLUMN year_of_admission TO admission_date;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.columns
+               WHERE table_name = 'academic_counselor' AND column_name = 'year_of_admission') THEN
+        ALTER TABLE academic_counselor
+            ALTER COLUMN year_of_admission TYPE DATE
+            USING make_date(year_of_admission, 1, 1);
+        ALTER TABLE academic_counselor RENAME COLUMN year_of_admission TO admission_date;
+    END IF;
+END $$;
 
 -- Mirrored materials: we host the file, so the FPT gate actually withholds it.
 ALTER TABLE fpt_subject_resources ADD COLUMN IF NOT EXISTS source_url   TEXT;

@@ -102,8 +102,8 @@ public class StudentServiceImpl implements StudentService {
             String universityName = request.getUniversityName().trim();
             student.setUniversityName(universityName.isEmpty() ? null : universityName);
         }
-        if (request.getYearOfAdmission() != null) {
-            student.setYearOfAdmission(request.getYearOfAdmission());
+        if (request.getAdmissionDate() != null) {
+            student.setAdmissionDate(request.getAdmissionDate());
         }
 
         if (request.getMajor() != null) {
