@@ -3,7 +3,7 @@ package com.inteliroadmap.backend.services.impl;
 import com.inteliroadmap.backend.domain.dto.request.CreateFeedbackRequest;
 import com.inteliroadmap.backend.domain.dto.request.ModifyFeedbackRequest;
 import com.inteliroadmap.backend.domain.dto.response.FeedbackAttachmentResponse;
-import com.inteliroadmap.backend.domain.dto.response.counselor.FeedbackResponse;
+import com.inteliroadmap.backend.domain.dto.response.counselor.CounselorFeedbackResponse;
 import com.inteliroadmap.backend.domain.entity.Feedback;
 import com.inteliroadmap.backend.domain.entity.FeedbackAttachment;
 import com.inteliroadmap.backend.utils.FileValidationUtil;
@@ -61,7 +61,7 @@ public class FeedbackServiceImpl implements FeedbackService {
      */
     @Transactional
     @Override
-    public FeedbackResponse createFeedback(CreateFeedbackRequest request, List<MultipartFile> files) {
+    public CounselorFeedbackResponse.FeedbackResponse createFeedback(CreateFeedbackRequest request, List<MultipartFile> files) {
         log.info("FeedbackServiceImpl: Creating feedback...");
 
         User sender = getAuthenticatedUser();
@@ -125,7 +125,7 @@ public class FeedbackServiceImpl implements FeedbackService {
      */
     @Transactional
     @Override
-    public FeedbackResponse modifyFeedback(ModifyFeedbackRequest request, List<MultipartFile> files) {
+    public CounselorFeedbackResponse.FeedbackResponse modifyFeedback(ModifyFeedbackRequest request, List<MultipartFile> files) {
         log.info("FeedbackServiceImpl: Modify feedback request received");
         // Verify user is authenticated
         getAuthenticatedUser();
@@ -179,7 +179,7 @@ public class FeedbackServiceImpl implements FeedbackService {
      */
     @Transactional
     @Override
-    public FeedbackResponse markReadFeedback(UUID feedbackId) {
+    public CounselorFeedbackResponse.FeedbackResponse markReadFeedback(UUID feedbackId) {
         log.info("FeedbackServiceImpl: Mark read feedback request received");
         // Verify user is authenticated
         getAuthenticatedUser();
@@ -224,8 +224,8 @@ public class FeedbackServiceImpl implements FeedbackService {
         log.info("FeedbackServiceImpl: Feedback deleted successfully");
     }
 
-    private FeedbackResponse toCrudFeedbackResponse(Feedback feedback) {
-        return FeedbackResponse.builder()
+    private CounselorFeedbackResponse.FeedbackResponse toCrudFeedbackResponse(Feedback feedback) {
+        return CounselorFeedbackResponse.FeedbackResponse.builder()
                 .feedbackId(feedback.getFeedbackId())
                 .senderId(feedback.getSender().getUserId())
                 .receiverId(feedback.getReceiver().getUserId())

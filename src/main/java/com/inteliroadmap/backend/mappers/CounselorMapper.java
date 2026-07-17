@@ -1,7 +1,8 @@
 package com.inteliroadmap.backend.mappers;
 
-import com.inteliroadmap.backend.domain.dto.response.counselor.CounselorResponse;
-import com.inteliroadmap.backend.domain.dto.response.counselor.FeedbackResponse;
+import com.inteliroadmap.backend.domain.dto.response.counselor.CounselorDashboardResponse;
+import com.inteliroadmap.backend.domain.dto.response.counselor.CurriculumResponse;
+import com.inteliroadmap.backend.domain.dto.response.counselor.CounselorFeedbackResponse;
 import com.inteliroadmap.backend.domain.dto.response.student.UpdateProfileResponse;
 import com.inteliroadmap.backend.domain.dto.response.FeedbackAttachmentResponse;
 import com.inteliroadmap.backend.domain.entity.AcademicCounselor;
@@ -16,52 +17,52 @@ import java.util.stream.Collectors;
 
 @Component
 public class CounselorMapper {
-    public CounselorResponse toRoadmapStatisticResponse(int total, Map<String, Integer> careerStatistics) {
-        return CounselorResponse.builder()
+    public CounselorDashboardResponse toRoadmapStatisticResponse(int total, Map<String, Integer> careerStatistics) {
+        return CounselorDashboardResponse.builder()
                 .total(total)
                 .totalCareerStatistics(careerStatistics)
                 .build();
     }
 
-    public CounselorResponse toMissingSkillsResponse(int total, Map<String, Integer> missingSkills, String careerName) {
-        return CounselorResponse.builder()
+    public CounselorDashboardResponse toMissingSkillsResponse(int total, Map<String, Integer> missingSkills, String careerName) {
+        return CounselorDashboardResponse.builder()
                 .total(total)
                 .totalMissingSkills(missingSkills)
                 .careerName(careerName)
                 .build();
     }
 
-    public CounselorResponse toGetStudentInfos(List<Map<String, Object>> stInfos, int totalPages, int currentPage) {
-        return CounselorResponse.builder()
+    public CounselorFeedbackResponse toGetStudentInfos(List<Map<String, Object>> stInfos, int totalPages, int currentPage) {
+        return CounselorFeedbackResponse.builder()
                 .students(stInfos)
                 .totalPages(totalPages)
                 .currentPage(currentPage)
                 .build();
     }
 
-    public CounselorResponse toGetFeedbacksResponse(List<Feedback> feedbacks, int total) {
-        List<FeedbackResponse> dtos = feedbacks.stream()
+    public CounselorDashboardResponse toGetFeedbacksResponse(List<Feedback> feedbacks, int total) {
+        List<CounselorFeedbackResponse.FeedbackResponse> dtos = feedbacks.stream()
                 .map(this::mapFeedbackToResponse)
                 .toList();
-        return CounselorResponse.builder()
+        return CounselorDashboardResponse.builder()
                 .feedbacks(dtos)
                 .total(total)
                 .build();
     }
 
-    public CounselorResponse toGetStudentStatisticAndFeedback(int progress, List<String> missingSkills, List<Feedback> feedbacks) {
-        List<FeedbackResponse> dtos = feedbacks.stream()
+    public CounselorFeedbackResponse toGetStudentStatisticAndFeedback(int progress, List<String> missingSkills, List<Feedback> feedbacks) {
+        List<CounselorFeedbackResponse.FeedbackResponse> dtos = feedbacks.stream()
                 .map(this::mapFeedbackToResponse)
                 .toList();
-        return CounselorResponse.builder()
+        return CounselorFeedbackResponse.builder()
                 .roadmapProgress(progress)
                 .missingSkills(missingSkills)
                 .feedbacks(dtos)
                 .build();
     }
 
-    private FeedbackResponse mapFeedbackToResponse(Feedback f) {
-        return FeedbackResponse.builder()
+    private CounselorFeedbackResponse.FeedbackResponse mapFeedbackToResponse(Feedback f) {
+        return CounselorFeedbackResponse.FeedbackResponse.builder()
                 .feedbackId(f.getFeedbackId())
                 .senderId(f.getSender().getUserId())
                 .receiverId(f.getReceiver().getUserId())
@@ -92,4 +93,9 @@ public class CounselorMapper {
                 .build();
     }
 
+    public CurriculumResponse toCurriculumResponse(List<String> curriculums) {
+        return CurriculumResponse.builder()
+                .curriculums(curriculums)
+                .build();
+    }
 }

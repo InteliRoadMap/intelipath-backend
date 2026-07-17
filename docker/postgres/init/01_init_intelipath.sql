@@ -56,7 +56,7 @@ CREATE TABLE IF NOT EXISTS students (
     career_id           UUID,
     -- Free text, display only. FPT material access is decided by users.account_type.
     university_name     VARCHAR(255),
-    year_of_admission   INT,
+    admission_date      DATE,
     major               VARCHAR(255),
     github_profile      VARCHAR(255),
     transcript_url      TEXT,
@@ -70,6 +70,7 @@ CREATE TABLE IF NOT EXISTS students (
 
 CREATE TABLE IF NOT EXISTS academic_counselor (
     user_id             UUID PRIMARY KEY,
+    university_name     VARCHAR(255),
     department          VARCHAR(255),
     year_of_admission   INT,
     CONSTRAINT fk_ac_user
