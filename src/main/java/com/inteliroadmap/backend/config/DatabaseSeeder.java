@@ -11,6 +11,7 @@ import com.inteliroadmap.backend.repositories.CareerRoleRepository;
 import com.inteliroadmap.backend.repositories.FeedbackRepository;
 import com.inteliroadmap.backend.repositories.FptSubjectRepository;
 import com.inteliroadmap.backend.repositories.FptSubjectSkillRepository;
+import com.inteliroadmap.backend.repositories.IndustryMentorRepository;
 import com.inteliroadmap.backend.repositories.NodeTypeRepository;
 import com.inteliroadmap.backend.repositories.SkillNodeRepository;
 import com.inteliroadmap.backend.repositories.SkillRepository;
@@ -48,6 +49,7 @@ public class DatabaseSeeder implements CommandLineRunner {
     private final SkillNodeRepository skillNodeRepository;
     private final CareerRequiredSkillRepository careerRequiredSkillRepository;
     private final AcademicCounselorRepository academicCounselorRepository;
+    private final IndustryMentorRepository industryMentorRepository;
     private final UserRepository userRepository;
     private final StudentRepository studentRepository;
     private final StudentSkillRepository studentSkillRepository;
@@ -478,7 +480,7 @@ public class DatabaseSeeder implements CommandLineRunner {
         if (admin == null) {
             admin = User.builder().email("intelipath@gmail.com").build();
         }
-        admin.setFullName("Admin");
+        admin.setFullName("intelipath");
         admin.setRole(UserRole.ADMIN);
         admin.setAccountType(AccountType.FPT);
         applySeedCredentials(admin, seedAccounts.getAdmin(), "admin");
@@ -489,7 +491,7 @@ public class DatabaseSeeder implements CommandLineRunner {
         if (userCou == null) {
             userCou = User.builder().email("mainclone1@gmail.com").build();
         }
-        userCou.setFullName("Counselor");
+        userCou.setFullName("Dang Phuoc Vinh");
         userCou.setRole(UserRole.COUNSELOR);
         // FPT so this counselor's student list resolves to the FPT students below.
         userCou.setAccountType(AccountType.FPT);
@@ -506,13 +508,35 @@ public class DatabaseSeeder implements CommandLineRunner {
         counselor.setDepartment("Software Engineer");
         academicCounselorRepository.save(counselor);
 
+        // --------------------------- Import Mentor Account ---------------------------- //
+        User userMen = userRepository.findByEmail("heomapkh939732948@gmail.com");
+        if (userMen == null) {
+            userMen = User.builder().email("heomapkh939732948@gmail.com").build();
+        }
+        userMen.setFullName("Dang Phuoc Vinh");
+        userMen.setRole(UserRole.MENTOR);
+        // OTHER because an industry mentor works at a company, not FPT. The value is inert
+        // for this role — the FPT gate only guards STUDENT endpoints — so it costs nothing
+        // to keep it honest rather than copying the counselor's FPT out of habit.
+        userMen.setAccountType(AccountType.OTHER);
+        applySeedCredentials(userMen, seedAccounts.getMentor(), "mentor");
+        userMen = userRepository.save(userMen);
+
+        IndustryMentor mentor = industryMentorRepository.findById(userMen.getUserId()).orElse(null);
+        if (mentor == null) {
+            mentor = IndustryMentor.builder().userId(userMen.getUserId()).build();
+        }
+        mentor.setCompany("FPT Software");
+        mentor.setIndustryFocus("Software Engineer");
+        industryMentorRepository.save(mentor);
+
         // -------------------------- Import Students Accounts -------------------------- //
         // ------------------ Specific Student Account ------------------ //
-        User userSt = userRepository.findByEmail("mainclone2@gmail.com");
+        User userSt = userRepository.findByEmail("dpvinh30092005@gmail.com");
         if (userSt == null) {
-            userSt = User.builder().email("mainclone2@gmail.com").build();
+            userSt = User.builder().email("dpvinh30092005@gmail.com").build();
         }
-        userSt.setFullName("Hau ST");
+        userSt.setFullName("Dang Phuoc Vinh");
         // A plausible undergraduate age: at 10 the profile form rightly rejects every
         // admission date, which made the seed account untestable.
         userSt.setYob(LocalDate.now().minusYears(20));
