@@ -72,7 +72,7 @@ CREATE TABLE IF NOT EXISTS academic_counselor (
     user_id             UUID PRIMARY KEY,
     university_name     VARCHAR(255),
     department          VARCHAR(255),
-    year_of_admission   INT,
+    admission_date      DATE,
     CONSTRAINT fk_ac_user
         FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE
 );
@@ -618,15 +618,27 @@ CREATE INDEX IF NOT EXISTS idx_fc_program_cohort ON fpt_curricula (program, coho
 
 -- Maps a subject into a curriculum at a given term. Same subject_code, different
 -- semester across curricula — this is where "trùng môn khác kỳ" is resolved.
+--
+-- combo_code splits a curriculum into its specialisation tracks. FLM's curriculum only
+-- reserves slots (SE_COM*1..*3) and the real subjects live behind a combo: Intensive
+-- Java gives HSF302/SBA301/MSS301, React/NodeJS and .NET give different ones. NULL means
+-- a trunk subject every student on the curriculum takes; a value means it belongs to
+-- that combo alone. Without this the tracks collapse and a .NET student is shown Java.
+-- combo_name is denormalised for display only — one importer writes both, so it cannot
+-- drift, and it saves a table for what is a handful of rows per curriculum.
 CREATE TABLE IF NOT EXISTS fpt_curriculum_subjects (
     curriculum_id UUID NOT NULL,
     subject_code  VARCHAR(20) NOT NULL,
     semester      INT,
+    combo_code    VARCHAR(40),
+    combo_name    TEXT,
     PRIMARY KEY (curriculum_id, subject_code),
     CONSTRAINT fk_fcs_curriculum FOREIGN KEY (curriculum_id) REFERENCES fpt_curricula (id) ON DELETE CASCADE,
     CONSTRAINT fk_fcs_subject FOREIGN KEY (subject_code) REFERENCES fpt_subjects (code) ON DELETE CASCADE
 );
 CREATE INDEX IF NOT EXISTS idx_fcs_curriculum ON fpt_curriculum_subjects (curriculum_id);
+-- The student read path is "trunk OR my combo", so it always filters on both columns.
+CREATE INDEX IF NOT EXISTS idx_fcs_curriculum_combo ON fpt_curriculum_subjects (curriculum_id, combo_code);
 
 CREATE TABLE IF NOT EXISTS fpt_subject_skills (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -639,12 +651,38 @@ CREATE TABLE IF NOT EXISTS fpt_subject_skills (
 );
 CREATE INDEX IF NOT EXISTS idx_fss_skill_name ON fpt_subject_skills (LOWER(skill_name));
 
+-- Course Learning Outcomes, straight from the syllabus (gvLO). These are what a subject
+-- page shows a student ("be able to work with JDBC"); they are also the text the skill
+-- matcher reads, but that happens upstream in the scraper. Subjects carry 4-13 each.
+CREATE TABLE IF NOT EXISTS fpt_subject_clos (
+    id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    subject_code  VARCHAR(20) NOT NULL,
+    code          VARCHAR(20) NOT NULL,   -- CLO1, CLO2, ...
+    outcome       TEXT NOT NULL,
+    order_index   INT NOT NULL DEFAULT 0,
+    CONSTRAINT fk_fsc_subject FOREIGN KEY (subject_code) REFERENCES fpt_subjects (code) ON DELETE CASCADE,
+    CONSTRAINT uq_fsc UNIQUE (subject_code, code)
+);
+CREATE INDEX IF NOT EXISTS idx_fsc_subject ON fpt_subject_clos (subject_code);
+
+-- kind=MATERIAL is a bibliographic reference (textbook, ISBN, an online article's link);
+-- kind=SESSION is one class session, and the only rows that ever carry a real file.
+--
+-- source_url is where a file was harvested from and is NEVER sent to a client: we mirror
+-- the file into our own storage and serve that. storage_path is the object key in the
+-- private bucket; a signed URL is minted per request after the FPT check, so the gate is
+-- a real boundary rather than a hidden link. NULL storage_path = not mirrored (yet), which
+-- is normal — 7 of 28 subjects publish no files at all.
 CREATE TABLE IF NOT EXISTS fpt_subject_resources (
     id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     subject_code  VARCHAR(20) NOT NULL,
     kind          VARCHAR(20) NOT NULL,
     title         TEXT NOT NULL,
     url           TEXT,
+    source_url    TEXT,
+    storage_path  TEXT,
+    size_bytes    BIGINT,
+    mirrored_at   TIMESTAMP,
     topic         TEXT,
     clo_ref       TEXT,
     order_index   INT NOT NULL DEFAULT 0,
@@ -703,6 +741,42 @@ END $$;
 ALTER TABLE fpt_subjects        DROP COLUMN IF EXISTS semester;
 ALTER TABLE student_fpt_subjects ADD COLUMN IF NOT EXISTS curriculum_id UUID;
 ALTER TABLE students             ADD COLUMN IF NOT EXISTS fpt_curriculum_id UUID;
+
+-- Specialisation combos: which track's subjects a curriculum row belongs to, and which
+-- track the student picked. NULL combo_code = trunk (everyone); NULL fpt_combo_code =
+-- the student hasn't picked, so they see the trunk only rather than another combo's.
+ALTER TABLE fpt_curriculum_subjects ADD COLUMN IF NOT EXISTS combo_code VARCHAR(40);
+ALTER TABLE fpt_curriculum_subjects ADD COLUMN IF NOT EXISTS combo_name TEXT;
+ALTER TABLE students                ADD COLUMN IF NOT EXISTS fpt_combo_code VARCHAR(40);
+CREATE INDEX IF NOT EXISTS idx_fcs_curriculum_combo ON fpt_curriculum_subjects (curriculum_id, combo_code);
+
+-- Admission moves from a bare year to a full date: the counselor enters it from the
+-- admission record, so the day and month are real data rather than something the form
+-- had to invent. Existing years become 1 January of that year; the counselor can enter
+-- the exact date later.
+DO $$
+BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns
+               WHERE table_name = 'students' AND column_name = 'year_of_admission') THEN
+        ALTER TABLE students
+            ALTER COLUMN year_of_admission TYPE DATE
+            USING make_date(year_of_admission, 1, 1);
+        ALTER TABLE students RENAME COLUMN year_of_admission TO admission_date;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.columns
+               WHERE table_name = 'academic_counselor' AND column_name = 'year_of_admission') THEN
+        ALTER TABLE academic_counselor
+            ALTER COLUMN year_of_admission TYPE DATE
+            USING make_date(year_of_admission, 1, 1);
+        ALTER TABLE academic_counselor RENAME COLUMN year_of_admission TO admission_date;
+    END IF;
+END $$;
+
+-- Mirrored materials: we host the file, so the FPT gate actually withholds it.
+ALTER TABLE fpt_subject_resources ADD COLUMN IF NOT EXISTS source_url   TEXT;
+ALTER TABLE fpt_subject_resources ADD COLUMN IF NOT EXISTS storage_path TEXT;
+ALTER TABLE fpt_subject_resources ADD COLUMN IF NOT EXISTS size_bytes   BIGINT;
+ALTER TABLE fpt_subject_resources ADD COLUMN IF NOT EXISTS mirrored_at  TIMESTAMP;
 
 DO $$
 BEGIN

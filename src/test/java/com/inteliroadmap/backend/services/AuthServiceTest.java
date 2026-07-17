@@ -20,6 +20,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.UUID;
@@ -59,7 +60,10 @@ class AuthServiceTest {
         assertEquals("new-access", response.getAccessToken());
         assertEquals("new-refresh", response.getRefreshToken());
         assertNotNull(response.getExpiresIn());
-        assertDoesNotThrow(() -> LocalDateTime.parse(response.getExpiresIn()));
+        // Must parse as an instant, not a zone-less local time: a client in another timezone
+        // reads a zone-less expiry as its own local clock and refreshes on a hot loop.
+        assertDoesNotThrow(() -> Instant.parse(response.getExpiresIn()));
+        assertTrue(response.getExpiresIn().endsWith("Z"));
 
         // The used token is kept alive briefly rather than deleted, so a concurrent
         // refresh carrying the same cookie still resolves.

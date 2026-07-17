@@ -41,7 +41,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -101,8 +100,8 @@ public class StudentServiceImpl implements StudentService {
             String universityName = request.getUniversityName().trim();
             student.setUniversityName(universityName.isEmpty() ? null : universityName);
         }
-        if (request.getYearOfAdmission() != null) {
-            student.setAdmissionDate(LocalDate.of(request.getYearOfAdmission(), 1, 1));
+        if (request.getAdmissionDate() != null) {
+            student.setAdmissionDate(request.getAdmissionDate());
         }
 
         if (request.getMajor() != null) {
@@ -321,7 +320,7 @@ public class StudentServiceImpl implements StudentService {
         RagDocument document = ragDocumentService.startStudentTranscript(user, transcriptUrl, file);
 
         try {
-            documentIngestionService.ingestPdfDocument(file);
+            documentIngestionService.ingestPdfDocument(file, document);
             ragDocumentService.markCompleted(document.getDocumentId());
         } catch (Exception exception) {
             ragDocumentService.markFailed(document.getDocumentId(), exception);

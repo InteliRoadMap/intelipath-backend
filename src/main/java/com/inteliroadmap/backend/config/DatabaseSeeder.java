@@ -98,15 +98,28 @@ public class DatabaseSeeder implements CommandLineRunner {
     }
 
     /**
-     * Import the FLM curriculum overlay (data/flm_overlay.json): each subject plus the
-     * catalog skills it covers and its lesson resources. Reference tables only — never
-     * touches student_fpt_subjects, so student declarations survive re-seeds. Idempotent:
-     * subjects are upserted by code; a subject's skills/resources are cleared and rebuilt.
+     * Seed the FLM curriculum overlay (data/flm_overlay.json) into an empty database:
+     * each subject plus the catalog skills it covers and its lesson resources. Reference
+     * tables only — never touches student_fpt_subjects, so student declarations survive.
+     *
+     * Bootstrap only. The file is a stale snapshot (one curriculum, no CLOs, no files) and
+     * importOverlay rebuilds a subject by clearing its skills/CLOs/resources first, so
+     * re-running it over synced data DELETES what the admin sync fetched — a restart alone
+     * was enough to cut a fresh sync's CLOs from 453 to 270 and its downloadable files from
+     * 63 to 32. Once any FPT subject exists, the live sync owns this data and the file
+     * must keep its hands off.
      */
     private void importFptSubjectData() {
         File overlayFile = new File(FLM_OVERLAY);
         if (!overlayFile.exists()) {
             log.warn("DatabaseSeeder: {} not found. Skipping FPT subject import.", FLM_OVERLAY);
+            return;
+        }
+
+        long existing = fptSubjectRepository.count();
+        if (existing > 0) {
+            log.info("DatabaseSeeder: {} FPT subjects already present — leaving them to the FLM sync, "
+                    + "skipping the {} snapshot.", existing, FLM_OVERLAY);
             return;
         }
 
@@ -501,7 +514,9 @@ public class DatabaseSeeder implements CommandLineRunner {
             userSt = User.builder().email("mainclone2@gmail.com").build();
         }
         userSt.setFullName("Hau ST");
-        userSt.setYob(LocalDate.now().getYear() - 10);
+        // A plausible undergraduate age: at 10 the profile form rightly rejects every
+        // admission date, which made the seed account untestable.
+        userSt.setYob(LocalDate.now().getYear() - 20);
         userSt.setRole(UserRole.STUDENT);
         // Stands in for a counselor-provisioned FPT student: local credential + FPT material.
         userSt.setAccountType(AccountType.FPT);

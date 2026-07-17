@@ -21,6 +21,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.Duration;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.util.Optional;
 
@@ -154,7 +155,11 @@ public class AuthServiceImpl implements AuthService {
         String accessToken = jwtService.generateAccessToken(user.getEmail(), user.getRole().name());
         String refreshToken = jwtService.generateRefreshToken(user.getEmail());
         LocalDateTime now = LocalDateTime.now();
-        LocalDateTime expiresIn = now.plus(Duration.ofMillis(jwtService.getAccessExpiration()));
+        // Instant, not LocalDateTime: expiresIn crosses the wire to a browser in another
+        // timezone, and a zone-less timestamp is read there as local time. The server runs
+        // UTC and clients run UTC+7, so that mis-read lands ~7h in the past and the client
+        // refreshes on a hot loop until it gives up and logs the user out.
+        Instant expiresIn = Instant.now().plusMillis(jwtService.getAccessExpiration());
 
         RefreshToken storedToken = RefreshToken.builder()
                 .token(TokenHashUtil.sha256Hex(refreshToken))
@@ -198,12 +203,13 @@ public class AuthServiceImpl implements AuthService {
      * @return RefreshResponse containing generated token information
      */
     @Override
-    public RefreshResponse refreshResponse(String accessToken, String refreshToken, LocalDateTime expiresIn) {
-        // Construct and return a structured response containing the new tokens and expiration time
+    public RefreshResponse refreshResponse(String accessToken, String refreshToken, Instant expiresIn) {
+        // Instant.toString() is ISO-8601 UTC ("...Z"), so the client parses the moment the
+        // server meant rather than the same wall clock in its own timezone.
         return RefreshResponse.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
-                .expiresIn(String.valueOf(expiresIn))
+                .expiresIn(expiresIn.toString())
                 .build();
     }
 

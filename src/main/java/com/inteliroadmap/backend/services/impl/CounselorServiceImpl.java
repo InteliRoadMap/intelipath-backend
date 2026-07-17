@@ -315,7 +315,7 @@ public class CounselorServiceImpl implements CounselorService {
         if(request.getYob() != null) user.setYob(request.getYob());
         if(request.getBio() != null) user.setBio(request.getBio());
         if(request.getDepartment() != null) counselor.setDepartment(request.getDepartment());
-        if(request.getYearOfAdmission() != null) counselor.setYearOfAdmission(request.getYearOfAdmission());
+        if(request.getAdmissionDate() != null) counselor.setAdmissionDate(request.getAdmissionDate());
 
         user = userRepository.save(user);
         counselor = academicCounselorRepository.save(counselor);

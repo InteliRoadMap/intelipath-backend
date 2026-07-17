@@ -9,6 +9,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
 import java.util.UUID;
 
 @Entity
@@ -29,7 +30,7 @@ public class AcademicCounselor {
     @Column(name = "department")
     private String department;
 
-    @Column(name = "year_of_admission")
-    private Integer yearOfAdmission;
+    @Column(name = "admission_date")
+    private LocalDate admissionDate;
 }
 

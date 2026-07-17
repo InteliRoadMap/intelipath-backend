@@ -1,12 +1,13 @@
 package com.inteliroadmap.backend.services.impl;
 
+import com.inteliroadmap.backend.domain.entity.RagDocument;
 import com.inteliroadmap.backend.services.DocumentIngestionService;
 import com.inteliroadmap.backend.services.PdfToMarkdownService;
+import com.inteliroadmap.backend.services.RagVectorStoreService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.ai.document.Document;
 import org.springframework.ai.transformer.splitter.TokenTextSplitter;
-import org.springframework.ai.vectorstore.VectorStore;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -26,16 +27,18 @@ import java.util.Map;
 @Slf4j
 public class DocumentIngestionServiceImpl implements DocumentIngestionService {
 
-    private final VectorStore vectorStore;
     private final PdfToMarkdownService pdfToMarkdownService;
+    private final RagVectorStoreService ragVectorStoreService;
 
     /**
-     * Ingest a PDF file into the Vector DB
-     * @param file The PDF file
+     * Ingest a PDF file into the Vector DB, owned by {@code document}.
+     *
+     * @param file     The PDF file
+     * @param document The RagDocument whose scope and owner the chunks inherit
      * @throws IOException If file reading fails
      */
     @Override
-    public void ingestPdfDocument(MultipartFile file) throws IOException {
+    public void ingestPdfDocument(MultipartFile file, RagDocument document) throws IOException {
         log.info("DocumentIngestionServiceImpl: Starting ingestion for PDF document: {}", file.getOriginalFilename());
 
         String markdown = pdfToMarkdownService.convertToMarkdown(file);
@@ -53,13 +56,14 @@ public class DocumentIngestionServiceImpl implements DocumentIngestionService {
         List<Document> chunkedDocuments = tokenTextSplitter.apply(documents);
 
         for (Document doc : chunkedDocuments) {
-            doc.getMetadata().put("file_name", file.getOriginalFilename());
             doc.getMetadata().put("content_type", "markdown");
         }
 
         log.info("DocumentIngestionServiceImpl: Split into {} final chunks. Saving to Vector DB...", chunkedDocuments.size());
 
-          vectorStore.accept(chunkedDocuments);
+        // Stamps each chunk with the document's owner and scope, and drops the previous
+        // version's chunks so a re-upload replaces rather than duplicates.
+        ragVectorStoreService.replaceDocumentChunks(document, chunkedDocuments);
 
         log.info("DocumentIngestionServiceImpl: Successfully ingested PDF document: {}", file.getOriginalFilename());
     }

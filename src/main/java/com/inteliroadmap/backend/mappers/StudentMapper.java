@@ -47,7 +47,7 @@ public class StudentMapper {
                 .university(student.getUniversityName())
                 .universityName(student.getUniversityName())
                 .accountType(user.getAccountType())
-                .yearOfAdmission(student.getAdmissionDate() != null ? student.getAdmissionDate().getYear() : null)
+                .admissionDate(student.getAdmissionDate())
                 .major(student.getMajor())
                 .githubProfile(student.getGithubProfile())
                 .transcriptUrl(student.getTranscriptUrl())

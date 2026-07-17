@@ -10,7 +10,7 @@ public class UpdateProfileRequest {
     @Size(max = 150, message = "Full name must not exceed 150 characters")
     private String fullName;
 
-    private Integer yearOfAdmission;
+    private LocalDate admissionDate;
 
     private Integer yob;
 

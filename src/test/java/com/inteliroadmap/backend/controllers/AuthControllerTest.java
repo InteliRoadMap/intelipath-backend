@@ -40,7 +40,7 @@ class AuthControllerTest {
         when(authService.refreshAccount(eq("old-refresh"))).thenReturn(RefreshResponse.builder()
                 .accessToken("new-access")
                 .refreshToken("new-refresh")
-                .expiresIn("2026-06-04T14:00:00")
+                .expiresIn("2026-06-04T14:00:00Z")
                 .build());
 
         mockMvc.perform(post("/api/v1/auth/refresh")
@@ -50,7 +50,7 @@ class AuthControllerTest {
                 .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_JSON))
                 .andExpect(jsonPath("$.accessToken").value("new-access"))
                 .andExpect(jsonPath("$.refreshToken").doesNotExist())
-                .andExpect(jsonPath("$.expiresIn").value("2026-06-04T14:00:00"));
+                .andExpect(jsonPath("$.expiresIn").value("2026-06-04T14:00:00Z"));
     }
 
     @Test
