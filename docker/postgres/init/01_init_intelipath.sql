@@ -61,7 +61,7 @@ CREATE TABLE IF NOT EXISTS students (
     major               VARCHAR(255),
     github_profile      VARCHAR(255),
     transcript_url      TEXT,
-    portfolio_slug      VARCHAR(100) UNIQUE,
+    portfolio_slug      VARCHAR(100) NOT NULL UNIQUE,
     fpt_curriculum_id   UUID,
     CONSTRAINT fk_st_user
         FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE,

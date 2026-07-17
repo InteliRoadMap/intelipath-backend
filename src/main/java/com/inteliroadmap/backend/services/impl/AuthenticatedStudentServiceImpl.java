@@ -7,7 +7,7 @@ import com.inteliroadmap.backend.exceptions.UnauthorizedException;
 import com.inteliroadmap.backend.repositories.StudentRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.services.AuthenticatedStudentService;
-import com.inteliroadmap.backend.utils.SlugUtils;
+import com.inteliroadmap.backend.services.PortfolioSlugService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.Authentication;
@@ -27,6 +27,7 @@ public class AuthenticatedStudentServiceImpl implements AuthenticatedStudentServ
 
     private final UserRepository userRepository;
     private final StudentRepository studentRepository;
+    private final PortfolioSlugService portfolioSlugService;
 
     /**
      * Get current authenticated student and create one if missing.
@@ -44,7 +45,7 @@ public class AuthenticatedStudentServiceImpl implements AuthenticatedStudentServ
             log.info("AuthenticatedStudentServiceImpl: Student profile not found. Creating a new one for user: {}", user.getEmail());
             student = studentRepository.save(Student.builder()
                     .userId(user.getUserId())
-                    .portfolioSlug(SlugUtils.generateSlug(user.getFullName(), user.getUserId()))
+                    .portfolioSlug(portfolioSlugService.allocateFor(user))
                     .build());
         }
         return student;
@@ -69,7 +70,7 @@ public class AuthenticatedStudentServiceImpl implements AuthenticatedStudentServ
         
         // Initialize the portfolio slug if it was previously empty
         if (student.getPortfolioSlug() == null || student.getPortfolioSlug().isBlank()) {
-            student.setPortfolioSlug(SlugUtils.generateSlug(user.getFullName(), user.getUserId()));
+            student.setPortfolioSlug(portfolioSlugService.allocateFor(user));
             student = studentRepository.save(student);
         }
         return student;
@@ -102,7 +103,7 @@ public class AuthenticatedStudentServiceImpl implements AuthenticatedStudentServ
         // If no student profile exists under lock, create and persist a new one
         Student student = Student.builder()
                 .userId(user.getUserId())
-                .portfolioSlug(SlugUtils.generateSlug(user.getFullName(), user.getUserId()))
+                .portfolioSlug(portfolioSlugService.allocateFor(user))
                 .build();
 
         return studentRepository.save(student);

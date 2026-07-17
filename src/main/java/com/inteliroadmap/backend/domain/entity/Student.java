@@ -49,7 +49,7 @@ public class Student {
     @Column(name = "transcript_url", columnDefinition = "TEXT")
     private String transcriptUrl;
 
-    @Column(name = "portfolio_slug", length = 100, unique = true)
+    @Column(name = "portfolio_slug", length = 100, nullable = false, unique = true)
     private String portfolioSlug;
 
     /** The FLM curriculum version this student follows (their cohort's program). */

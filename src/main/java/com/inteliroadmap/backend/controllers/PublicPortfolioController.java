@@ -16,6 +16,8 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.UUID;
+
 @RestController
 @RequestMapping("/api/v1/public-portfolio")
 @RequiredArgsConstructor
@@ -44,7 +46,7 @@ public class PublicPortfolioController {
                 content = @Content(schema = @Schema(implementation = PortfolioResponse.class))),
             @ApiResponse(responseCode = "404", description = "Portfolio or User not found")
     })
-    public ResponseEntity<PortfolioResponse> getPortfolioByStudentId(@PathVariable java.util.UUID studentId) {
+    public ResponseEntity<PortfolioResponse> getPortfolioByStudentId(@PathVariable UUID studentId) {
         log.info("PublicPortfolioController: Request received: Get Public Portfolio for studentId '{}'", studentId);
         return ResponseEntity.ok(portfolioService.getPortfolioByStudentId(studentId));
     }

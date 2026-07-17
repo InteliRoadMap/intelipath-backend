@@ -22,6 +22,9 @@ public class PortfolioResponse {
 
     @Data @Builder @NoArgsConstructor @AllArgsConstructor
     public static class UserInfoResponse {
+        // The slug addresses the portfolio, but feedback is addressed to a person:
+        // a viewer who arrived by slug still needs the id to write back.
+        private UUID userId;
         private String fullName;
         private String bio;
         private String email;

@@ -11,6 +11,7 @@ import lombok.NoArgsConstructor;
 @Builder
 public class MentorStudentResponse {
     private String id;
+    private String portfolioSlug;
     private String fullName;
     private String email;
     private String career;

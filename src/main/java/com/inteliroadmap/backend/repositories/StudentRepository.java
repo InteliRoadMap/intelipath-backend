@@ -50,4 +50,6 @@ public interface StudentRepository extends JpaRepository<Student, UUID> {
 
     boolean existsByPortfolioSlug(String portfolioSlug);
     Optional<Student> findByPortfolioSlug(String portfolioSlug);
+
+    List<Student> findByPortfolioSlugIsNullOrPortfolioSlugEquals(String portfolioSlug);
 }

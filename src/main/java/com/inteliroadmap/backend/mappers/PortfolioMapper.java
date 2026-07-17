@@ -30,6 +30,7 @@ public class PortfolioMapper {
             List<StudentEducation> education) {
 
         PortfolioResponse.UserInfoResponse userInfo = PortfolioResponse.UserInfoResponse.builder()
+                .userId(user.getUserId())
                 .fullName(user.getFullName())
                 .bio(user.getBio())
                 .email(user.getEmail())

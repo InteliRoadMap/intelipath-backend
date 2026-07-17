@@ -145,7 +145,7 @@ public class MentorServiceImpl implements MentorService {
 
     private String getRelativeTime(LocalDateTime time) {
         if (time == null) return "Unknown";
-        long days = java.time.Duration.between(time, LocalDateTime.now()).toDays();
+        long days = Duration.between(time, LocalDateTime.now()).toDays();
         if (days == 0) return "Today";
         if (days == 1) return "1 day ago";
         return days + " days ago";
@@ -169,6 +169,7 @@ public class MentorServiceImpl implements MentorService {
             return MentorPendingReviewResponse.builder()
                     .id(req.getRequestId().toString())
                     .studentId(req.getStudent().getUserId().toString())
+                    .portfolioSlug(student != null ? student.getPortfolioSlug() : null)
                     .studentName(name)
                     .yob(yob)
                     .targetCareer(career)
@@ -201,6 +202,7 @@ public class MentorServiceImpl implements MentorService {
 
             dtos.add(MentorStudentResponse.builder()
                     .id(userSt.getUserId().toString())
+                    .portfolioSlug(student.getPortfolioSlug())
                     .fullName(userSt.getFullName())
                     .email(userSt.getEmail())
                     .career(career)

@@ -14,6 +14,7 @@ import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.security.CustomOAuth2User;
 import com.inteliroadmap.backend.repositories.StudentRepository;
 import com.inteliroadmap.backend.domain.entity.Student;
+import com.inteliroadmap.backend.services.PortfolioSlugService;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,6 +46,7 @@ public class OAuth2UserServiceImpl extends DefaultOAuth2UserService {
     private final UserRepository userRepository;
     private final OauthAccountRepository oauthAccountRepository;
     private final StudentRepository studentRepository;
+    private final PortfolioSlugService portfolioSlugService;
 
     /**
      * Loads user info from OAuth2 provider and creates or updates local user data.
@@ -188,8 +190,7 @@ public class OAuth2UserServiceImpl extends DefaultOAuth2UserService {
         Student student = Student.builder()
                 .userId(savedUser.getUserId())
                 .githubProfile(userInfo.getHtmlUrl())
-                // Generate a unique portfolio slug based on the user's name and ID
-                .portfolioSlug(com.inteliroadmap.backend.utils.SlugUtils.generateSlug(savedUser.getFullName(), savedUser.getUserId()))
+                .portfolioSlug(portfolioSlugService.allocateFor(savedUser))
                 .build();
         studentRepository.save(student);
 

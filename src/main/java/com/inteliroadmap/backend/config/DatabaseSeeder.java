@@ -21,6 +21,7 @@ import com.inteliroadmap.backend.repositories.StudentRepository;
 import com.inteliroadmap.backend.repositories.StudentSkillRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.services.FptOverlayImportService;
+import com.inteliroadmap.backend.services.PortfolioSlugService;
 import com.opencsv.CSVReader;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -62,6 +63,7 @@ public class DatabaseSeeder implements CommandLineRunner {
     private final FptSubjectSkillRepository fptSubjectSkillRepository;
     private final FptOverlayImportService fptOverlayImportService;
     private final PasswordEncoder passwordEncoder;
+    private final PortfolioSlugService portfolioSlugService;
     private final SeedAccountsProperties seedAccounts;
 
     // v2 seed data: id-based tree + selection semantics (see intelipath-service/scripts/migrate_roadmap.py).
@@ -89,6 +91,7 @@ public class DatabaseSeeder implements CommandLineRunner {
         importFptSubjectData();
         importMockUsersData();
         importMockReviewRequests();
+        backfillPortfolioSlugs();
 
         log.info("DatabaseSeeder: =====================================================");
         log.info("DatabaseSeeder:  SEEDING SUMMARY NOTIFICATION ");
@@ -476,6 +479,35 @@ public class DatabaseSeeder implements CommandLineRunner {
     }
 
     /**
+     * Gives a slug to any student still missing one.
+     *
+     * The DDL declares portfolio_slug NOT NULL, but that only binds databases
+     * created after the change: 01_init_intelipath.sql runs once, on an empty
+     * volume. Databases seeded before it hold rows with a null slug, and every
+     * one of them is a portfolio nobody can open. This repairs them in place.
+     *
+     * Cheap when there is nothing to do — one indexed query returning no rows.
+     */
+    private void backfillPortfolioSlugs() {
+        List<Student> unslugged = studentRepository.findByPortfolioSlugIsNullOrPortfolioSlugEquals("");
+        if (unslugged.isEmpty()) {
+            return;
+        }
+
+        log.info("DatabaseSeeder: Backfilling portfolio slugs for {} student(s)...", unslugged.size());
+        for (Student student : unslugged) {
+            User user = userRepository.findById(student.getUserId()).orElse(null);
+            if (user == null) {
+                log.warn("DatabaseSeeder: Student {} has no user row; cannot build a slug.", student.getUserId());
+                continue;
+            }
+            student.setPortfolioSlug(portfolioSlugService.allocateFor(user));
+            studentRepository.save(student);
+        }
+        log.info("DatabaseSeeder: Portfolio slug backfill done.");
+    }
+
+    /**
      * Portfolio review requests aimed at the seeded mentor.
      *
      * This is the only relationship between a mentor and a student that exists:
@@ -607,6 +639,10 @@ public class DatabaseSeeder implements CommandLineRunner {
         st.setUniversityName(FPT_UNIVERSITY_NAME);
         st.setCareerRole(careerRoleRepository.findByCareerName("Frontend"));
         st.setMajor("Software Engineer");
+        // Re-derived rather than filled-only: this account's identity is defined here,
+        // and it has been renamed since it was first seeded, so a slug left over from
+        // the old name would still be pointing at it.
+        st.setPortfolioSlug(portfolioSlugService.allocateFor(userSt));
         studentRepository.save(st);
 
         // ------------------- Random Student Accounts ------------------ //
@@ -642,6 +678,7 @@ public class DatabaseSeeder implements CommandLineRunner {
 
             Student stu = Student.builder()
                     .userId(sUser.getUserId())
+                    .portfolioSlug(portfolioSlugService.allocateFor(sUser))
                     .careerRole(frontend)
                     .universityName(FPT_UNIVERSITY_NAME)
                     .admissionDate(LocalDate.now().minusYears(random.nextInt(4)).withMonth(9).withDayOfMonth(1))
