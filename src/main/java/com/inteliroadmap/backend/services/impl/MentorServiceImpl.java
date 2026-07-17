@@ -5,6 +5,7 @@ import com.inteliroadmap.backend.domain.dto.request.UpdateMentorProfileRequest;
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorResponse;
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorCareerDistributionResponse;
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorDashboardMetricsResponse;
+import com.inteliroadmap.backend.domain.dto.response.mentor.MentorDirectoryResponse;
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorFeedbackHistoryResponse;
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorPendingReviewResponse;
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorProfileResponse;
@@ -19,6 +20,7 @@ import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.domain.enums.ReviewStatus;
 import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
 import com.inteliroadmap.backend.domain.enums.UserRole;
+import com.inteliroadmap.backend.domain.enums.UserStatus;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.exceptions.ForbiddenException;
 import com.inteliroadmap.backend.repositories.FeedbackRepository;
@@ -207,6 +209,37 @@ public class MentorServiceImpl implements MentorService {
         }
 
         return new PageImpl<>(dtos, pageable, studentUsersPage.getTotalElements());
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public Page<MentorDirectoryResponse> getMentorDirectory(Pageable pageable) {
+        log.info("MentorServiceImpl: Get mentor directory request received");
+
+        Page<User> mentorUsers = userRepository.findByRoleAndUserStatusOrderByFullNameAsc(
+                UserRole.MENTOR, UserStatus.ACTIVE, pageable);
+
+        // One lookup for the whole page rather than one per row: the profile is
+        // optional here, so a mentor with no industry_mentor row still lists.
+        List<UUID> ids = mentorUsers.getContent().stream().map(User::getUserId).toList();
+        Map<UUID, IndustryMentor> profiles = industryMentorRepository.findAllById(ids).stream()
+                .collect(Collectors.toMap(IndustryMentor::getUserId, p -> p));
+
+        List<MentorDirectoryResponse> dtos = mentorUsers.getContent().stream()
+                .map(user -> {
+                    IndustryMentor profile = profiles.get(user.getUserId());
+                    return MentorDirectoryResponse.builder()
+                            .userId(user.getUserId().toString())
+                            .fullName(user.getFullName())
+                            .email(user.getEmail())
+                            .avatarUrl(user.getAvatarUrl())
+                            .company(profile != null ? profile.getCompany() : null)
+                            .industryFocus(profile != null ? profile.getIndustryFocus() : null)
+                            .build();
+                })
+                .toList();
+
+        return new PageImpl<>(dtos, pageable, mentorUsers.getTotalElements());
     }
 
     @Transactional

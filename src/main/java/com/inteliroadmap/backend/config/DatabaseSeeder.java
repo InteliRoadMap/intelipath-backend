@@ -13,6 +13,7 @@ import com.inteliroadmap.backend.repositories.FptSubjectRepository;
 import com.inteliroadmap.backend.repositories.FptSubjectSkillRepository;
 import com.inteliroadmap.backend.repositories.IndustryMentorRepository;
 import com.inteliroadmap.backend.repositories.NodeTypeRepository;
+import com.inteliroadmap.backend.repositories.PortfolioReviewRequestRepository;
 import com.inteliroadmap.backend.repositories.SkillNodeRepository;
 import com.inteliroadmap.backend.repositories.SkillRepository;
 import com.inteliroadmap.backend.repositories.StudentProgressRepository;
@@ -50,6 +51,7 @@ public class DatabaseSeeder implements CommandLineRunner {
     private final CareerRequiredSkillRepository careerRequiredSkillRepository;
     private final AcademicCounselorRepository academicCounselorRepository;
     private final IndustryMentorRepository industryMentorRepository;
+    private final PortfolioReviewRequestRepository reviewRequestRepository;
     private final UserRepository userRepository;
     private final StudentRepository studentRepository;
     private final StudentSkillRepository studentSkillRepository;
@@ -86,6 +88,7 @@ public class DatabaseSeeder implements CommandLineRunner {
         importRoadmapData();
         importFptSubjectData();
         importMockUsersData();
+        importMockReviewRequests();
 
         log.info("DatabaseSeeder: =====================================================");
         log.info("DatabaseSeeder:  SEEDING SUMMARY NOTIFICATION ");
@@ -470,6 +473,57 @@ public class DatabaseSeeder implements CommandLineRunner {
         }
         user.setUsername(account.getUsername());
         user.setPasswordHash(passwordEncoder.encode(account.getPassword()));
+    }
+
+    /**
+     * Portfolio review requests aimed at the seeded mentor.
+     *
+     * This is the only relationship between a mentor and a student that exists:
+     * every mentor-side number — "mentees", pending reviews, the student list —
+     * is derived from this table. With none, the mentor dashboard is honestly
+     * empty and there is nothing to look at in dev.
+     *
+     * Deliberately its own method rather than a few lines appended to
+     * importMockUsersData(): that method returns early once 100 students exist,
+     * so anything after that point would never run on an already-seeded database.
+     */
+    private void importMockReviewRequests() {
+        if (reviewRequestRepository.count() > 0) {
+            log.info("DatabaseSeeder: Review requests already seeded. Skipping...");
+            return;
+        }
+
+        User mentor = userRepository.findByEmail("heomapkh939732948@gmail.com");
+        if (mentor == null) {
+            log.warn("DatabaseSeeder: Cannot seed review requests: no seeded mentor found.");
+            return;
+        }
+
+        // Oldest first, so the queue has a visible spread of waiting times rather
+        // than five requests that all arrived in the same second.
+        List<User> students = userRepository.findAll().stream()
+                .filter(u -> u.getRole() == UserRole.STUDENT)
+                .limit(5)
+                .toList();
+
+        if (students.isEmpty()) {
+            log.warn("DatabaseSeeder: Cannot seed review requests: no students found.");
+            return;
+        }
+
+        int daysAgo = 9;
+        for (User student : students) {
+            PortfolioReviewRequest request = PortfolioReviewRequest.builder()
+                    .student(student)
+                    .mentor(mentor)
+                    .status(ReviewStatus.PENDING)
+                    .createAt(LocalDateTime.now().minusDays(daysAgo))
+                    .build();
+            reviewRequestRepository.save(request);
+            daysAgo = Math.max(0, daysAgo - 2);
+        }
+
+        log.info("DatabaseSeeder: Seeded {} pending review requests for the mentor.", students.size());
     }
 
     public void importMockUsersData(){

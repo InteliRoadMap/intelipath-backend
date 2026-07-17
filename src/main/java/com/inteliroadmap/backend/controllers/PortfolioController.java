@@ -1,6 +1,7 @@
 package com.inteliroadmap.backend.controllers;
 
 import com.inteliroadmap.backend.domain.dto.request.PortfolioUpsertRequest;
+import com.inteliroadmap.backend.domain.dto.request.RequestReviewRequest;
 import com.inteliroadmap.backend.domain.dto.request.UpdateSlugRequest;
 import com.inteliroadmap.backend.domain.dto.response.portfolio.PortfolioResponse;
 import com.inteliroadmap.backend.services.PortfolioService;
@@ -22,6 +23,8 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/v1/student/portfolio")
@@ -68,11 +71,11 @@ public class PortfolioController {
             @ApiResponse(responseCode = "400", description = "Invalid payload or request already exists"),
             @ApiResponse(responseCode = "404", description = "Mentor not found")
     })
-    public ResponseEntity<java.util.Map<String, Object>> requestReview(
-            @RequestBody @Valid com.inteliroadmap.backend.domain.dto.request.RequestReviewRequest request) {
+    public ResponseEntity<Map<String, Object>> requestReview(
+            @RequestBody @Valid RequestReviewRequest request) {
         log.info("PortfolioController: Request received: Request Portfolio Review to {}", request.getEmail());
         portfolioService.requestReview(request);
-        return ResponseEntity.ok(java.util.Map.of(
+        return ResponseEntity.ok(Map.of(
                 "success", true,
                 "message", "Review request sent successfully."
         ));

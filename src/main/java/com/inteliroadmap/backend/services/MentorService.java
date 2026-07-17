@@ -5,6 +5,7 @@ import com.inteliroadmap.backend.domain.dto.request.UpdateMentorProfileRequest;
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorResponse;
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorCareerDistributionResponse;
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorDashboardMetricsResponse;
+import com.inteliroadmap.backend.domain.dto.response.mentor.MentorDirectoryResponse;
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorFeedbackHistoryResponse;
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorPendingReviewResponse;
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorProfileResponse;
@@ -26,6 +27,13 @@ public interface MentorService {
     Page<MentorPendingReviewResponse> getPendingReviews(Pageable pageable);
 
     Page<MentorStudentResponse> getStudentInfos(Pageable pageable);
+
+    /**
+     * The mentor directory a student browses before asking for a portfolio review.
+     * Student-facing, so unlike every other method here it is not scoped to the
+     * caller's own mentor account.
+     */
+    Page<MentorDirectoryResponse> getMentorDirectory(Pageable pageable);
 
     List<MentorCareerDistributionResponse> getCareerDistribution();
 
