@@ -1,10 +1,21 @@
-package com.inteliroadmap.backend.domain.entity;//import com.inteliroadmap.backend.domain.entity.Assessment;
+package com.inteliroadmap.backend.domain.entity;
+
+//import com.inteliroadmap.backend.domain.entity.Assessment;
 //import com.inteliroadmap.backend.domain.entity.CareerRole;
-
-
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.inteliroadmap.backend.domain.enums.AccountType;
 import com.inteliroadmap.backend.domain.enums.UserRole;
 import com.inteliroadmap.backend.domain.enums.UserStatus;
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
+import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -12,7 +23,6 @@ import lombok.NoArgsConstructor;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.List;
 import java.util.UUID;
 
 
@@ -35,6 +45,15 @@ public class User {
     @Column(nullable = false, unique = true)
     private String email;
 
+    /** Login name for provisioned accounts (staff, FPT students); null for OAuth accounts. */
+    @Column(name = "username", length = 100, unique = true)
+    private String username;
+
+    /** BCrypt hash; null for OAuth accounts, which have no local credential. */
+    @JsonIgnore
+    @Column(name = "password_hash", length = 100)
+    private String passwordHash;
+
     @Column(name = "full_name")
     private String fullName;
 
@@ -43,11 +62,14 @@ public class User {
     @Column(columnDefinition = "TEXT")
     private String bio;
 
-    @Column(name = "create_at")
-    private LocalDateTime createAt;
+    @Column(name = "avatar_url", columnDefinition = "TEXT")
+    private String avatarUrl;
 
-    @Column(name = "update_at")
-    private LocalDateTime updateAt;
+    @Column(name = "created_at")
+    private LocalDateTime createdAt;
+
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "role")
@@ -57,24 +79,31 @@ public class User {
     @Column(name = "account_status")
     private UserStatus userStatus = UserStatus.ACTIVE;
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
-    @com.fasterxml.jackson.annotation.JsonIgnore
-    private List<OauthAccount> oauthAccounts;
+    // @Builder.Default because the column is NOT NULL: without it Lombok's builder
+    // ignores this initializer and inserts null.
+    @Builder.Default
+    @Enumerated(EnumType.STRING)
+    @Column(name = "account_type", nullable = false)
+    private AccountType accountType = AccountType.OTHER;
 
-    //    // 1 User có nhiều records ở bảng con
+//    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+//    @com.fasterxml.jackson.annotation.JsonIgnore
+//    private List<OauthAccount> oauthAccounts;
+//
+//    // 1 User có nhiều records ở bảng con
 //    // mappedBy = tên field trong class con trỏ ngược lại User
 //    // cascade = ALL: thao tác trên User sẽ ảnh hưởng luôn các bảng con
 //    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
 //    private List<OauthAccount> oauthAccounts;
 //
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
-    @com.fasterxml.jackson.annotation.JsonIgnore
-    private List<RefreshToken> refreshTokens;
+//    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL)
+//    @com.fasterxml.jackson.annotation.JsonIgnore
+//    private List<RefreshToken> refreshTokens;
 
     @PrePersist
     public void prePersist() {
-        createAt = LocalDateTime.now();
-        updateAt = LocalDateTime.now();
+        createdAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
         if (this.userStatus == null) {
             this.userStatus = UserStatus.ACTIVE;
         }
@@ -86,8 +115,6 @@ public class User {
 
     @PreUpdate
     public void preUpdate() {
-        updateAt = LocalDateTime.now();
+        updatedAt = LocalDateTime.now();
     }
-
-
 }

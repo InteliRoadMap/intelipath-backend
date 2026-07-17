@@ -1,11 +1,20 @@
 package com.inteliroadmap.backend.domain.entity;
 
-import jakarta.persistence.*;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -14,7 +23,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @AllArgsConstructor
 @Builder
-@com.fasterxml.jackson.annotation.JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+@JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class CareerRole {
 
     @Id
@@ -25,9 +34,11 @@ public class CareerRole {
     @Column(name = "career_name", nullable = false)
     private String careerName;
 
-    @Column(name = "prerequisite")
-    private String prerequisite;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "prerequisite", columnDefinition = "jsonb")
+    private List<CareerRole> prerequisite;
 
     @Column(name = "description", columnDefinition = "TEXT")
     private String description;
 }
+

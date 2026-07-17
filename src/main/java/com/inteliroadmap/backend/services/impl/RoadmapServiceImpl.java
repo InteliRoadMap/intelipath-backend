@@ -1,0 +1,939 @@
+package com.inteliroadmap.backend.services.impl;
+
+import com.inteliroadmap.backend.components.RoadmapProgressCalculator;
+import com.inteliroadmap.backend.components.RoadmapSelectionResolver;
+import com.inteliroadmap.backend.components.SelectionView;
+import com.inteliroadmap.backend.domain.dto.request.UpdateNodeProgressRequest;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.FptNodeCoverageResponse;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.FptNodeResourceResponse;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapNodeResponse;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.StudentRoadmapResponse;
+import com.inteliroadmap.backend.domain.entity.CareerRequiredSkill;
+import com.inteliroadmap.backend.domain.entity.CareerRole;
+import com.inteliroadmap.backend.domain.entity.FptSubject;
+import com.inteliroadmap.backend.domain.entity.FptSubjectResource;
+import com.inteliroadmap.backend.domain.entity.FptSubjectSkill;
+import com.inteliroadmap.backend.domain.entity.Skill;
+import com.inteliroadmap.backend.domain.entity.RoadmapNodeLayout;
+import com.inteliroadmap.backend.domain.entity.SkillNode;
+import com.inteliroadmap.backend.domain.entity.Student;
+import com.inteliroadmap.backend.domain.entity.StudentProgress;
+import com.inteliroadmap.backend.domain.entity.StudentSkill;
+import com.inteliroadmap.backend.domain.entity.User;
+import com.inteliroadmap.backend.domain.enums.AccountType;
+import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
+import com.inteliroadmap.backend.repositories.CareerRequiredSkillRepository;
+import com.inteliroadmap.backend.repositories.CareerRoleRepository;
+import com.inteliroadmap.backend.repositories.FptSubjectRepository;
+import com.inteliroadmap.backend.repositories.FptSubjectResourceRepository;
+import com.inteliroadmap.backend.repositories.FptSubjectSkillRepository;
+import com.inteliroadmap.backend.repositories.RoadmapNodeLayoutRepository;
+import com.inteliroadmap.backend.repositories.SkillNodeRepository;
+import com.inteliroadmap.backend.repositories.SkillRepository;
+import com.inteliroadmap.backend.repositories.StudentProgressRepository;
+import com.inteliroadmap.backend.repositories.StudentRepository;
+import com.inteliroadmap.backend.repositories.StudentSkillRepository;
+import com.inteliroadmap.backend.repositories.UserRepository;
+import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
+import com.inteliroadmap.backend.exceptions.ForbiddenException;
+import com.inteliroadmap.backend.security.SecurityUtils;
+import com.inteliroadmap.backend.services.AuthenticatedStudentService;
+import com.inteliroadmap.backend.services.RoadmapSelectionService;
+import com.inteliroadmap.backend.services.RoadmapService;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.Set;
+import java.util.UUID;
+import java.util.stream.Collectors;
+
+/**
+ * Implementation of the {@link RoadmapService} interface.
+ * Manages the generation, retrieval, and progress tracking of career roadmaps for students.
+ */
+@Service
+@RequiredArgsConstructor
+@Slf4j
+public class RoadmapServiceImpl implements RoadmapService {
+
+    private final RoadmapProgressCalculator roadmapProgressCalculator;
+    private final RoadmapNodeLayoutRepository roadmapNodeLayoutRepository;
+    private final UserRepository userRepository;
+    private final StudentRepository studentRepository;
+    private final CareerRoleRepository careerRoleRepository;
+    private final SkillNodeRepository skillNodeRepository;
+    private final StudentProgressRepository studentProgressRepository;
+    private final StudentSkillRepository studentSkillRepository;
+    private final CareerRequiredSkillRepository careerRequiredSkillRepository;
+    private final SkillRepository skillRepository;
+    private final FptSubjectRepository fptSubjectRepository;
+    private final FptSubjectSkillRepository fptSubjectSkillRepository;
+    private final FptSubjectResourceRepository fptSubjectResourceRepository;
+    private final RoadmapSelectionService roadmapSelectionService;
+    private final RoadmapSelectionResolver roadmapSelectionResolver;
+
+    private static final String COMPLETED_STATUS = "COMPLETED";
+    private static final String FRONTEND_COMPLETED_STATUS = "completed";
+    private static final String FRONTEND_IN_PROGRESS_STATUS = "in_progress";
+    private static final String FRONTEND_CURRENT_STATUS = "current";
+    private static final String FRONTEND_LOCKED_STATUS = "locked";
+    // An alternative in a CHOOSE_ONE group the student did not pick: shown greyed
+    // out, not part of the active path, and not counted toward progress.
+    private static final String FRONTEND_ALTERNATIVE_STATUS = "alternative";
+    private final AuthenticatedStudentService authenticatedStudentService;
+
+    /**
+     * Fraction of a topic's child weight that must be COMPLETED before the topic
+     * (spine) node itself auto-completes. A topic like "Internet" finishes once
+     * its sub-skills (HTTP, DNS, Hosting...) cross this threshold — the student
+     * never marks the topic manually. Configurable via {@code roadmap.parent-completion-threshold}.
+     */
+    @Value("${roadmap.parent-completion-threshold:0.6}")
+    private double parentCompletionThreshold;
+
+    /**
+     * Securely identifies the currently authenticated student.
+     * Extracts the user email from the SecurityContextHolder and retrieves the corresponding Student profile.
+     *
+     * @return The authenticated Student entity
+     * @throws ResourceNotFoundException if the token is invalid or the student profile is missing
+     */
+    private Student getAuthenticatedStudent() {
+        return authenticatedStudentService.getOrCreateStudent();
+    }
+
+    /**
+     * Builds the authenticated student's target roadmap for the frontend contract.
+     * Business rules:
+     * - Student is resolved from JWT, never from request parameters.
+     * - Node IDs are real UUID values from skill_nodes.
+     * - Status is translated to frontend lowercase values only.
+     * - Missing roadmap/progress data returns empty arrays/default progress, not null.
+     *
+     * @return student roadmap response
+     */
+    @Transactional(readOnly = true)
+    @Override
+    public StudentRoadmapResponse getStudentRoadmap() {
+        log.info("RoadmapServiceImpl: Fetching authenticated student roadmap");
+
+        // Fetch authenticated student
+        Student student = getAuthenticatedStudent();
+        // If the student hasn't selected a career, return an empty roadmap
+        if (student.getCareerRole() == null || student.getCareerRole().getCareerId() == null) {
+            return StudentRoadmapResponse.builder()
+                    .progress(0)
+                    .nodes(List.of())
+                    .build();
+        }
+
+        // Seed any obvious CHOOSE_ONE picks from the student's skill profile before
+        // reading the roadmap, so a Java student sees Java pre-selected on first load.
+        // Runs in its own transaction; a failure here must not break the read.
+        try {
+            roadmapSelectionService.autoDefaultSelections();
+        } catch (RuntimeException e) {
+            log.warn("RoadmapServiceImpl: auto-default selections skipped: {}", e.getMessage());
+        }
+
+        // Look up the career role and associated skill nodes
+        CareerRole careerRole = careerRoleRepository.findByCareerId(student.getCareerRole().getCareerId());
+        List<SkillNode> nodes = skillNodeRepository
+                .findByCareerRole_CareerIdOrderByNodeLevelAscNodeNameAsc(careerRole.getCareerId());
+
+        if (nodes.isEmpty()) {
+            return StudentRoadmapResponse.builder()
+                    .targetCareerRole(careerRole.getCareerName())
+                    .progress(0)
+                    .nodes(List.of())
+                    .build();
+        }
+
+        // Fetch student's progress for these specific nodes and map by node ID
+        Map<UUID, StudentProgress> progressByNodeId = mapProgressByNodeId(
+                studentProgressRepository.findByStudent_UserIdAndSkillNode_NodeIdIn(
+                        student.getUserId(),
+                        nodes.stream().map(SkillNode::getNodeId).toList()
+                )
+        );
+
+        // Resolve the student's CHOOSE_ONE picks: which alternatives are off-path.
+        SelectionView selectionView = roadmapSelectionResolver.resolve(student.getUserId(), nodes);
+
+        // Compute frontend statuses (e.g., locked, current, completed) and overall progress.
+        // Progress counts the active path only, so picking a language never dilutes the %.
+        Map<UUID, String> statusByNodeId = buildFrontendStatusMap(nodes, progressByNodeId, selectionView);
+        int progress = calculateProgress(selectionView.activePathNodes(nodes), progressByNodeId);
+
+        // FPT material is only offered to FPT accounts; everyone else gets the public
+        // roadmap.sh links that every node already carries.
+        User user = userRepository.findByUserId(student.getUserId());
+        boolean fptAccount = user != null && user.getAccountType() == AccountType.FPT;
+
+        // Build the hierarchical roadmap tree
+        return StudentRoadmapResponse.builder()
+                .targetCareerRole(careerRole.getCareerName())
+                .progress(progress)
+                .nodes(buildRoadmapTree(nodes, statusByNodeId, progressByNodeId, selectionView, fptAccount))
+                .build();
+    }
+
+    /**
+     * Retrieves the roadmap template for a career without student progress.
+     *
+     * @param careerId career role UUID
+     * @return roadmap template response
+     */
+    @Transactional(readOnly = true)
+    @Override
+    public StudentRoadmapResponse getCareerRoadmapTemplate(UUID careerId) {
+        Optional<CareerRole> careerRoleOptional = careerRoleRepository.findById(careerId);
+        if (careerRoleOptional.isEmpty()) {
+            throw new ResourceNotFoundException("Career not found");
+        }
+
+        CareerRole careerRole = careerRoleOptional.get();
+        List<SkillNode> nodes = skillNodeRepository
+                .findByCareerRole_CareerIdOrderByNodeLevelAscNodeNameAsc(careerId);
+        List<RoadmapNodeResponse> nodeDtos = nodes.stream()
+                .map(node -> mapToLegacyNodeDto(node, "not_started"))
+                .toList();
+
+        return StudentRoadmapResponse.builder()
+                .targetCareerRole(careerRole.getCareerName())
+                .progress(0)
+                .nodes(nodeDtos)
+                .build();
+    }
+
+    /**
+     * Calculates the authenticated student's completion percentage for a career.
+     *
+     * @param careerId career role UUID
+     * @return completion percentage from 0 to 100
+     */
+    @Transactional(readOnly = true)
+    @Override
+    public Integer getCareerProgress(UUID careerId) {
+        Student student = getStudentFromContext();
+        List<SkillNode> nodes = skillNodeRepository.findByCareerRole_CareerId(careerId);
+        if (nodes.isEmpty()) {
+            return 0;
+        }
+
+        List<UUID> nodeIds = nodes.stream()
+                .map(SkillNode::getNodeId)
+                .toList();
+        List<StudentProgress> progressList =
+                studentProgressRepository.findByStudent_UserIdAndSkillNode_NodeIdIn(
+                        student.getUserId(),
+                        nodeIds
+                );
+
+        // Count only the student's active path (chosen alternatives), matching
+        // /roadmaps/student. Delegate to the shared calculator (single source of truth).
+        SelectionView selectionView = roadmapSelectionResolver.resolve(student.getUserId(), nodes);
+        return roadmapProgressCalculator.calculateProgress(selectionView.activePathNodes(nodes), progressList);
+    }
+
+    /**
+     * Retrieves one roadmap node using the existing roadmap API response.
+     *
+     * @param nodeId roadmap node UUID
+     * @return roadmap node detail response
+     */
+    @Transactional(readOnly = true)
+    @Override
+    public RoadmapNodeResponse getNodeDetail(UUID nodeId) {
+        Optional<SkillNode> nodeOptional = skillNodeRepository.findById(nodeId);
+        if (nodeOptional.isEmpty()) {
+            throw new ResourceNotFoundException("Node not found");
+        }
+
+        return mapToLegacyNodeDto(nodeOptional.get(), null);
+    }
+
+    /**
+     * Creates or updates the authenticated student's progress for a roadmap node.
+     *
+     * @param request request body containing node ID and status
+     */
+    @Transactional
+    @Override
+    public void updateNodeProgress(UpdateNodeProgressRequest request) {
+        Student student = getStudentFromContext();
+
+        Optional<SkillNode> nodeOptional = skillNodeRepository.findById(request.getNodeId());
+        if (nodeOptional.isEmpty()) {
+            throw new ResourceNotFoundException("Node not found");
+        }
+
+        SkillNode node = nodeOptional.get();
+
+        // Resolve the student's CHOOSE_ONE picks over this career once; used both to
+        // block writes on off-path nodes and to gate topic auto-completion below.
+        List<SkillNode> careerNodes = (node.getCareerRole() != null && node.getCareerRole().getCareerId() != null)
+                ? skillNodeRepository.findByCareerRole_CareerIdOrderByNodeLevelAscNodeNameAsc(node.getCareerRole().getCareerId())
+                : List.of();
+        SelectionView selectionView = roadmapSelectionResolver.resolve(student.getUserId(), careerNodes);
+
+        // An alternative the student has not chosen (or any alternative while the
+        // CHOOSE_ONE group is still undecided) is off the active path: the student
+        // must pick it first before tracking progress on it.
+        if (selectionView.isExcludedFromProgress(node.getNodeId())) {
+            throw new ForbiddenException("Select this alternative for your roadmap before tracking progress on it.");
+        }
+
+        Optional<StudentProgress> progressOptional =
+                studentProgressRepository.findByStudent_UserIdAndSkillNode_NodeId(student.getUserId(), node.getNodeId());
+
+        StudentProgress progress;
+        if (progressOptional.isPresent()) {
+            progress = progressOptional.get();
+        } else {
+            progress = StudentProgress.builder()
+                    .student(Student.builder().userId(student.getUserId()).build())
+                    .skillNode(node)
+                    .createdAt(LocalDateTime.now())
+                    .build();
+        }
+
+        RoadmapStepStatus newStatus;
+        try {
+            newStatus = RoadmapStepStatus.valueOf(request.getStatus().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            newStatus = RoadmapStepStatus.IN_PROGRESS;
+        }
+
+        // Enforce the same unlock gating the read path computes: a node that is still
+        // locked (prerequisite/stage/parent not satisfied) cannot be advanced. This keeps
+        // the write path from completing nodes out of order and feeding bad auto-completion.
+        if ((newStatus == RoadmapStepStatus.IN_PROGRESS || newStatus == RoadmapStepStatus.COMPLETED)
+                && !careerNodes.isEmpty()) {
+            Map<UUID, StudentProgress> progressByNode = mapProgressByNodeId(
+                    studentProgressRepository.findByStudent_UserIdAndSkillNode_NodeIdIn(
+                            student.getUserId(),
+                            careerNodes.stream().map(SkillNode::getNodeId).toList()));
+            String computedStatus = buildFrontendStatusMap(careerNodes, progressByNode, selectionView).get(node.getNodeId());
+            if (FRONTEND_LOCKED_STATUS.equals(computedStatus)) {
+                throw new ForbiddenException("This node is locked; complete its prerequisites first.");
+            }
+        }
+
+        progress.setStatus(newStatus);
+        if (RoadmapStepStatus.COMPLETED == newStatus
+                && progress.getCompletedAt() == null) {
+            progress.setCompletedAt(java.time.LocalDateTime.now());
+            
+            // Auto-sync skill to profile (only when the student has a target career)
+            if (node.getSkill() != null
+                    && student.getCareerRole() != null
+                    && student.getCareerRole().getCareerId() != null) {
+                Skill skill = skillRepository.findById(node.getSkill().getSkillId()).orElse(null);
+                if (skill != null) {
+                    boolean hasSkill = studentSkillRepository.existsByStudent_UserIdAndSkill_SkillId(student.getUserId(), skill.getSkillId());
+                    if (!hasSkill) {
+                        List<SkillNode> allNodesForSkill = skillNodeRepository
+                                .findBySkill_SkillIdAndCareerRole_CareerId(
+                                        skill.getSkillId(),
+                                        student.getCareerRole().getCareerId()
+                                );
+                        boolean allCompleted = true;
+                        
+                        for (SkillNode skillNode : allNodesForSkill) {
+                            if (skillNode.getNodeId().equals(node.getNodeId())) {
+                                continue;
+                            }
+                            StudentProgress nodeProgress = studentProgressRepository.findByStudent_UserIdAndSkillNode_NodeId(student.getUserId(), skillNode.getNodeId()).orElse(null);
+                            if (nodeProgress == null || nodeProgress.getStatus() != RoadmapStepStatus.COMPLETED) {
+                                allCompleted = false;
+                                break;
+                            }
+                        }
+
+                        if (allCompleted) {
+                            StudentSkill newSkill = StudentSkill.builder()
+                                    .student(Student.builder().userId(student.getUserId()).build())
+                                    .skill(skill)
+                                    .build();
+                            studentSkillRepository.save(newSkill);
+                            log.info("RoadmapServiceImpl: Auto-synced skill {} to student {} after all required nodes were completed", skill.getSkillName(), student.getUserId());
+                        }
+                    }
+                }
+            }
+        }
+        studentProgressRepository.save(progress);
+
+        // A topic (spine) node auto-completes from its children, so whenever a child's
+        // status changes, re-evaluate every ancestor topic and complete/revert it.
+        syncTopicAutoCompletion(student, node, selectionView);
+    }
+
+    /**
+     * Walks up the parent chain of {@code changedNode} and keeps each topic node's
+     * stored progress in sync with the auto-completion rule: a topic is COMPLETED once
+     * its child weight crosses {@link #parentCompletionThreshold}, and reverted back to
+     * IN_PROGRESS if a child is later un-completed and drags it below the threshold.
+     */
+    private void syncTopicAutoCompletion(Student student, SkillNode changedNode, SelectionView selectionView) {
+        SkillNode topic = changedNode.getParentNode();
+        while (topic != null) {
+            final SkillNode currentTopic = topic;
+            List<SkillNode> children = skillNodeRepository.findByParentNode_NodeId(currentTopic.getNodeId());
+            long totalWeight = 0;
+            long doneWeight = 0;
+            for (SkillNode child : children) {
+                // Off-path alternatives never count toward a topic's completion, so
+                // e.g. "Pick a Language" completes from the single chosen language.
+                if (selectionView.isExcludedFromProgress(child.getNodeId())) {
+                    continue;
+                }
+                int weight = nodeWeight(child);
+                totalWeight += weight;
+                StudentProgress childProgress = studentProgressRepository
+                        .findByStudent_UserIdAndSkillNode_NodeId(student.getUserId(), child.getNodeId())
+                        .orElse(null);
+                if (childProgress != null && RoadmapStepStatus.COMPLETED == childProgress.getStatus()) {
+                    doneWeight += weight;
+                }
+            }
+            boolean reachedThreshold = totalWeight > 0
+                    && (double) doneWeight / totalWeight >= parentCompletionThreshold;
+
+            StudentProgress topicProgress = studentProgressRepository
+                    .findByStudent_UserIdAndSkillNode_NodeId(student.getUserId(), currentTopic.getNodeId())
+                    .orElse(null);
+
+            if (reachedThreshold) {
+                if (topicProgress == null) {
+                    topicProgress = StudentProgress.builder()
+                            .student(Student.builder().userId(student.getUserId()).build())
+                            .skillNode(currentTopic)
+                            .createdAt(LocalDateTime.now())
+                            .build();
+                }
+                if (RoadmapStepStatus.COMPLETED != topicProgress.getStatus()) {
+                    topicProgress.setStatus(RoadmapStepStatus.COMPLETED);
+                    topicProgress.setCompletedAt(LocalDateTime.now());
+                    studentProgressRepository.save(topicProgress);
+                    log.info("RoadmapServiceImpl: Topic {} auto-completed for student {} ({}/{} child weight)",
+                            currentTopic.getNodeName(), student.getUserId(), doneWeight, totalWeight);
+                }
+            } else if (topicProgress != null && RoadmapStepStatus.COMPLETED == topicProgress.getStatus()) {
+                // Dropped below the threshold: remove the auto-completion so the read
+                // path recomputes the topic's real status (locked/current) from scratch.
+                studentProgressRepository.delete(topicProgress);
+                log.info("RoadmapServiceImpl: Topic {} auto-completion cleared for student {} ({}/{} child weight)",
+                        currentTopic.getNodeName(), student.getUserId(), doneWeight, totalWeight);
+            }
+
+            topic = topic.getParentNode();
+        }
+    }
+
+    /**
+     * Retrieves the student entity from the provided authorization header.
+     *
+     * @return the {@link Student} associated with the token
+     * @throws RuntimeException if the authorization header is invalid
+     * @throws ResourceNotFoundException if the user or student profile cannot be found
+     */
+    private Student getStudentFromContext() {
+        String email = SecurityUtils.getCurrentUserEmail();
+        User user = userRepository.findByEmail(email);
+        if (user == null) {
+            throw new ResourceNotFoundException("User not found");
+        }
+
+        Student student = studentRepository.findByUserId(user.getUserId());
+        if (student == null) {
+            throw new ResourceNotFoundException("Student profile not found");
+        }
+        return student;
+    }
+
+    /**
+     * Maps a {@link SkillNode} to a legacy {@link RoadmapNodeResponse}.
+     *
+     * @param node the skill node to map
+     * @param status the progress status of the node, defaults to "not_started" if null
+     * @return the mapped {@link RoadmapNodeResponse}
+     */
+    private RoadmapNodeResponse mapToLegacyNodeDto(SkillNode node, String status) {
+        String parentNode = node.getParentNode() != null ?
+                node.getParentNode().getNodeName() : null;
+
+        return RoadmapNodeResponse.builder()
+                .nodeId(node.getNodeId())
+                .nodeName(node.getNodeName())
+                .parentNode(parentNode)
+                .nodeLevel(node.getNodeLevel())
+                .description(node.getDescription())
+                .resource(node.getResource())
+                .status(status != null ? status : "not_started")
+                .build();
+    }
+
+    /**
+     * Maps a list of student progress records by their associated node IDs.
+     *
+     * @param progresses the list of {@link StudentProgress}
+     * @return a map of node IDs to their corresponding {@link StudentProgress}
+     */
+    private Map<UUID, StudentProgress> mapProgressByNodeId(List<StudentProgress> progresses) {
+        Map<UUID, StudentProgress> progressByNodeId = new HashMap<>();
+        for (StudentProgress progress : progresses) {
+            if (progress.getSkillNode().getNodeId() != null) {
+                progressByNodeId.put(progress.getSkillNode().getNodeId(), progress);
+            }
+        }
+        return progressByNodeId;
+    }
+
+    /**
+     * Builds a map of frontend status strings for each node based on the student's progress.
+     * Determines whether a node is completed, in progress, current, or locked based on prerequisites.
+     *
+     * @param nodes the list of all {@link SkillNode}s in the roadmap
+     * @param progressByNodeId the mapped student progress by node ID
+     * @return a map of node IDs to their frontend status string
+     */
+    private static final String NEVER_COMPLETE_POLICY = "NEVER_COMPLETE";
+
+    private Map<UUID, String> buildFrontendStatusMap(
+            List<SkillNode> nodes,
+            Map<UUID, StudentProgress> progressByNodeId,
+            SelectionView selectionView
+    ) {
+        Map<UUID, String> statusByNodeId = new HashMap<>();
+        Set<String> passedStages = findPassedStages(nodes, progressByNodeId);
+        Set<UUID> topicIds = topicParentIds(nodes);
+        Map<UUID, List<SkillNode>> childrenByParent = childrenByParent(nodes);
+
+        // Parents/previous nodes must be classified before their dependants,
+        // regardless of the level/name order the nodes were fetched in.
+        for (SkillNode node : orderDependenciesFirst(nodes)) {
+            // Unchosen alternative of a decided CHOOSE_ONE group (and its subtree):
+            // greyed out, off the active path — bypass the normal gating rules.
+            if (selectionView.isGreyedAlternative(node.getNodeId())) {
+                statusByNodeId.put(node.getNodeId(), FRONTEND_ALTERNATIVE_STATUS);
+                continue;
+            }
+
+            StudentProgress progress = progressByNodeId.get(node.getNodeId());
+            if (progress != null && RoadmapStepStatus.COMPLETED == progress.getStatus()) {
+                statusByNodeId.put(node.getNodeId(), FRONTEND_COMPLETED_STATUS);
+                continue;
+            }
+            if (progress != null && RoadmapStepStatus.IN_PROGRESS == progress.getStatus()) {
+                statusByNodeId.put(node.getNodeId(), FRONTEND_IN_PROGRESS_STATUS);
+                continue;
+            }
+
+            if (topicIds.contains(node.getNodeId())) {
+                // A topic (spine) node is gated only by its own sequential order
+                // (previousNode) and stage — never by its own children. Once
+                // reachable it auto-completes as soon as enough child weight is done,
+                // otherwise it stays the current focus while its sub-skills are learned.
+                boolean gateLocked = isStageLocked(node, passedStages)
+                        || isSequentialGateLocked(node.getPreviousNode(), statusByNodeId);
+                if (gateLocked) {
+                    statusByNodeId.put(node.getNodeId(), FRONTEND_LOCKED_STATUS);
+                } else if (childCompletionRatio(node, childrenByParent, progressByNodeId, selectionView) >= parentCompletionThreshold) {
+                    statusByNodeId.put(node.getNodeId(), FRONTEND_COMPLETED_STATUS);
+                } else {
+                    statusByNodeId.put(node.getNodeId(), FRONTEND_CURRENT_STATUS);
+                }
+                continue;
+            }
+
+            // Leaf / child node: unlocks as soon as its parent topic is REACHED
+            // (i.e. no longer locked) rather than fully completed, plus any
+            // sequential previousNode ordering among siblings/spine leaves.
+            boolean locked = isStageLocked(node, passedStages)
+                    || isParentReachedGateLocked(node.getParentNode(), statusByNodeId)
+                    || isSequentialGateLocked(node.getPreviousNode(), statusByNodeId);
+            statusByNodeId.put(node.getNodeId(), locked ? FRONTEND_LOCKED_STATUS : FRONTEND_CURRENT_STATUS);
+        }
+
+        return statusByNodeId;
+    }
+
+    /** Node ids that are referenced as a {@code parentNode} by at least one other node (i.e. topics). */
+    private Set<UUID> topicParentIds(List<SkillNode> nodes) {
+        return nodes.stream()
+                .map(SkillNode::getParentNode)
+                .filter(Objects::nonNull)
+                .map(SkillNode::getNodeId)
+                .collect(Collectors.toSet());
+    }
+
+    /** Children grouped by their parent topic id. */
+    private Map<UUID, List<SkillNode>> childrenByParent(List<SkillNode> nodes) {
+        return nodes.stream()
+                .filter(n -> n.getParentNode() != null)
+                .collect(Collectors.groupingBy(n -> n.getParentNode().getNodeId()));
+    }
+
+    /**
+     * Completed-child weight over total-child weight for a topic (0.0 when it has no
+     * counted children). Children off the active path (unchosen alternatives, or all
+     * alternatives while a CHOOSE_ONE group is undecided) are excluded from both sides,
+     * so e.g. "Pick a Language" completes once the single chosen language is done.
+     */
+    private double childCompletionRatio(
+            SkillNode topic,
+            Map<UUID, List<SkillNode>> childrenByParent,
+            Map<UUID, StudentProgress> progressByNodeId,
+            SelectionView selectionView
+    ) {
+        List<SkillNode> children = childrenByParent.getOrDefault(topic.getNodeId(), List.of());
+        long totalWeight = 0;
+        long doneWeight = 0;
+        for (SkillNode child : children) {
+            if (selectionView.isExcludedFromProgress(child.getNodeId())) {
+                continue;
+            }
+            int weight = nodeWeight(child);
+            totalWeight += weight;
+            StudentProgress p = progressByNodeId.get(child.getNodeId());
+            if (p != null && RoadmapStepStatus.COMPLETED == p.getStatus()) {
+                doneWeight += weight;
+            }
+        }
+        return totalWeight == 0 ? 0.0 : (double) doneWeight / totalWeight;
+    }
+
+    private int nodeWeight(SkillNode node) {
+        if (node.getType() != null && node.getType().getWeight() != null && node.getType().getWeight() > 0) {
+            return node.getType().getWeight();
+        }
+        return 1;
+    }
+
+    /**
+     * Sequential gate (spine order / sibling chaining): the dependant is locked
+     * until its gate node is COMPLETED. A NEVER_COMPLETE group header can never be
+     * completed, so there the dependant only stays locked while the header is locked.
+     */
+    private boolean isSequentialGateLocked(SkillNode gate, Map<UUID, String> statusByNodeId) {
+        if (gate == null) {
+            return false;
+        }
+        String gateStatus = statusByNodeId.get(gate.getNodeId());
+        if (gateStatus == null) {
+            return true;
+        }
+        if (NEVER_COMPLETE_POLICY.equalsIgnoreCase(gate.getCompletionPolicy())) {
+            return FRONTEND_LOCKED_STATUS.equals(gateStatus);
+        }
+        return !FRONTEND_COMPLETED_STATUS.equals(gateStatus);
+    }
+
+    /**
+     * Hierarchy gate (topic -> its children): a child unlocks the moment its parent
+     * topic is reached, so it is locked only while the parent itself is still locked
+     * (or unknown). This lets a student start learning sub-skills as soon as the topic
+     * is the current focus, instead of forcing the topic to be completed first.
+     */
+    private boolean isParentReachedGateLocked(SkillNode parent, Map<UUID, String> statusByNodeId) {
+        if (parent == null) {
+            return false;
+        }
+        String parentStatus = statusByNodeId.get(parent.getNodeId());
+        if (parentStatus == null) {
+            return true;
+        }
+        return FRONTEND_LOCKED_STATUS.equals(parentStatus);
+    }
+
+    /**
+     * A node whose NodeType requires unlock keys stays locked until every stage
+     * named in stageUnlockKey has been passed (all of that stage's completable
+     * nodes are COMPLETED).
+     */
+    private boolean isStageLocked(SkillNode node, Set<String> passedStages) {
+        if (node.getType() == null || !Boolean.TRUE.equals(node.getType().getUnlockKeyRequired())) {
+            return false;
+        }
+        List<String> requiredStages = node.getType().getStageUnlockKey();
+        if (requiredStages == null) {
+            return false;
+        }
+        for (String stage : requiredStages) {
+            if (stage != null && !passedStages.contains(stage.trim().toUpperCase())) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /** Stages where every completable (non-group) node is COMPLETED. */
+    private Set<String> findPassedStages(List<SkillNode> nodes, Map<UUID, StudentProgress> progressByNodeId) {
+        Map<String, Boolean> stageCompleted = new HashMap<>();
+        for (SkillNode node : nodes) {
+            if (node.getType() == null || node.getType().getStage() == null) {
+                continue;
+            }
+            String stage = node.getType().getStage().name();
+            if (NEVER_COMPLETE_POLICY.equalsIgnoreCase(node.getCompletionPolicy())) {
+                stageCompleted.putIfAbsent(stage, true);
+                continue;
+            }
+            StudentProgress progress = progressByNodeId.get(node.getNodeId());
+            boolean completed = progress != null && RoadmapStepStatus.COMPLETED == progress.getStatus();
+            stageCompleted.merge(stage, completed, Boolean::logicalAnd);
+        }
+
+        Set<String> passed = new HashSet<>();
+        stageCompleted.forEach((stage, completed) -> {
+            if (Boolean.TRUE.equals(completed)) {
+                passed.add(stage);
+            }
+        });
+        return passed;
+    }
+
+    /** Kahn-style ordering over parent/previous references; tolerates cycles by appending leftovers. */
+    private List<SkillNode> orderDependenciesFirst(List<SkillNode> nodes) {
+        Set<UUID> emitted = new HashSet<>();
+        List<SkillNode> ordered = new ArrayList<>(nodes.size());
+        List<SkillNode> remaining = new ArrayList<>(nodes);
+
+        boolean progressMade = true;
+        while (!remaining.isEmpty() && progressMade) {
+            progressMade = false;
+            Iterator<SkillNode> iterator = remaining.iterator();
+            while (iterator.hasNext()) {
+                SkillNode node = iterator.next();
+                boolean parentReady = node.getParentNode() == null || emitted.contains(node.getParentNode().getNodeId());
+                boolean previousReady = node.getPreviousNode() == null || emitted.contains(node.getPreviousNode().getNodeId());
+                if (parentReady && previousReady) {
+                    ordered.add(node);
+                    emitted.add(node.getNodeId());
+                    iterator.remove();
+                    progressMade = true;
+                }
+            }
+        }
+        ordered.addAll(remaining);
+        return ordered;
+    }
+
+    /**
+     * Calculates the overall progress percentage for a roadmap.
+     *
+     * @param nodes the list of {@link SkillNode}s in the roadmap
+     * @param progressByNodeId the mapped student progress by node ID
+     * @return the calculated progress percentage (0 to 100)
+     */
+    private int calculateProgress(List<SkillNode> nodes, Map<UUID, StudentProgress> progressByNodeId) {
+        return roadmapProgressCalculator.calculateProgress(nodes, progressByNodeId);
+    }
+
+
+    /**
+     * @param fptAccount when false the FLM overlay is skipped entirely, so nodes carry no
+     *                   fptCoverage/fptResources and the two overlay queries never run
+     */
+    private List<RoadmapNodeResponse> buildRoadmapTree(
+            List<SkillNode> nodes,
+            Map<UUID, String> statusByNodeId,
+            Map<UUID, StudentProgress> progressByNodeId,
+            SelectionView selectionView,
+            boolean fptAccount
+    ) {
+        // Presentation-only placement, joined in from the layout table.
+        Map<UUID, RoadmapNodeLayout> layoutsByNodeId = new HashMap<>();
+        for (RoadmapNodeLayout layout : roadmapNodeLayoutRepository
+                .findByNodeIdIn(nodes.stream().map(SkillNode::getNodeId).toList())) {
+            layoutsByNodeId.put(layout.getNodeId(), layout);
+        }
+
+        Set<UUID> topicIds = topicParentIds(nodes);
+        Map<UUID, List<SkillNode>> childrenByParent = childrenByParent(nodes);
+
+        // FLM overlay: skill name -> teaching FPT subjects, and subject -> lesson resources.
+        // Left empty for non-FPT accounts, which also skips both overlay queries.
+        Map<String, List<FptSubject>> subjectsBySkill = new HashMap<>();
+        Map<String, List<FptSubjectResource>> resourcesByCode = new HashMap<>();
+        List<FptSubjectSkill> fptLinks = fptAccount ? fptSubjectSkillRepository.findAll() : List.of();
+        if (!fptLinks.isEmpty()) {
+            Set<String> codes = fptLinks.stream().map(FptSubjectSkill::getSubjectCode).collect(Collectors.toSet());
+            Map<String, FptSubject> subjectByCode = fptSubjectRepository.findAllById(codes).stream()
+                    .collect(Collectors.toMap(FptSubject::getCode, s -> s));
+            for (FptSubjectSkill link : fptLinks) {
+                FptSubject subject = subjectByCode.get(link.getSubjectCode());
+                if (subject != null && link.getSkillName() != null) {
+                    subjectsBySkill.computeIfAbsent(link.getSkillName().toLowerCase(), k -> new ArrayList<>()).add(subject);
+                }
+            }
+            resourcesByCode = fptSubjectResourceRepository
+                    .findBySubjectCodeInOrderBySubjectCodeAscOrderIndexAsc(codes).stream()
+                    .collect(Collectors.groupingBy(FptSubjectResource::getSubjectCode));
+        }
+        final Map<String, List<FptSubject>> subjectsBySkillFinal = subjectsBySkill;
+        final Map<String, List<FptSubjectResource>> resourcesByCodeFinal = resourcesByCode;
+
+        return nodes.stream()
+                .map(node -> {
+                    RoadmapNodeLayout layout = layoutsByNodeId.get(node.getNodeId());
+                    boolean isTopic = topicIds.contains(node.getNodeId());
+                    List<SkillNode> children = isTopic
+                            ? childrenByParent.getOrDefault(node.getNodeId(), List.of())
+                            : List.of();
+                    // Only children on the student's active path count toward the topic
+                    // bar. For a CHOOSE_ONE group that means the single chosen alternative,
+                    // so a picked-and-finished "Pick a Database" reads 1/1, not 1/6.
+                    List<SkillNode> countedChildren = children.stream()
+                            .filter(c -> !selectionView.isExcludedFromProgress(c.getNodeId()))
+                            .toList();
+                    int childCompleted = (int) countedChildren.stream()
+                            .map(c -> progressByNodeId.get(c.getNodeId()))
+                            .filter(p -> p != null && RoadmapStepStatus.COMPLETED == p.getStatus())
+                            .count();
+                    StudentProgress nodeProgress = progressByNodeId.get(node.getNodeId());
+                    String completedAt = nodeProgress != null && nodeProgress.getCompletedAt() != null
+                            ? nodeProgress.getCompletedAt().toString()
+                            : null;
+
+                    // FLM coverage/resources for this node, joined by its skill name.
+                    String skillName = node.getSkill() != null && node.getSkill().getSkillName() != null
+                            ? node.getSkill().getSkillName() : node.getNodeName();
+                    List<FptSubject> coverSubjects = skillName != null
+                            ? subjectsBySkillFinal.getOrDefault(skillName.toLowerCase(), List.of())
+                            : List.of();
+                    boolean covered = !coverSubjects.isEmpty();
+                    // Only flag self-study on concrete leaf skill nodes, so the canvas isn't noisy.
+                    boolean selfStudy = !covered && node.getSkill() != null && !isTopic;
+                    // Non-FPT accounts get null, not a selfStudy=true stub: with an empty
+                    // overlay every leaf would otherwise claim FPT doesn't teach it.
+                    FptNodeCoverageResponse fptCoverage = (fptAccount && (covered || selfStudy))
+                            ? FptNodeCoverageResponse.builder()
+                                    .covered(covered)
+                                    .selfStudy(selfStudy)
+                                    .subjects(coverSubjects.stream()
+                                            // Term is per-curriculum now; omit it on the shared node view.
+                                            .map(s -> FptNodeCoverageResponse.FptSubjectRefResponse.builder()
+                                                    .code(s.getCode()).name(s.getName()).build())
+                                            .toList())
+                                    .build()
+                            : null;
+                    List<FptNodeResourceResponse> fptResources = fptAccount
+                            ? buildNodeResources(coverSubjects, resourcesByCodeFinal)
+                            : null;
+
+                    return RoadmapNodeResponse.builder()
+                            .nodeId(node.getNodeId())
+                            .nodeName(node.getNodeName())
+                            .parentNode(node.getParentNode() != null ? node.getParentNode().getNodeId().toString() : null)
+                            .previousNode(node.getPreviousNode() != null ? node.getPreviousNode().getNodeId().toString() : null)
+                            .nodeLevel(node.getNodeLevel())
+                            .stage(node.getType() != null && node.getType().getStage() != null
+                                    ? node.getType().getStage().name() : null)
+                            .completionPolicy(node.getCompletionPolicy())
+                            .weight(node.getType() != null ? node.getType().getWeight() : null)
+                            .requiredProficiency(node.getRequiredProficiency())
+                            .parentTopic(isTopic)
+                            .childTotal(countedChildren.size())
+                            .childCompleted(childCompleted)
+                            .selection(node.getSelection())
+                            .chooseCount(node.getChooseCount())
+                            .nodeKind(node.getNodeKind())
+                            .axis(node.getAxis())
+                            .isOptional(node.getIsOptional())
+                            .isCheckpoint(node.getIsCheckpoint())
+                            .positionX(layout != null ? layout.getPositionX() : null)
+                            .positionY(layout != null ? layout.getPositionY() : null)
+                            .lane(layout != null ? layout.getLane() : null)
+                            .displayOrder(layout != null ? layout.getDisplayOrder() : null)
+                            .description(node.getDescription())
+                            .resource(node.getResource())
+                            .status(statusByNodeId.getOrDefault(node.getNodeId(), FRONTEND_LOCKED_STATUS))
+                            .completedAt(completedAt)
+                            .fptCoverage(fptCoverage)
+                            .fptResources(fptResources)
+                            .build();
+                })
+                .toList();
+    }
+
+    // Session topics that are class logistics, not learning content — never worth
+    // surfacing on a skill node.
+    private static final List<String> SESSION_TOPIC_SKIP = List.of(
+            "orientation", "lab room", "regulation", "review", "revision", "revison",
+            "exam", "final", "project evaluation", "progress test", "mock", "guideline",
+            "holiday", "quiz", "assignment submission");
+
+    private static final int MAX_SESSIONS_PER_SUBJECT = 6;
+    private static final int MAX_NODE_RESOURCES = 24;
+
+    /**
+     * Pick the resources actually worth showing on one skill node. A subject's syllabus
+     * has ~60 session rows, most of them just a weekly schedule entry with nothing to
+     * open; dumping them all is noise. So: keep every material (textbook / online course
+     * link), but for sessions keep only ones that link to something, drop pure logistics
+     * (orientation / exam / project evaluation …), and collapse repeated chapters — then
+     * cap so a node with several covering subjects stays readable. Materials come first.
+     */
+    private List<FptNodeResourceResponse> buildNodeResources(
+            List<FptSubject> subjects, Map<String, List<FptSubjectResource>> resourcesByCode) {
+        List<FptNodeResourceResponse> materials = new ArrayList<>();
+        List<FptNodeResourceResponse> sessions = new ArrayList<>();
+        Set<String> seenMaterialTitles = new HashSet<>();
+        Set<String> seenSessionTopics = new HashSet<>();
+
+        for (FptSubject subject : subjects) {
+            int keptSessions = 0;
+            for (FptSubjectResource r : resourcesByCode.getOrDefault(subject.getCode(), List.of())) {
+                boolean isSession = "SESSION".equals(r.getKind().name());
+                String url = r.getUrl() != null ? r.getUrl().trim() : "";
+
+                if (!isSession) {
+                    String key = (r.getTitle() == null ? "" : r.getTitle().trim().toLowerCase());
+                    if (!key.isEmpty() && !seenMaterialTitles.add(key)) continue;
+                    materials.add(toResource(r));
+                    continue;
+                }
+
+                // Sessions: only ones you can actually open, minus logistics, deduped by topic.
+                if (url.isEmpty()) continue;
+                if (keptSessions >= MAX_SESSIONS_PER_SUBJECT) continue;
+                String topic = (r.getTopic() == null ? "" : r.getTopic().trim().toLowerCase());
+                if (topic.isEmpty()) continue;
+                if (SESSION_TOPIC_SKIP.stream().anyMatch(topic::contains)) continue;
+                String norm = subject.getCode() + "|" + topic.replace("(cnt)", "").replace("(cont)", "").trim();
+                if (!seenSessionTopics.add(norm)) continue;
+                sessions.add(toResource(r));
+                keptSessions++;
+            }
+        }
+
+        List<FptNodeResourceResponse> out = new ArrayList<>(materials);
+        out.addAll(sessions);
+        return out.size() > MAX_NODE_RESOURCES ? out.subList(0, MAX_NODE_RESOURCES) : out;
+    }
+
+    private static FptNodeResourceResponse toResource(FptSubjectResource r) {
+        return FptNodeResourceResponse.builder()
+                .subjectCode(r.getSubjectCode())
+                .kind(r.getKind().name())
+                .title(r.getTitle())
+                .url(r.getUrl())
+                .topic(r.getTopic())
+                .build();
+    }
+}

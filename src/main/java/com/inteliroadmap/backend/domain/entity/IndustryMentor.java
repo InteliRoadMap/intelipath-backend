@@ -1,6 +1,9 @@
 package com.inteliroadmap.backend.domain.entity;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -17,13 +20,8 @@ import java.util.UUID;
 public class IndustryMentor {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "mentor_id")
-    private UUID mentorId;
-
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false, unique = true, foreignKey = @ForeignKey(name = "fk_im_user"))
-    private User user;
+    @Column(name = "user_id")
+    private UUID userId;
 
     @Column(name = "company")
     private String company;
@@ -31,3 +29,4 @@ public class IndustryMentor {
     @Column(name = "industry_focus")
     private String industryFocus;
 }
+

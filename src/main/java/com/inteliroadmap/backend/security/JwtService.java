@@ -1,7 +1,11 @@
 package com.inteliroadmap.backend.security;
 
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
-import io.jsonwebtoken.*;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
+import io.jsonwebtoken.Jws;
+import io.jsonwebtoken.JwtException;
+import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
 import lombok.Getter;
 import lombok.extern.slf4j.Slf4j;
@@ -9,6 +13,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
 import java.util.Date;
 
 @Component
@@ -19,10 +24,13 @@ public class JwtService {
     @Value("${JWT_SECRET}")
     private String secretKey;
 
-    @Value("${JWT_ACCESS_EXPIRATION}")
+    // Short-lived access token (default 15 minutes) keeps the blast radius of a
+    // leaked/necessarily-revoked token small, since access tokens are stateless.
+    @Value("${JWT_ACCESS_EXPIRATION:900000}")
     private long accessExpiration;
 
-    @Value("${JWT_REFRESH_EXPIRATION}")
+    // Refresh token default 7 days; it is DB-backed and revocable.
+    @Value("${JWT_REFRESH_EXPIRATION:604800000}")
     private long refreshExpiration;
 
     /**
@@ -32,7 +40,7 @@ public class JwtService {
      * @return JWT access token
      */
     public String generateAccessToken(String email, String role) {
-        log.debug("Generating access token for: {}", email);
+        log.debug("JwtService: Generating access token for: {}", email);
 
         try {
             return Jwts.builder()
@@ -40,10 +48,10 @@ public class JwtService {
                     .claim("role", role)
                     .issuedAt(new Date())
                     .expiration(new Date(System.currentTimeMillis() + accessExpiration))
-                    .signWith(getSigningKey())
+                    .signWith(getSigningKey(), Jwts.SIG.HS256)
                     .compact();
         } catch (Exception e) {
-            log.error("Error generating access token: {}", e.getMessage());
+            log.error("JwtService: Error generating access token: {}", e.getMessage());
             throw new RuntimeException("Failed to generate access token", e);
         }
     }
@@ -55,16 +63,16 @@ public class JwtService {
      */
     public String generateRefreshToken(String email) {
 
-        log.debug("Generating refresh token for: {}", email);
+        log.debug("JwtService: Generating refresh token for: {}", email);
         try {
             return Jwts.builder()
                     .subject(email)
                     .issuedAt(new Date())
                     .expiration(new Date(System.currentTimeMillis() + refreshExpiration))
-                    .signWith(getSigningKey())
+                    .signWith(getSigningKey(), Jwts.SIG.HS256)
                     .compact();
         } catch (Exception e) {
-            log.error("Error generating refresh token: {}", e.getMessage());
+            log.error("JwtService: Error generating refresh token: {}", e.getMessage());
             throw new RuntimeException("Failed to generate refresh token", e);
         }
     }
@@ -80,10 +88,10 @@ public class JwtService {
             getClaims(token);
             return true;
         } catch (ExpiredJwtException e) {
-            log.warn("Token expired");
+            log.warn("JwtService: Token expired");
             return false;
         } catch (JwtException e) {
-            log.warn("Token invalid");
+            log.warn("JwtService: Token invalid");
             return false;
         }
     }
@@ -98,7 +106,7 @@ public class JwtService {
         try {
             return getClaims(token).getSubject();
         } catch (Exception e) {
-            log.warn("Cannot extract email");
+            log.warn("JwtService: Cannot extract email");
             return null;
         }
     }
@@ -113,7 +121,7 @@ public class JwtService {
         try {
             return getClaims(token).get("role", String.class);
         } catch (Exception e) {
-            log.warn("Cannot extract role");
+            log.warn("JwtService: Cannot extract role");
             return null;
         }
     }
@@ -125,11 +133,18 @@ public class JwtService {
      * @return claims payload
      */
     private Claims getClaims(String token) {
-        return Jwts.parser()
+        Jws<Claims> jws = Jwts.parser()
                 .verifyWith(getSigningKey())
                 .build()
-                .parseSignedClaims(token)
-                .getPayload();
+                .parseSignedClaims(token);
+        // Defence-in-depth: never trust the client-supplied header algorithm.
+        // Only HS256-signed tokens are accepted, so a downgrade or algorithm-swap
+        // header can never route verification down an unexpected path.
+        String alg = jws.getHeader().getAlgorithm();
+        if (!Jwts.SIG.HS256.getId().equals(alg)) {
+            throw new JwtException("Unexpected JWT algorithm: " + alg);
+        }
+        return jws.getPayload();
     }
 
     /**
@@ -139,7 +154,7 @@ public class JwtService {
      */
     private SecretKey getSigningKey() {
         return Keys.hmacShaKeyFor(
-                secretKey.getBytes()
+                secretKey.getBytes(StandardCharsets.UTF_8)
         );
     }
 

@@ -5,6 +5,25 @@ spring:
   profiles:
     active: prod
 
+  servlet:
+    multipart:
+      # Container-level guardrail: reject oversized uploads before they reach the
+      # controllers. Per-endpoint type/size checks live in FileValidationUtil.
+      max-file-size: 10MB
+      max-request-size: 30MB
+
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${GOOGLE_EMAIL_USERNAME}
+    password: ${GOOGLE_EMAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}
@@ -22,17 +41,10 @@ spring:
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: none
     properties:
       hibernate:
         format_sql: true
-
-  flyway:
-    enabled: true
-    baseline-on-migrate: true
-    baseline-version: 0
-    connect-retries: 10
-    connect-retries-interval: 5s
 
   security:
     oauth2:
@@ -51,12 +63,73 @@ spring:
               - user:email
               - read:user
 
-jwt:
-  secret: ${JWT_SECRET}
-  expiration: ${JWT_EXPIRATION:86400000}
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY}
+      chat:
+        options:
+          model: ${OPENAI_MODEL}
+          # Lower = more consistent/deterministic answers (good for analysis).
+          # Raise toward 0.7 for more creative replies. Tune here.
+          temperature: ${OPENAI_TEMPERATURE:0.3}
+    vectorstore:
+      pgvector:
+        initialize-schema: true
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+        dimensions: 1536
+    mcp:
+      client:
+        enabled: ${MCP_DOCUMENT_SERVICE_ENABLED:false}
+        initialized: ${MCP_DOCUMENT_SERVICE_ENABLED:false}
+        request-timeout: ${MCP_DOCUMENT_SERVICE_TIMEOUT:60s}
+        streamable-http:
+          connections:
+            document-tools:
+              # Spring's Streamable-HTTP client appends its MCP endpoint path (/mcp).
+              url: ${MCP_DOCUMENT_SERVICE_URL:http://localhost:8000}
+
+supabase:
+  url: ${SUPABASE_URL}
+  key: ${SUPABASE_KEY}
 
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
   api-docs:
     path: /v3/api-docs
+
+ai-service:
+  base-url: ${AI_SERVICE_BASE_URL:http://localhost:8000}
+  api-key: ${AI_SERVICE_API_KEY:}
+  connect-timeout: ${AI_SERVICE_CONNECT_TIMEOUT:5s}
+  read-timeout: ${AI_SERVICE_READ_TIMEOUT:300s}
+
+mentor:
+  # RAG retrieval embeds every message and queries the vector store, adding
+  # latency. Set false to skip it and make chat noticeably faster when you are
+  # not using ingested knowledge. Tune here.
+  rag-enabled: ${MENTOR_RAG_ENABLED:true}
+
+# Credentials for the seeded dev accounts. Supplied from .env, never defaulted:
+# a password in the repo is a password everyone with repo access knows. Leave a
+# pair unset and that account seeds without a local credential (OAuth only).
+seed:
+  admin:
+    username: ${SEED_ADMIN_USERNAME:}
+    password: ${SEED_ADMIN_PASSWORD:}
+  counselor:
+    username: ${SEED_COUNSELOR_USERNAME:}
+    password: ${SEED_COUNSELOR_PASSWORD:}
+  student:
+    username: ${SEED_STUDENT_USERNAME:}
+    password: ${SEED_STUDENT_PASSWORD:}
+  mentor:
+    password: ${SEED_MENTOR_PASSWORD:}
+    username: ${SEED_MENTOR_USERNAME:}
+
+roadmap:
+  # A topic (spine) node auto-completes once this fraction of its child sub-skills'
+  # weight is COMPLETED (0.6 = 60%). Children unlock as soon as the topic is reached,
+  # and the student never marks a topic manually. Tune here.
+  parent-completion-threshold: ${ROADMAP_PARENT_COMPLETION_THRESHOLD:0.6}

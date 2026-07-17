@@ -1,5 +1,6 @@
 package com.inteliroadmap.backend.domain.dto.response.student;
 
+import com.inteliroadmap.backend.domain.enums.ImportanceLevel;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -16,5 +17,6 @@ public class SkillGapItemResponse {
     private String type;
     private String title;
     private String description;
-    private String severity;
+    private ImportanceLevel severity;
+    private Integer progress;
 }

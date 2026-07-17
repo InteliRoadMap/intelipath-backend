@@ -1,11 +1,12 @@
 package com.inteliroadmap.backend.services;
 
 import com.inteliroadmap.backend.domain.dto.request.ImportSkillsRequest;
+import com.inteliroadmap.backend.domain.entity.CareerRole;
 import com.inteliroadmap.backend.domain.entity.Skill;
 import com.inteliroadmap.backend.domain.entity.Student;
 import com.inteliroadmap.backend.domain.entity.StudentSkill;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
-import com.inteliroadmap.backend.helper.AuthenticatedStudentHelper;
+import com.inteliroadmap.backend.services.AuthenticatedStudentService;
 import com.inteliroadmap.backend.mappers.SkillMapper;
 import com.inteliroadmap.backend.repositories.CareerRequiredSkillRepository;
 import com.inteliroadmap.backend.repositories.CareerRoleRepository;
@@ -19,6 +20,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -42,34 +44,35 @@ class SkillServiceTest {
     @Mock
     private CareerRequiredSkillRepository careerRequiredSkillRepository;
     @Mock
-    private AuthenticatedStudentHelper authenticatedStudentHelper;
+    private AuthenticatedStudentService authenticatedStudentService;
 
     private SkillService skillService;
 
     @BeforeEach
     void setUp() {
-        skillService = new SkillService(
+        skillService = new com.inteliroadmap.backend.services.impl.SkillServiceImpl(
                 skillRepository,
                 studentSkillRepository,
                 careerRoleRepository,
                 careerRequiredSkillRepository,
-                authenticatedStudentHelper,
-                new SkillMapper()
+                authenticatedStudentService,
+                new SkillMapper(skillRepository)
         );
     }
 
     @Test
     void importStudentSkillsSavesUniqueNewSkills() {
-        Student student = Student.builder().studentId(UUID.randomUUID()).build();
+        Student student = Student.builder().userId(UUID.randomUUID()).build();
         Skill skill = skill("Java");
         ImportSkillsRequest request = request(skill.getSkillId(), skill.getSkillId());
 
-        when(authenticatedStudentHelper.getOrCreateStudentForUpdate()).thenReturn(student);
+        when(authenticatedStudentService.getOrCreateStudentForUpdate()).thenReturn(student);
         when(skillRepository.findAllById(anySet())).thenReturn(List.of(skill));
-        when(studentSkillRepository.findByStudentAndSkill_SkillIdIn(student, List.of(skill.getSkillId())))
+        when(studentSkillRepository.findByStudent_UserIdAndSkill_SkillIdIn(student.getUserId(), List.of(skill.getSkillId())))
                 .thenReturn(List.of());
-        when(studentSkillRepository.findByStudent(student))
+        when(studentSkillRepository.findByStudent_UserId(student.getUserId()))
                 .thenReturn(List.of(StudentSkill.builder().student(student).skill(skill).build()));
+        when(skillRepository.findById(skill.getSkillId())).thenReturn(Optional.of(skill));
 
         var response = skillService.importStudentSkills(request);
 
@@ -82,15 +85,16 @@ class SkillServiceTest {
 
     @Test
     void importStudentSkillsDoesNotInsertExistingSkill() {
-        Student student = Student.builder().studentId(UUID.randomUUID()).build();
+        Student student = Student.builder().userId(UUID.randomUUID()).build();
         Skill skill = skill("Java");
         StudentSkill existing = StudentSkill.builder().student(student).skill(skill).build();
 
-        when(authenticatedStudentHelper.getOrCreateStudentForUpdate()).thenReturn(student);
+        when(authenticatedStudentService.getOrCreateStudentForUpdate()).thenReturn(student);
         when(skillRepository.findAllById(anySet())).thenReturn(List.of(skill));
-        when(studentSkillRepository.findByStudentAndSkill_SkillIdIn(student, List.of(skill.getSkillId())))
+        when(studentSkillRepository.findByStudent_UserIdAndSkill_SkillIdIn(student.getUserId(), List.of(skill.getSkillId())))
                 .thenReturn(List.of(existing));
-        when(studentSkillRepository.findByStudent(student)).thenReturn(List.of(existing));
+        when(studentSkillRepository.findByStudent_UserId(student.getUserId())).thenReturn(List.of(existing));
+        when(skillRepository.findById(skill.getSkillId())).thenReturn(Optional.of(skill));
 
         var response = skillService.importStudentSkills(request(skill.getSkillId()));
 
@@ -101,12 +105,12 @@ class SkillServiceTest {
 
     @Test
     void importStudentSkillsRejectsEntireRequestWhenSkillIsMissing() {
-        Student student = Student.builder().studentId(UUID.randomUUID()).build();
+        Student student = Student.builder().userId(UUID.randomUUID()).build();
         Skill skill = skill("Java");
         UUID missingSkillId = UUID.randomUUID();
         ImportSkillsRequest request = request(skill.getSkillId(), missingSkillId);
 
-        when(authenticatedStudentHelper.getOrCreateStudentForUpdate()).thenReturn(student);
+        when(authenticatedStudentService.getOrCreateStudentForUpdate()).thenReturn(student);
         when(skillRepository.findAllById(anySet())).thenReturn(List.of(skill));
 
         assertThrows(ResourceNotFoundException.class, () -> skillService.importStudentSkills(request));
@@ -115,14 +119,15 @@ class SkillServiceTest {
 
     @Test
     void getStudentSkillsReturnsSelectedAndAllAvailableSkills() {
-        Student student = Student.builder().studentId(UUID.randomUUID()).build();
+        Student student = Student.builder().userId(UUID.randomUUID()).careerRole(CareerRole.builder().build()).build();
         Skill selectedSkill = skill("Java");
         Skill availableSkill = skill("Python");
         StudentSkill selected = StudentSkill.builder().student(student).skill(selectedSkill).build();
 
-        when(authenticatedStudentHelper.getOrCreateStudent()).thenReturn(student);
-        when(studentSkillRepository.findByStudent(student)).thenReturn(List.of(selected));
+        when(authenticatedStudentService.getOrCreateStudent()).thenReturn(student);
+        when(studentSkillRepository.findByStudent_UserId(student.getUserId())).thenReturn(List.of(selected));
         when(skillRepository.findAll()).thenReturn(List.of(selectedSkill, availableSkill));
+        when(skillRepository.findById(selectedSkill.getSkillId())).thenReturn(Optional.of(selectedSkill));
 
         var response = skillService.getStudentSkills();
 
@@ -133,11 +138,11 @@ class SkillServiceTest {
 
     @Test
     void getStudentSkillsReturnsEmptySelectedSkillsWhenStudentHasNone() {
-        Student student = Student.builder().studentId(UUID.randomUUID()).build();
+        Student student = Student.builder().userId(UUID.randomUUID()).careerRole(CareerRole.builder().build()).build();
         Skill availableSkill = skill("Java");
 
-        when(authenticatedStudentHelper.getOrCreateStudent()).thenReturn(student);
-        when(studentSkillRepository.findByStudent(student)).thenReturn(List.of());
+        when(authenticatedStudentService.getOrCreateStudent()).thenReturn(student);
+        when(studentSkillRepository.findByStudent_UserId(student.getUserId())).thenReturn(List.of());
         when(skillRepository.findAll()).thenReturn(List.of(availableSkill));
 
         var response = skillService.getStudentSkills();
@@ -168,7 +173,7 @@ class SkillServiceTest {
         assertAllListsNotNull(response);
     }
 
-    private void assertAllListsNotNull(com.inteliroadmap.backend.domain.dto.response.SkillResponse response) {
+    private void assertAllListsNotNull(com.inteliroadmap.backend.domain.dto.response.roadmap.SkillResponse response) {
         assertNotNull(response.getSelectedSkills());
         assertNotNull(response.getSkills());
         assertNotNull(response.getRequiredSkills());
@@ -186,7 +191,6 @@ class SkillServiceTest {
                 .skillId(UUID.randomUUID())
                 .skillName(name)
                 .category("Backend")
-                .career("Software Developer")
                 .build();
     }
 }

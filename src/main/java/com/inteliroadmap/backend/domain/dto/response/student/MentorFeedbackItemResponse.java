@@ -5,7 +5,6 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
-import java.time.LocalDateTime;
 import java.util.UUID;
 
 @Data
@@ -15,6 +14,7 @@ import java.util.UUID;
 public class MentorFeedbackItemResponse {
     private UUID id;
     private String name;
-    private LocalDateTime time;
+    private String time;
     private String text;
+    private boolean read;
 }

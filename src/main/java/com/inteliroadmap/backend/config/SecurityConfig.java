@@ -1,9 +1,10 @@
 package com.inteliroadmap.backend.config;
 
-//import com.inteliroadmap.backend.security.JwtAuthenticationFilter;
 import com.inteliroadmap.backend.security.OAuth2AuthenticationFailureHandler;
 import com.inteliroadmap.backend.security.OAuth2AuthenticationSuccessHandler;
+import com.inteliroadmap.backend.security.HttpCookieOAuth2AuthorizationRequestRepository;
 import com.inteliroadmap.backend.security.JwtAuthenticationFilter;
+import com.inteliroadmap.backend.services.impl.OAuth2UserServiceImpl;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -11,6 +12,7 @@ import org.springframework.http.HttpMethod;
 import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -19,13 +21,26 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
-    private final com.inteliroadmap.backend.services.OAuth2UserService oAuth2UserService;
+    private final OAuth2UserServiceImpl oAuth2UserService;
     private final OAuth2AuthenticationSuccessHandler oAuth2AuthenticationSuccessHandler;
     private final OAuth2AuthenticationFailureHandler oAuth2AuthenticationFailureHandler;
+    private final HttpCookieOAuth2AuthorizationRequestRepository httpCookieOAuth2AuthorizationRequestRepository;
+
+    /**
+     * Hashes local credentials for counselor-provisioned FPT accounts. No
+     * AuthenticationManager/UserDetailsService is declared on purpose: AuthServiceImpl
+     * verifies the password itself and mints a JWT, matching the stateless flow the
+     * OAuth path already uses.
+     */
+    @Bean
+    public PasswordEncoder passwordEncoder() {
+        return new BCryptPasswordEncoder();
+    }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -40,9 +55,12 @@ public class SecurityConfig {
                         // ============================================================
                         // PUBLIC ENDPOINTS - No authentication required
                         // ============================================================
+                        .dispatcherTypeMatchers(jakarta.servlet.DispatcherType.ASYNC).permitAll()
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                         .requestMatchers(
                                 "/api/v1/auth/**",
+                                "/api/v1/public/**",
+                                "/api/v1/public-portfolio/**",
                                 "/oauth2/**",
                                 "/login/oauth2/**"
                         ).permitAll()
@@ -57,53 +75,16 @@ public class SecurityConfig {
                         ).permitAll()
 
                         // ============================================================
-                        // STUDENT ENDPOINTS - Role: STUDENT
-                        // Sprint 2: Profile & Assessment
-                        // ============================================================
-                        .requestMatchers("/api/v1/student/**").hasRole("STUDENT")
-
-                        // ============================================================
-                        // ROADMAP ENDPOINTS - Role: STUDENT
-                        // Sprint 3: Roadmap
-                        // ============================================================
-                         .requestMatchers("/api/v1/roadmap/**").hasRole("STUDENT")
-                         .requestMatchers(HttpMethod.GET, "/roadmap/**").hasRole("STUDENT")
-                         .requestMatchers(HttpMethod.PUT, "/roadmap/**").hasRole("STUDENT")
-
-                        // ============================================================
-                        // AI CHAT ENDPOINTS - Role: STUDENT
-                        // Sprint 4: AI Virtual Mentor
-                        // ============================================================
-                        // .requestMatchers(HttpMethod.POST, "/chat/**").hasRole("STUDENT")
-                        // .requestMatchers(HttpMethod.GET, "/chat/**").hasRole("STUDENT")
-
-                        // ============================================================
-                        // PORTFOLIO ENDPOINTS - Role: STUDENT
-                        // Sprint 4: E-Portfolio
-                        // ============================================================
-                        // .requestMatchers(HttpMethod.POST, "/portfolio/**").hasRole("STUDENT")
-                        // .requestMatchers(HttpMethod.GET, "/portfolio/**").hasRole("STUDENT")
-
-                        // ============================================================
-                        // COUNSELOR ENDPOINTS - Role: COUNSELOR
-                        // Sprint 5: Counselor Dashboard
-                        // ============================================================
-                        // .requestMatchers(HttpMethod.GET, "/counselor/**").hasRole("COUNSELOR")
-                        // .requestMatchers(HttpMethod.POST, "/feedback/**").hasRole("COUNSELOR")
-
-                        // ============================================================
-                        // MARKET PULSE ENDPOINTS - Role: STUDENT, COUNSELOR
-                        // Sprint 5: Market Pulse
-                        // ============================================================
-                        // .requestMatchers(HttpMethod.GET, "/market/**")
-                        //     .hasAnyRole("STUDENT", "COUNSELOR")
-
-                        // ============================================================
                         // All other endpoints require authentication
+                        // Controller-level @PreAuthorize will handle specific role checks
                         // ============================================================
                         .anyRequest().authenticated()
                 )
                 .oauth2Login(oauth2 -> oauth2
+                        .authorizationEndpoint(authorization -> authorization
+                                .baseUri("/oauth2/authorization")
+                                .authorizationRequestRepository(httpCookieOAuth2AuthorizationRequestRepository)
+                        )
                         .userInfoEndpoint(userInfo -> userInfo
                                 .userService(oAuth2UserService)
                         )
@@ -116,15 +97,5 @@ public class SecurityConfig {
                 );
 
         return http.build();
-    }
-
-    /**
-     * Password Encoder - BCrypt
-     * Used to encode and verify passwords
-     * @return BCryptPasswordEncoder
-     */
-    @Bean
-    public PasswordEncoder passwordEncoder() {
-        return new BCryptPasswordEncoder();
     }
 }

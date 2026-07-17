@@ -1,6 +1,6 @@
 package com.inteliroadmap.backend.controllers;
 
-import com.inteliroadmap.backend.domain.dto.response.CareerResponse;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.CareerResponse;
 import com.inteliroadmap.backend.services.CareerService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -24,7 +24,7 @@ import java.util.UUID;
  * Provides functionality to fetch available career roles and their specific skill requirements.
  */
 @RestController
-@RequestMapping("/careers")
+@RequestMapping("/api/v1/careers")
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Career services", description = "Career endpoints")
@@ -52,12 +52,16 @@ public class CareerController {
                     )
             ),
             @ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized or invalid access token"
+            ),
+            @ApiResponse(
                     responseCode = "404",
                     description = "No Career role available"
             )
     })
     public ResponseEntity<List<CareerResponse>> getAllCareers() {
-        log.info("Fetching all career roles");
+        log.info("CareerController: Fetching all career roles");
         // Delegate to CareerService to retrieve all available careers
         return ResponseEntity.ok(careerService.getAllCareers());
     }
@@ -83,12 +87,16 @@ public class CareerController {
                     )
             ),
             @ApiResponse(
+                    responseCode = "401",
+                    description = "Unauthorized or invalid access token"
+            ),
+            @ApiResponse(
                     responseCode = "404",
                     description = "No Career requirement available"
             )
     })
     public ResponseEntity<CareerResponse> getCareerRequirements(@PathVariable("career_id") UUID careerId) {
-        log.info("Fetching requirements for career role: {}", careerId);
+        log.info("CareerController: Fetching requirements for career role: {}", careerId);
         // Delegate to CareerService to fetch skill node requirements for the specified career
         return ResponseEntity.ok(careerService.getCareerRequirements(careerId));
     }

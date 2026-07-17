@@ -4,6 +4,7 @@ import com.inteliroadmap.backend.domain.entity.RefreshToken;
 import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.repositories.RefreshTokenRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
+import com.inteliroadmap.backend.utils.CookieUtils;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
@@ -32,6 +33,8 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
     private final JwtService jwtService;
     private final RefreshTokenRepository refreshTokenRepository;
     private final UserRepository userRepository;
+    private final HttpCookieOAuth2AuthorizationRequestRepository httpCookieOAuth2AuthorizationRequestRepository;
+    private final AuthenticationCookieService authenticationCookieService;
 
     @Value("${AUTHORIZED_REDIRECT_URI}")
     private String authorizedRedirectUri;
@@ -43,12 +46,18 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         String targetUrl = determineTargetUrl(request, response, authentication);
 
         if (response.isCommitted()) {
-            log.debug("Response has already been committed. Unable to redirect to {}", targetUrl);
+            log.debug("OAuth2AuthenticationSuccessHandler: Response has already been committed. Unable to redirect to {}", targetUrl);
             return;
         }
 
-        log.info("Authentication success for user: {}", email);
+        log.info("OAuth2AuthenticationSuccessHandler: Authentication success for user: {}", email);
+        clearAuthenticationAttributes(request, response);
         getRedirectStrategy().sendRedirect(request, response, targetUrl);
+    }
+
+    protected void clearAuthenticationAttributes(HttpServletRequest request, HttpServletResponse response) {
+        super.clearAuthenticationAttributes(request);
+        httpCookieOAuth2AuthorizationRequestRepository.removeAuthorizationRequestCookies(request, response);
     }
 
     /**
@@ -64,7 +73,7 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         String email = oauth2User.getEmail();
         String role = oauth2User.getRole();
 
-        log.info("Generating tokens for OAuth2 user: {}", email);
+        log.info("OAuth2AuthenticationSuccessHandler: Generating tokens for OAuth2 user: {}", email);
 
         // Generate tokens
         String accessToken = jwtService.generateAccessToken(email, role);
@@ -74,16 +83,19 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
         User user = userRepository.findByEmail(email);
         if (user != null) {
             RefreshToken token = RefreshToken.builder()
-                    .token(refreshToken)
-                    .user(user)
-                    .expireAt(LocalDateTime.now().plus(Duration.ofMillis(jwtService.getRefreshExpiration())))
+                    .token(TokenHashUtil.sha256Hex(refreshToken))
+                    .user(User.builder().userId(user.getUserId()).build())
+                    .expiredAt(LocalDateTime.now().plus(Duration.ofMillis(jwtService.getRefreshExpiration())))
                     .build();
             refreshTokenRepository.save(token);
         }
 
+        // Keep accessToken available to the callback page for OAuth login,
+        // but store refreshToken only in an HttpOnly cookie.
+        CookieUtils.addNonHttpOnlyCookie(response, "token", accessToken, 60);
+        authenticationCookieService.addRefreshTokenCookie(response, refreshToken);
+
         return UriComponentsBuilder.fromUriString(authorizedRedirectUri)
-                .queryParam("token", accessToken)
-                .queryParam("refreshToken", refreshToken)
                 .build().toUriString();
     }
 }

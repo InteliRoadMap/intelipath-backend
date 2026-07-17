@@ -1,6 +1,16 @@
 package com.inteliroadmap.backend.domain.entity;
 
-import jakarta.persistence.*;
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.ForeignKey;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -21,12 +31,18 @@ public class StudentSkill {
     @Column(name = "student_skill_id")
     private UUID studentSkillId;
 
+    @JsonIgnore
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "student_id", nullable = false, foreignKey = @ForeignKey(name = "fk_ss_student"))
-    @com.fasterxml.jackson.annotation.JsonIgnore
+    @JoinColumn(name = "user_id", nullable = false, foreignKey = @ForeignKey(name = "fk_ss_student"))
     private Student student;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "skill_id", nullable = false, foreignKey = @ForeignKey(name = "fk_ss_skill"))
     private Skill skill;
+
+    @Column(name = "custom_description", columnDefinition = "TEXT")
+    private String customDescription;
+
+    @Column(name = "tech_stack")
+    private String techStack;
 }

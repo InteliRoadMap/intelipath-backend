@@ -9,5 +9,5 @@ import java.util.UUID;
 
 @Repository
 public interface SkillTrendRepository extends JpaRepository<SkillTrend, UUID> {
-    List<SkillTrend> findBySkill_SkillIdInOrderByWeekStackAsc(List<UUID> skillIds);
+    List<SkillTrend> findBySkill_SkillIdInOrderByWeekStampAsc(List<UUID> skillIds);
 }

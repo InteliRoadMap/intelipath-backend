@@ -1,6 +1,9 @@
 package com.inteliroadmap.backend.domain.entity;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
@@ -18,20 +21,13 @@ import java.util.UUID;
 public class AcademicCounselor {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.UUID)
-    @Column(name = "counselor_id")
-    private UUID counselorId;
-
-    @OneToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "user_id", nullable = false, unique = true, foreignKey = @ForeignKey(name = "fk_ac_user"))
-    private User user;
-
-    @Column(name = "university")
-    private String university;
+    @Column(name = "user_id")
+    private UUID userId;
 
     @Column(name = "department")
     private String department;
 
-    @Column(name = "year_of_admission")
-    private LocalDate yearOfAdmission;
+    @Column(name = "admission_date")
+    private LocalDate admissionDate;
 }
+
