@@ -17,7 +17,7 @@ public class StudentResponse {
     private UUID id;
     private String fullName;
     private String email;
-    private LocalDate yob;
+    private Integer yob;
     private String bio;
     private String university;
     private String universityName;

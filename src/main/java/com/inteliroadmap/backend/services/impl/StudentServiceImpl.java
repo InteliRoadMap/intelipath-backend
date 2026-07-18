@@ -14,7 +14,6 @@ import com.inteliroadmap.backend.domain.entity.Student;
 import com.inteliroadmap.backend.domain.entity.StudentProgress;
 import com.inteliroadmap.backend.domain.entity.StudentSkill;
 import com.inteliroadmap.backend.domain.entity.User;
-import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.services.AuthenticatedStudentService;
 import com.inteliroadmap.backend.services.DocumentIngestionService;
@@ -42,7 +41,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -129,7 +127,7 @@ public class StudentServiceImpl implements StudentService {
             userChanged = true;
         }
         if (request.getYob() != null && !request.getYob().trim().isEmpty()) {
-            user.setYob(LocalDate.parse(request.getYob()));
+            user.setYob(Integer.parseInt(request.getYob().trim()));
             userChanged = true;
         }
 

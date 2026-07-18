@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS users (
     -- BCrypt hash; NULL for OAuth accounts, which have no local credential.
     password_hash   VARCHAR(100),
     full_name       VARCHAR(255),
-    yob             DATE,
+    yob             INT,
     bio             TEXT,
     avatar_url      TEXT,
     created_at      TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -55,8 +55,7 @@ CREATE TABLE IF NOT EXISTS students (
     user_id             UUID PRIMARY KEY,
     career_id           UUID,
     -- Free text, display only. FPT material access is decided by users.account_type.
-    university_name      VARCHAR(255),
-    -- A full date, not a year: the counselor enters it from the admission record.
+    university_name     VARCHAR(255),
     admission_date      DATE,
     major               VARCHAR(255),
     github_profile      VARCHAR(255),
@@ -71,6 +70,7 @@ CREATE TABLE IF NOT EXISTS students (
 
 CREATE TABLE IF NOT EXISTS academic_counselor (
     user_id             UUID PRIMARY KEY,
+    university_name     VARCHAR(255),
     department          VARCHAR(255),
     admission_date      DATE,
     CONSTRAINT fk_ac_user

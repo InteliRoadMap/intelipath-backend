@@ -36,7 +36,6 @@ public class Student {
     @Column(name = "university_name")
     private String universityName;
 
-    /** The day the student was admitted, as the counselor entered it from the record. */
     @Column(name = "admission_date")
     private LocalDate admissionDate;
 

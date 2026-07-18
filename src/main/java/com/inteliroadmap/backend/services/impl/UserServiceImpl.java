@@ -105,7 +105,7 @@ public class UserServiceImpl implements UserService {
             user.setFullName(request.getFullName());
         }
         if (request.getYob() != null && !request.getYob().trim().isEmpty()) {
-            user.setYob(LocalDate.parse(request.getYob()));
+            user.setYob(Integer.parseInt(request.getYob()));
         }
         if (request.getBio() != null) {
             user.setBio(request.getBio());

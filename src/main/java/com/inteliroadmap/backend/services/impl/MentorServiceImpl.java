@@ -162,7 +162,7 @@ public class MentorServiceImpl implements MentorService {
             User studentUser = userRepository.findById(req.getStudent().getUserId()).orElse(null);
             
             String name = studentUser != null ? studentUser.getFullName() : "Unknown";
-            String yob = studentUser != null && studentUser.getYob() != null ? String.valueOf(studentUser.getYob().getYear()) : "Unknown";
+            String yob = studentUser != null && studentUser.getYob() != null ? String.valueOf(studentUser.getYob()) : "Unknown";
             String university = student != null && student.getUniversityName() != null ? student.getUniversityName() : "Unknown";
             String career = student != null && student.getCareerRole() != null ? student.getCareerRole().getCareerName() : "Unknown";
 

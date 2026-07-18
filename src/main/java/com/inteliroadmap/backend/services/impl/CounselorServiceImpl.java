@@ -2,28 +2,22 @@ package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.components.RoadmapProgressCalculator;
 import com.inteliroadmap.backend.domain.dto.request.ExportStudentListRequest;
+import com.inteliroadmap.backend.domain.dto.request.ImportStudentAccountsRequest;
 import com.inteliroadmap.backend.domain.dto.request.UpdateProfileRequest;
-import com.inteliroadmap.backend.domain.dto.response.counselor.CounselorResponse;
+import com.inteliroadmap.backend.domain.dto.response.counselor.CounselorDashboardResponse;
+import com.inteliroadmap.backend.domain.dto.response.counselor.CounselorFeedbackResponse;
+import com.inteliroadmap.backend.domain.dto.response.counselor.CurriculumResponse;
+import com.inteliroadmap.backend.domain.entity.*;
 import com.inteliroadmap.backend.domain.projection.StudentInfoProjection;
 import com.inteliroadmap.backend.domain.dto.response.student.UpdateProfileResponse;
-import com.inteliroadmap.backend.domain.entity.AcademicCounselor;
-import com.inteliroadmap.backend.domain.entity.CareerRole;
-import com.inteliroadmap.backend.domain.entity.Feedback;
-import com.inteliroadmap.backend.domain.entity.Student;
 import com.inteliroadmap.backend.domain.enums.AccountType;
-import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.exceptions.UnauthorizedException;
+import com.inteliroadmap.backend.exceptions.BadRequestException;
 import com.inteliroadmap.backend.mappers.CounselorMapper;
-import com.inteliroadmap.backend.repositories.AcademicCounselorRepository;
-import com.inteliroadmap.backend.repositories.CareerRoleRepository;
-import com.inteliroadmap.backend.repositories.FeedbackRepository;
-import com.inteliroadmap.backend.repositories.SkillNodeRepository;
-import com.inteliroadmap.backend.repositories.StudentProgressRepository;
-import com.inteliroadmap.backend.repositories.StudentRepository;
-import com.inteliroadmap.backend.repositories.StudentSkillRepository;
-import com.inteliroadmap.backend.repositories.UserRepository;
+import com.inteliroadmap.backend.repositories.*;
 import com.inteliroadmap.backend.services.CounselorService;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -65,6 +59,8 @@ public class CounselorServiceImpl implements CounselorService {
     private final StudentRepository studentRepository;
     private final AcademicCounselorRepository academicCounselorRepository;
     private final StudentSkillRepository studentSkillRepository;
+    private final FptCurriculumRepository fptCurriculumRepository;
+    private final PasswordEncoder passwordEncoder;
 
 
     /**
@@ -110,7 +106,7 @@ public class CounselorServiceImpl implements CounselorService {
      */
     @Transactional
     @Override
-    public CounselorResponse getCareerStatistics() {
+    public CounselorDashboardResponse getCareerStatistics() {
         log.info("CounselorServiceImpl: Get careers statistic request received");
         getAuthenticatedCounselor();
 
@@ -145,7 +141,7 @@ public class CounselorServiceImpl implements CounselorService {
      */
     @Transactional
     @Override
-    public CounselorResponse getStudentsMissingSkills(String searchName) {
+    public CounselorDashboardResponse getStudentsMissingSkills(String searchName) {
         log.info("CounselorServiceImpl: Get students skill gap of a career request received");
         getAuthenticatedCounselor();
 
@@ -188,7 +184,7 @@ public class CounselorServiceImpl implements CounselorService {
      */
     @Transactional
     @Override
-    public CounselorResponse getAllFeedbacksSentByMe() {
+    public CounselorDashboardResponse getAllFeedbacksSentByMe() {
         log.info("CounselorServiceImpl: Get feedback request received");
         // Identify the counselor and fetch all feedbacks where they are the receiver
         AcademicCounselor counselor = getAuthenticatedCounselor();
@@ -210,7 +206,7 @@ public class CounselorServiceImpl implements CounselorService {
      */
     @Transactional
     @Override
-    public CounselorResponse getStudentInfos(String search, int page, int size) {
+    public CounselorFeedbackResponse getStudentInfos(String search, int page, int size) {
         log.info("CounselorServiceImpl: Get students info request received");
         if (search == null) search = "";
 
@@ -252,7 +248,7 @@ public class CounselorServiceImpl implements CounselorService {
      */
     @Transactional
     @Override
-    public CounselorResponse getStudentStatisticAndFeedback(UUID studentId) {
+    public CounselorFeedbackResponse getStudentStatisticAndFeedback(UUID studentId) {
         log.info("CounselorServiceImpl: Getting student statistic and feedback...");
 
         AcademicCounselor counselor = getAuthenticatedCounselor();
@@ -320,6 +316,7 @@ public class CounselorServiceImpl implements CounselorService {
         if(request.getYob() != null) user.setYob(request.getYob());
         if(request.getBio() != null) user.setBio(request.getBio());
         if(request.getDepartment() != null) counselor.setDepartment(request.getDepartment());
+        if(request.getAdmissionDate() != null) counselor.setAdmissionDate(request.getAdmissionDate());
 
         user = userRepository.save(user);
         counselor = academicCounselorRepository.save(counselor);
@@ -399,6 +396,124 @@ public class CounselorServiceImpl implements CounselorService {
 
         } catch (IOException e) {
             log.error("CounselorServiceImpl: Error while exporting student list", e);
+        }
+        return null;
+    }
+
+    @Transactional
+    @Override
+    public CurriculumResponse getCurriculums() {
+        log.info("CounselorServiceImpl: Get curriculums request received");
+
+        List<String> curriculums = new ArrayList<>();
+        List<FptCurriculum> FptCurriculums = fptCurriculumRepository.findAll();
+        if (FptCurriculums.isEmpty()) throw new ResourceNotFoundException("Curriculums not found");
+        else {
+            for (FptCurriculum fptCurriculum : FptCurriculums) {
+                curriculums.add(fptCurriculum.getCode());
+            }
+        }
+        log.info("CounselorServiceImpl: Get curriculums  successfully");
+        return counselorMapper.toCurriculumResponse(curriculums);
+    }
+
+    @Transactional
+    @Override
+    public void checkStudentEmail(String email) {
+        log.info("CounselorServiceImpl: Check student email request received");
+        User user = userRepository.findByEmail(email);
+        if (user != null) throw new BadRequestException("Student email already exists");
+        log.info("CounselorServiceImpl: Student email is valid to create account");
+    }
+
+    @Transactional
+    @Override
+    public byte[] importStudentAccounts(ImportStudentAccountsRequest request) {
+        log.info("CounselorServiceImpl: Import student accounts request received");
+        AcademicCounselor counselor = getAuthenticatedCounselor();
+        User userC = userRepository.findByUserId(counselor.getUserId());
+
+        List<String[]> createdAccounts = new ArrayList<>();
+        List<ImportStudentAccountsRequest.StudentAccounts> studentAccounts = request.getAccounts();
+        for (ImportStudentAccountsRequest.StudentAccounts account: studentAccounts) {
+            User stUser = userRepository.findByEmail(account.getEmail());
+
+            FptCurriculum curriculum = fptCurriculumRepository.findByCode(account.getCurriculum()).orElse(null);
+            if (curriculum == null) throw new ResourceNotFoundException("Curriculum not found");
+
+            String username;
+
+            if (stUser != null) {
+                log.info("CounselorServiceImpl: User account for student {} found, skip importing", account.getEmail());
+                username = stUser.getUsername();
+            } else {
+                // Generate username as "Curriculum program + @ + email"
+                username = curriculum.getProgram() + "@" + account.getEmail().replaceAll("@\\s+", "");
+
+                // Generates random password from the last set of strings in UUID (12 char)
+                String randomPassword = UUID.randomUUID().toString().split("-")[4];
+
+                createdAccounts.add(new String[]{account.getFullName(), account.getEmail(), username, randomPassword});
+
+                stUser = User.builder()
+                        .username(username)
+                        .passwordHash(passwordEncoder.encode(randomPassword))
+                        .email(account.getEmail())
+                        .fullName(account.getFullName())
+                        .accountType(userC.getAccountType())
+                        .build();
+                stUser = userRepository.save(stUser);
+            }
+
+            Student student = studentRepository.findByUserId(stUser.getUserId());
+            if (student != null) log.info("CounselorServiceImpl: Student account for student {} found, skip importing", username);
+            else {
+                String uniName = counselor.getUniversityName();
+
+                student = Student.builder()
+                        .userId(stUser.getUserId())
+                        .universityName(uniName)
+                        .admissionDate(account.getAdmissionDate())
+                        .major(account.getMajor())
+                        .fptCurriculumId(curriculum.getId())
+                        .build();
+                studentRepository.save(student);
+            }
+        }
+        log.info("CounselorServiceImpl: {} Student accounts successfully imported", createdAccounts.size());
+
+        log.info("CounselorServiceImpl: Creating Student account list");
+        try (XSSFWorkbook workbook = new XSSFWorkbook()) {
+            Sheet sheet = workbook.createSheet("Student Accounts");
+
+            // Header
+            Row header = sheet.createRow(0);
+            header.createCell(0).setCellValue("Student Name");
+            header.createCell(1).setCellValue("Email");
+            header.createCell(2).setCellValue("Account Username");
+            header.createCell(3).setCellValue("Temporary Password");
+
+            // Body
+            int rowNum = 1;
+            for(String[] acc : createdAccounts) {
+                Row row = sheet.createRow(rowNum++);
+                row.createCell(0).setCellValue(acc[0]);
+                row.createCell(1).setCellValue(acc[1]);
+                row.createCell(2).setCellValue(acc[2]);
+                row.createCell(3).setCellValue(acc[3]);
+            }
+
+            // Auto size columns
+            for (int i = 0; i < 4; i++) sheet.autoSizeColumn(i);
+
+            ByteArrayOutputStream output = new ByteArrayOutputStream();
+            workbook.write(output);
+
+            log.info("CounselorServiceImpl: Student account list returned");
+            return output.toByteArray();
+
+        } catch (IOException e) {
+            log.error("CounselorServiceImpl: Error while exporting student account list", e);
         }
         return null;
     }
