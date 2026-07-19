@@ -89,6 +89,11 @@ spring:
               # Spring's Streamable-HTTP client appends its MCP endpoint path (/mcp).
               url: ${MCP_DOCUMENT_SERVICE_URL:http://localhost:8000}
 
+app:
+  # Base URL of the frontend, used to build the emailed password-reset link
+  # (FRONTEND_URL/reset-password?token=...). Override per environment via env.
+  frontend-url: ${FRONTEND_URL:http://localhost:5173}
+
 supabase:
   url: ${SUPABASE_URL}
   key: ${SUPABASE_KEY}

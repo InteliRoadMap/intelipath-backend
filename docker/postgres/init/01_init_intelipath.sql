@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS users (
     -- BCrypt hash; NULL for OAuth accounts, which have no local credential.
     password_hash   VARCHAR(100),
     full_name       VARCHAR(255),
-    yob             INT,
+    yob             DATE,
     bio             TEXT,
     avatar_url      TEXT,
     created_at      TIMESTAMP NOT NULL DEFAULT NOW(),
@@ -475,6 +475,21 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
         FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE
 );
 
+-- Password reset (magic link). Only the SHA-256 digest of the token is stored, the
+-- raw token travels once in the emailed link. used_at makes a token single-use;
+-- expires_at bounds the window (~30 min) so a leaked or scanner-prefetched link
+-- stops working quickly.
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id    UUID NOT NULL,
+    token_hash TEXT NOT NULL UNIQUE,
+    expires_at TIMESTAMP NOT NULL,
+    used_at    TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT now(),
+    CONSTRAINT fk_prt_user
+        FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS chat_sessions (
     session_id   UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id      UUID NOT NULL,
@@ -534,6 +549,7 @@ CREATE INDEX IF NOT EXISTS idx_recruitment_posts_company_id      ON recruitment_
 CREATE INDEX IF NOT EXISTS idx_recruitment_posts_recruitment_id  ON recruitment_posts (recruitment_id);
 CREATE INDEX IF NOT EXISTS idx_oauth_accounts_user_id            ON oauth_accounts (user_id);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id            ON refresh_tokens (user_id);
+CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id      ON password_reset_tokens (user_id);
 CREATE INDEX IF NOT EXISTS idx_chat_sessions_user_id             ON chat_sessions (user_id);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_session_id          ON chat_messages (session_id);
 

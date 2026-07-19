@@ -562,9 +562,9 @@ public class DatabaseSeeder implements CommandLineRunner {
         log.info("DatabaseSeeder: Seeding Mock Data (Students, Counselors, Feedbacks, Progress)...");
 
         // ---------------------------- Import Admin Account ---------------------------- //
-        User admin = userRepository.findByEmail("thanhhau2110@gmail.com");
+        User admin = userRepository.findByEmail("intelipath@gmail.com");
         if (admin == null) {
-            admin = User.builder().email("thanhhau2110@gmail.com").build();
+            admin = User.builder().email("intelipath@gmail.com").build();
         }
         admin.setFullName("intelipath");
         admin.setRole(UserRole.ADMIN);
@@ -626,7 +626,7 @@ public class DatabaseSeeder implements CommandLineRunner {
         userSt.setFullName("Dang Phuoc Vinh");
         // A plausible undergraduate age: at 10 the profile form rightly rejects every
         // admission date, which made the seed account untestable.
-        userSt.setYob(LocalDate.now().getYear() - 20);
+        userSt.setYob(LocalDate.now().minusYears(20));
         userSt.setRole(UserRole.STUDENT);
         // Stands in for a counselor-provisioned FPT student: local credential + FPT material.
         userSt.setAccountType(AccountType.FPT);

@@ -12,7 +12,7 @@ public class UpdateProfileRequest {
 
     private LocalDate admissionDate;
 
-    private Integer yob;
+    private LocalDate yob;
 
     @Size(max = 2000, message = "Bio must not exceed 2000 characters")
     private String bio;

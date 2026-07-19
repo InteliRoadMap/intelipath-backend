@@ -2,27 +2,34 @@ package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.domain.dto.request.LoginRequest;
 import com.inteliroadmap.backend.domain.dto.response.auth.RefreshResponse;
+import com.inteliroadmap.backend.domain.entity.PasswordResetToken;
 import com.inteliroadmap.backend.domain.entity.RefreshToken;
 import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.domain.enums.UserStatus;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.exceptions.UnauthorizedException;
+import com.inteliroadmap.backend.repositories.PasswordResetTokenRepository;
 import com.inteliroadmap.backend.repositories.RefreshTokenRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.security.JwtService;
 import com.inteliroadmap.backend.security.TokenHashUtil;
 import com.inteliroadmap.backend.services.AuthService;
+import com.inteliroadmap.backend.services.EmailService;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.util.UriComponentsBuilder;
 
+import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.LocalDateTime;
+import java.util.Base64;
 import java.util.Optional;
 
 /**
@@ -40,10 +47,21 @@ public class AuthServiceImpl implements AuthService {
     // rather than forcing a logout. The old token self-expires after the window.
     private static final Duration ROTATION_GRACE = Duration.ofSeconds(30);
 
+    // A reset link is valid for 30 minutes: long enough to survive an email-scanner
+    // prefetch and the user switching devices, short enough that a leaked link expires soon.
+    private static final Duration RESET_TOKEN_TTL = Duration.ofMinutes(30);
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+
     private final UserRepository userRepository;
     private final RefreshTokenRepository refreshTokenRepository;
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
+    private final EmailService emailService;
+
+    // Base of the emailed reset link; the frontend serves /reset-password?token=...
+    @Value("${app.frontend-url:http://localhost:5173}")
+    private String frontendUrl;
 
     /**
      * Authenticates a provisioned account (staff or FPT student) by username and password.
@@ -183,6 +201,87 @@ public class AuthServiceImpl implements AuthService {
      */
     private ResponseStatusException invalidCredentials() {
         return new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid username or password");
+    }
+
+    @Transactional
+    @Override
+    public void forgotPassword(String email) {
+        log.info("AuthServiceImpl: Password reset requested");
+        User user = userRepository.findByEmail(email);
+
+        // Neutral outcome: never reveal whether the address exists, and skip OAuth-only
+        // accounts that have no local password to reset. The controller returns 200 regardless.
+        if (user == null || user.getPasswordHash() == null) {
+            log.info("AuthServiceImpl: Reset requested for an address with no local credential; no email sent");
+            return;
+        }
+
+        // One pending link per user: drop older tokens so a previously emailed link
+        // can't be redeemed after this fresh request.
+        passwordResetTokenRepository.deleteByUser_UserId(user.getUserId());
+
+        String rawToken = generateResetToken();
+        LocalDateTime now = LocalDateTime.now();
+        PasswordResetToken resetToken = PasswordResetToken.builder()
+                .user(User.builder().userId(user.getUserId()).build())
+                .tokenHash(TokenHashUtil.sha256Hex(rawToken))
+                .expiresAt(now.plus(RESET_TOKEN_TTL))
+                .createdAt(now)
+                .build();
+        passwordResetTokenRepository.save(resetToken);
+
+        String resetLink = UriComponentsBuilder.fromUriString(frontendUrl)
+                .path("/reset-password")
+                .queryParam("token", rawToken)
+                .build()
+                .toUriString();
+        emailService.sendPasswordResetEmail(user.getEmail(), user.getFullName(), resetLink);
+        log.info("AuthServiceImpl: Password reset link sent for user: {}", user.getEmail());
+    }
+
+    @Transactional
+    @Override
+    public void resetPassword(String token, String newPassword) {
+        log.info("AuthServiceImpl: Password reset submission received");
+
+        // Locked lookup so two concurrent redemptions of the same link cannot both pass the
+        // used_at check.
+        PasswordResetToken stored = passwordResetTokenRepository
+                .findByTokenHashForUpdate(TokenHashUtil.sha256Hex(token))
+                .orElseThrow(this::invalidResetToken);
+
+        if (stored.getUsedAt() != null || stored.getExpiresAt().isBefore(LocalDateTime.now())) {
+            log.warn("AuthServiceImpl: Reset token already used or expired");
+            throw invalidResetToken();
+        }
+
+        User user = userRepository.findByUserId(stored.getUser().getUserId());
+        if (user == null) {
+            throw invalidResetToken();
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(newPassword));
+        userRepository.save(user);
+
+        // Single-use: burn the token so the link cannot be replayed.
+        stored.setUsedAt(LocalDateTime.now());
+        passwordResetTokenRepository.save(stored);
+
+        // A password change should end existing sessions on other devices.
+        refreshTokenRepository.deleteByUser_UserId(user.getUserId());
+        log.info("AuthServiceImpl: Password reset successful for user: {}", user.getEmail());
+    }
+
+    /** High-entropy URL-safe token; only its SHA-256 digest is persisted. */
+    private String generateResetToken() {
+        byte[] bytes = new byte[32];
+        SECURE_RANDOM.nextBytes(bytes);
+        return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
+    }
+
+    /** One code and message for every reset failure, so a caller cannot probe token state. */
+    private ResponseStatusException invalidResetToken() {
+        return new ResponseStatusException(HttpStatus.BAD_REQUEST, "Reset link is invalid or has expired");
     }
 
     @Transactional

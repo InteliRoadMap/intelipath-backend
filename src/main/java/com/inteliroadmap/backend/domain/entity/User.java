@@ -57,7 +57,7 @@ public class User {
     @Column(name = "full_name")
     private String fullName;
 
-    private Integer yob;
+    private LocalDate yob;
 
     @Column(columnDefinition = "TEXT")
     private String bio;

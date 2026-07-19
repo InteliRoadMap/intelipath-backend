@@ -156,6 +156,50 @@ public class EmailUtil {
             </html>
             """;
 
+    /**
+     * Password reset email for the magic-link flow. Three placeholders, in order:
+     * recipient full name, the reset URL used in the button href, and the same URL
+     * shown as a copy-paste fallback. No literal '%' appears in the markup so
+     * String.formatted stays safe.
+     */
+    public static final String RESET_PASSWORD_LINK = """
+            <!doctype html>
+            <html lang="en">
+              <head>
+                <meta charset="UTF-8" />
+                <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+              </head>
+              <body style="margin:0; padding:40px 16px; background:#f1f5f9; font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif; color:#1f2937; -webkit-font-smoothing:antialiased;">
+                <div style="max-width:480px; margin:0 auto; background:#ffffff; border:1px solid #e2e8f0; border-radius:16px; overflow:hidden;">
+                  <div style="background:#00838f; padding:28px 32px;">
+                    <div style="font-size:18px; font-weight:700; color:#ffffff; letter-spacing:0.2px;">InteliPath</div>
+                  </div>
+                  <div style="padding:32px;">
+                    <h1 style="margin:0 0 12px; font-size:20px; font-weight:700; color:#0f172a;">Reset your password</h1>
+                    <p style="margin:0 0 8px; font-size:14px; line-height:1.6; color:#475569;">Hi %s,</p>
+                    <p style="margin:0 0 24px; font-size:14px; line-height:1.6; color:#475569;">
+                      We received a request to reset your password. Click the button below to choose a new one.
+                      This link expires in 30 minutes and can be used once.
+                    </p>
+                    <a href="%s" style="display:inline-block; background:#00838f; color:#ffffff; text-decoration:none; font-size:14px; font-weight:600; padding:12px 28px; border-radius:10px;">
+                      Reset password
+                    </a>
+                    <p style="margin:24px 0 8px; font-size:12px; line-height:1.6; color:#94a3b8;">
+                      If the button does not work, copy and paste this link into your browser:
+                    </p>
+                    <p style="margin:0 0 8px; font-size:12px; line-height:1.6; color:#00838f; word-break:break-all;">%s</p>
+                    <p style="margin:24px 0 0; font-size:12px; line-height:1.6; color:#94a3b8;">
+                      If you did not request this, you can safely ignore this email &mdash; your password will not change.
+                    </p>
+                  </div>
+                  <div style="padding:16px 32px; border-top:1px solid #e2e8f0; font-size:12px; color:#94a3b8;">
+                    &copy; 2026 InteliPath. All rights reserved.
+                  </div>
+                </div>
+              </body>
+            </html>
+            """;
+
     public static final String FEEDBACK_NOTIFICATION_EMAIL = """
             <!doctype html>
             <html lang="vi">

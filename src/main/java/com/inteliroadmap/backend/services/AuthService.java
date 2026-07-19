@@ -20,5 +20,18 @@ public interface AuthService {
 
     void logout(String refreshToken);
 
+    /**
+     * Starts the magic-link password reset. Always completes without revealing whether the
+     * email maps to an account: if it does, a single-use token is minted, hashed, stored, and
+     * emailed as a link; if it doesn't, nothing happens. The caller returns a neutral 200 either way.
+     */
+    void forgotPassword(String email);
+
+    /**
+     * Completes a reset: validates the raw token against its stored digest (unused, unexpired),
+     * sets the new BCrypt password, and marks the token used. Throws 400 on any invalid token.
+     */
+    void resetPassword(String token, String newPassword);
+
     ResponseStatusException invalidRefreshToken();
 }

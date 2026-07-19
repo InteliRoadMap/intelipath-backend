@@ -12,6 +12,7 @@ import com.inteliroadmap.backend.domain.entity.StudentSkill;
 import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.domain.enums.ReviewStatus;
 import com.inteliroadmap.backend.domain.enums.UserRole;
+import com.inteliroadmap.backend.exceptions.BadRequestException;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.services.AuthenticatedStudentService;
 import com.inteliroadmap.backend.repositories.PortfolioConfigRepository;
@@ -172,7 +173,7 @@ public class PortfolioServiceImpl implements PortfolioService {
                 ReviewStatus.PENDING
         );
         if (exists) {
-            throw new IllegalStateException("Review request already exists");
+            throw new BadRequestException("You already have a pending review request with this mentor.");
         }
 
         User studentUser = userRepository.findById(student.getUserId())

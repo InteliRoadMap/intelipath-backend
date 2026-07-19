@@ -1,5 +1,7 @@
 package com.inteliroadmap.backend.services.impl;
 
+import java.time.LocalDate;
+
 import com.inteliroadmap.backend.components.RoadmapProgressCalculator;
 import com.inteliroadmap.backend.domain.dto.request.SetupStudentProfileRequest;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.RequiredSkillResponse;
@@ -127,7 +129,7 @@ public class StudentServiceImpl implements StudentService {
             userChanged = true;
         }
         if (request.getYob() != null && !request.getYob().trim().isEmpty()) {
-            user.setYob(Integer.parseInt(request.getYob().trim()));
+            user.setYob(LocalDate.parse(request.getYob().trim()));
             userChanged = true;
         }
 

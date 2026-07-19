@@ -47,8 +47,37 @@ public class EmailServiceImpl implements EmailService {
 //    }
 
     /**
+     * Sends the password-reset magic link. Failures propagate so the caller can log
+     * them, but the controller still returns a neutral 200 so a caller cannot probe
+     * which addresses exist.
+     */
+    @Override
+    public void sendPasswordResetEmail(String email, String fullName, String resetLink) {
+        log.info("EmailServiceImpl: Preparing password reset email for {}", email);
+
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper =
+                    new MimeMessageHelper(message, true, "UTF-8");
+
+            String htmlContent = EmailUtil.RESET_PASSWORD_LINK.formatted(
+                    fullName == null ? "there" : fullName, resetLink, resetLink);
+            helper.setTo(email);
+            helper.setSubject("Reset your InteliPath password");
+            helper.setText(htmlContent, true);
+
+            mailSender.send(message);
+            log.info("EmailServiceImpl: Password reset email successfully sent to {}", email);
+
+        } catch (MessagingException e) {
+            log.error("EmailServiceImpl: Failed to send password reset email", e);
+            throw new RuntimeException("Email Module: Failed to send password reset email");
+        }
+    }
+
+    /**
      * Sends a general notification email to the specified email address.
-     * 
+     *
      * @param email The recipient's email address
      */
     @Override
