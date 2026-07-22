@@ -126,14 +126,18 @@ public class SkillExtractionServiceImpl implements SkillExtractionService {
         for (Map.Entry<String, Map<LocalDate, Integer>> entry : skillDateCountMap.entrySet()) {
             String skillName = entry.getKey();
             
-            // Find or create new Skill in `skills` table
-            Skill skill = skillRepository.findBySkillName(skillName);
+            // Match the catalog without case sensitivity before minting anything. The
+            // scraper's vocabulary is not the catalog's, so an exact-only lookup answered
+            // "no such skill" for names that differ from a real entry by nothing a reader
+            // would notice, and every miss inserted a new row: the catalog carries 300
+            // skills of which 138 sit on no roadmap, including CSS beside CSS3 and Go
+            // beside Golang.
+            Skill skill = skillRepository.findBySkillNameIgnoreCase(skillName);
             if (skill == null) {
-                skill = Skill.builder()
-                        .skillName(skillName)
-                        // .career("IT") // Default
-                        .build();
-                skill = skillRepository.save(skill);
+                // A genuinely new skill is still worth recording — market demand is exactly
+                // where the catalog learns about things the roadmaps do not teach yet.
+                skill = skillRepository.save(Skill.builder().skillName(skillName).build());
+                log.info("SkillExtractionServiceImpl: '{}' is new to the catalog; added from market data.", skillName);
             }
 
             for (Map.Entry<LocalDate, Integer> dateEntry : entry.getValue().entrySet()) {
