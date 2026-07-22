@@ -1,5 +1,6 @@
 package com.inteliroadmap.backend.services.impl;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import com.inteliroadmap.backend.components.RoadmapProgressCalculator;
 import com.inteliroadmap.backend.components.RoadmapSelectionResolver;
 import com.inteliroadmap.backend.components.SelectionView;
@@ -247,9 +248,13 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
 
         Map<UUID, List<SkillNode>> nodesBySkillId = new HashMap<>();
         Map<String, List<SkillNode>> nodesBySkillName = new HashMap<>();
+        Map<String, List<SkillNode>> nodesByKeyword = new HashMap<>();
         Map<UUID, SkillNode> nodesById = new HashMap<>();
         for (SkillNode node : careerNodes) {
             nodesById.put(node.getNodeId(), node);
+            for (String keyword : evidenceKeywords(node)) {
+                nodesByKeyword.computeIfAbsent(keyword, key -> new ArrayList<>()).add(node);
+            }
             if (node.getSkill() != null) {
                 nodesBySkillId.computeIfAbsent(node.getSkill().getSkillId(), key -> new ArrayList<>()).add(node);
                 if (node.getSkill().getSkillName() != null) {
@@ -285,7 +290,17 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
                 offerCandidate(candidates, excludedNodeIds,
                         nodesById.get(evidence.getNodeId()), confidence, reason, evidence.getEvidenceId(), importanceBySkillId);
             } else if (evidence.getSkillName() != null) {
-                for (SkillNode node : nodesBySkillName.getOrDefault(evidence.getSkillName().toLowerCase(), List.of())) {
+                String skillName = evidence.getSkillName().toLowerCase();
+                List<SkillNode> matched = nodesBySkillName.get(skillName);
+                if (matched == null) {
+                    // No node carries this exact skill. Fall back to the node's own
+                    // evidence_keywords, which is where a roadmap says "React counts as
+                    // Frontend Framework". The column was seeded for every node and then
+                    // never read, so evidence for a specific technology was discarded even
+                    // when the node it belongs to named it outright.
+                    matched = nodesByKeyword.getOrDefault(skillName, List.of());
+                }
+                for (SkillNode node : matched) {
                     offerCandidate(candidates, excludedNodeIds, node, confidence, reason, evidence.getEvidenceId(), importanceBySkillId);
                 }
             }
@@ -343,6 +358,27 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
                 : MIN_EVIDENCE_CONFIDENCE;
         threshold = threshold.max(importanceFloor(node, importanceBySkillId));
         return confidence.compareTo(threshold) >= 0;
+    }
+
+    /**
+     * The node's declared evidence synonyms, lowercased.
+     *
+     * <p>Matched whole against an evidence skill name rather than as substrings: the list
+     * holds generic words like "types" and "package" that would otherwise pull in anything.
+     */
+    private static List<String> evidenceKeywords(SkillNode node) {
+        JsonNode keywords = node.getEvidenceKeywords();
+        if (keywords == null || !keywords.isArray()) {
+            return List.of();
+        }
+        List<String> result = new ArrayList<>();
+        for (JsonNode keyword : keywords) {
+            String value = keyword.asText("").trim().toLowerCase();
+            if (!value.isEmpty()) {
+                result.add(value);
+            }
+        }
+        return result;
     }
 
     /** The minimum confidence dictated by how important the node's skill is to the career. */
