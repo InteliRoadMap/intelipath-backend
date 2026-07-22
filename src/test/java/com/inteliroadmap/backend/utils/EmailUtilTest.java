@@ -52,4 +52,20 @@ class EmailUtilTest {
     void escapesAmpersandsBeforeTags() {
         assertEquals("Tom &amp; Jerry &lt;b&gt;", EmailUtil.escapeHtml("Tom & Jerry <b>"));
     }
+
+    /**
+     * The accent is a literal in each template because a text block cannot interpolate a
+     * constant, so nothing but this stops the two drifting apart again — they were already
+     * shipping in teal and a cyan-to-blue gradient at the same time.
+     */
+    @Test
+    void everyEmailUsesTheOneBrandAccent() {
+        for (String template : new String[]{
+                EmailUtil.FEEDBACK_NOTIFICATION_EMAIL, EmailUtil.RESET_PASSWORD_LINK}) {
+            assertTrue(template.contains(EmailUtil.BRAND_ACCENT),
+                    "template does not use the brand accent " + EmailUtil.BRAND_ACCENT);
+            assertFalse(template.contains("#00838f"), "template still uses the old teal");
+            assertFalse(template.contains("linear-gradient"), "template still has a gradient banner");
+        }
+    }
 }

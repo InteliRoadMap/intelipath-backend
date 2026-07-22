@@ -6,6 +6,13 @@ import java.util.Random;
 
 public class EmailUtil {
 
+    /**
+     * The one accent every InteliPath email uses, matching {@code --color-brand-indigo} in
+     * the frontend. Templates are text blocks and cannot interpolate it, so the literal is
+     * repeated in the markup below — change it here and in each template together.
+     */
+    static final String BRAND_ACCENT = "#4f46e5";
+
     /** Bold inside a feedback body, darkened so headings separate from the text they label. */
     private static final String BOLD_STYLE = " style=\"color:#0f172a; font-weight:700;\"";
 
@@ -166,6 +173,10 @@ public class EmailUtil {
      * recipient full name, the reset URL used in the button href, and the same URL
      * shown as a copy-paste fallback. No literal '%' appears in the markup so
      * String.formatted stays safe.
+     *
+     * <p>Shares its frame with {@link #FEEDBACK_NOTIFICATION_EMAIL}: same wordmark, card,
+     * spacing, and the same {@value #BRAND_ACCENT} accent. Two mails from one product
+     * arriving in two visual identities is how a reader learns to trust neither.
      */
     public static final String RESET_PASSWORD_LINK = """
             <!doctype html>
@@ -174,32 +185,43 @@ public class EmailUtil {
                 <meta charset="UTF-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
               </head>
-              <body style="margin:0; padding:40px 16px; background:#f1f5f9; font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif; color:#1f2937; -webkit-font-smoothing:antialiased;">
-                <div style="max-width:480px; margin:0 auto; background:#ffffff; border:1px solid #e2e8f0; border-radius:16px; overflow:hidden;">
-                  <div style="background:#00838f; padding:28px 32px;">
-                    <div style="font-size:18px; font-weight:700; color:#ffffff; letter-spacing:0.2px;">InteliPath</div>
+              <body style="margin:0; padding:32px 16px; background:#f8fafc; font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif; -webkit-font-smoothing:antialiased;">
+                <div style="max-width:520px; margin:0 auto;">
+
+                  <div style="padding:0 4px 18px; font-size:16px; font-weight:700; letter-spacing:-0.01em; color:#4f46e5;">
+                    InteliPath
                   </div>
-                  <div style="padding:32px;">
-                    <h1 style="margin:0 0 12px; font-size:20px; font-weight:700; color:#0f172a;">Reset your password</h1>
-                    <p style="margin:0 0 8px; font-size:14px; line-height:1.6; color:#475569;">Hi %s,</p>
-                    <p style="margin:0 0 24px; font-size:14px; line-height:1.6; color:#475569;">
-                      We received a request to reset your password. Click the button below to choose a new one.
-                      This link expires in 30 minutes and can be used once.
-                    </p>
-                    <a href="%s" style="display:inline-block; background:#00838f; color:#ffffff; text-decoration:none; font-size:14px; font-weight:600; padding:12px 28px; border-radius:10px;">
-                      Reset password
-                    </a>
-                    <p style="margin:24px 0 8px; font-size:12px; line-height:1.6; color:#94a3b8;">
-                      If the button does not work, copy and paste this link into your browser:
-                    </p>
-                    <p style="margin:0 0 8px; font-size:12px; line-height:1.6; color:#00838f; word-break:break-all;">%s</p>
-                    <p style="margin:24px 0 0; font-size:12px; line-height:1.6; color:#94a3b8;">
-                      If you did not request this, you can safely ignore this email &mdash; your password will not change.
-                    </p>
+
+                  <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:14px; overflow:hidden;">
+                    <div style="padding:30px 32px 26px;">
+
+                      <h1 style="margin:0 0 14px; font-size:18px; font-weight:700; letter-spacing:-0.01em; color:#0f172a;">Reset your password</h1>
+                      <p style="margin:0 0 6px; font-size:14px; line-height:1.65; color:#64748b;">Hi %s,</p>
+                      <p style="margin:0 0 24px; font-size:14px; line-height:1.65; color:#64748b;">
+                        We received a request to reset your password. Choose a new one using the button below.
+                        The link expires in 30 minutes and can be used once.
+                      </p>
+
+                      <a href="%s" style="display:inline-block; background:#4f46e5; color:#ffffff; text-decoration:none; font-size:14px; font-weight:600; padding:12px 26px; border-radius:10px;">
+                        Reset password
+                      </a>
+
+                      <p style="margin:26px 0 6px; font-size:12px; line-height:1.6; color:#94a3b8;">
+                        If the button does not work, paste this link into your browser:
+                      </p>
+                      <p style="margin:0; font-size:12px; line-height:1.6; color:#4f46e5; word-break:break-all;">%s</p>
+
+                      <p style="margin:24px 0 0; padding-top:20px; border-top:1px solid #f1f5f9; font-size:12px; line-height:1.6; color:#94a3b8;">
+                        If you did not request this, you can ignore this email &mdash; your password will not change.
+                      </p>
+
+                    </div>
                   </div>
-                  <div style="padding:16px 32px; border-top:1px solid #e2e8f0; font-size:12px; color:#94a3b8;">
-                    &copy; 2026 InteliPath. All rights reserved.
-                  </div>
+
+                  <p style="margin:18px 4px 0; font-size:11.5px; line-height:1.6; color:#94a3b8;">
+                    &copy; 2026 InteliPath
+                  </p>
+
                 </div>
               </body>
             </html>
@@ -210,6 +232,9 @@ public class EmailUtil {
      * Outlook and several webmail clients drop the block entirely, which would strip this
      * message back to unstyled text. Placeholders, in order: receiver name, sender role,
      * sender name, card label, rendered body.
+     *
+     * <p>Shares its frame and its {@value #BRAND_ACCENT} accent with
+     * {@link #RESET_PASSWORD_LINK}; keep the two in step.
      */
     public static final String FEEDBACK_NOTIFICATION_EMAIL = """
             <!doctype html>
