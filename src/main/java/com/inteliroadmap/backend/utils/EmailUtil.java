@@ -1,8 +1,13 @@
 package com.inteliroadmap.backend.utils;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Random;
 
 public class EmailUtil {
+
+    /** Bold inside a feedback body, darkened so headings separate from the text they label. */
+    private static final String BOLD_STYLE = " style=\"color:#0f172a; font-weight:700;\"";
 
     /**
      * Generate a 6-digit random OTP
@@ -200,136 +205,47 @@ public class EmailUtil {
             </html>
             """;
 
+    /**
+     * Feedback notification. Styles are inline rather than in a &lt;style&gt; block because
+     * Outlook and several webmail clients drop the block entirely, which would strip this
+     * message back to unstyled text. Placeholders, in order: receiver name, sender role,
+     * sender name, card label, rendered body.
+     */
     public static final String FEEDBACK_NOTIFICATION_EMAIL = """
             <!doctype html>
-            <html lang="vi">
+            <html lang="en">
               <head>
                 <meta charset="UTF-8" />
                 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-                <style>
-                  body {
-                    font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
-                    background: #f1f5f9;
-                    margin: 0;
-                    padding: 40px 16px;
-                    color: #1f2937;
-                    -webkit-font-smoothing: antialiased;
-                  }
-            
-                  .wrap {
-                    max-width: 520px;
-                    margin: 0 auto;
-                    background: #ffffff;
-                    border-radius: 20px;
-                    overflow: hidden;
-                    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.08);
-                  }
-            
-                  .header {
-                    background: linear-gradient(135deg, #0ea5e9 0%%, #2563eb 100%%);
-                    position: relative;
-                    text-align: center;
-                    padding: 32px 24px;
-                    font-size: 28px;
-                    font-weight: 800;
-                    color: #fff;
-                    letter-spacing: -0.03em;
-                    line-height: 1;
-                  }
-            
-                  .body {
-                    padding: 32px 32px 28px;
-                  }
-            
-                  .greeting {
-                    font-size: 19px;
-                    font-weight: 600;
-                    color: #111827;
-                    margin: 0 0 8px;
-                  }
-            
-                  .sub {
-                    font-size: 13.5px;
-                    color: #6b7280;
-                    line-height: 1.65;
-                    margin: 0 0 22px;
-                  }
-            
-                  .sender {
-                    color: #0284c7; 
-                    background: #e0f2fe; 
-                    padding: 2px 8px; 
-                    border-radius: 6px; 
-                    white-space: nowrap;
-                  }
-            
-                  .card {
-                    background: #f8fafc;
-                    border: 1px solid #e2e8f0;
-                    border-radius: 12px;
-                    padding: 18px 22px;
-                    margin-bottom: 18px;
-                  }
-            
-                  .clabel {
-                    font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
-                    font-size: 11px;
-                    text-transform: uppercase;
-                    letter-spacing: 0.09em;
-                    font-weight: 700;
-                    color: #1d4ed8;
-                    margin-bottom: 10px;
-                  }
-            
-                  .msg {
-                    font-size: 14.5px;
-                    color: #1e293b;
-                    line-height: 1.7;
-                    margin: 0;
-                  }
-
-                  .msg p {
-                    margin: 0 0 12px;
-                  }
-
-                  .msg p:last-child {
-                    margin-bottom: 0;
-                  }
-
-                  .msg strong {
-                    color: #0f172a;
-                    font-weight: 700;
-                  }
-            
-                  .foot {
-                    background: #f9fafb;
-                    border-top: 1px solid #f1f5f9;
-                    text-align: center;
-                    padding: 16px;
-                    font-size: 11.5px;
-                    color: #9ca3af;
-                  }
-                </style>
               </head>
-              <body>
-                <div class="wrap">
-                  <div class="header">
+              <body style="margin:0; padding:32px 16px; background:#f8fafc; font-family:'Inter','Segoe UI',system-ui,-apple-system,sans-serif; -webkit-font-smoothing:antialiased;">
+                <div style="max-width:520px; margin:0 auto;">
+
+                  <div style="padding:0 4px 18px; font-size:16px; font-weight:700; letter-spacing:-0.01em; color:#4f46e5;">
                     InteliPath
                   </div>
-            
-                  <div class="body">
-                    <p class="greeting">Hello, %s</p>
-                    <p class="sub">
-                      Your %s <strong class="sender">%s</strong> has sent you new feedback.
-                    </p>
 
-                    <div class="card">
-                      <div class="clabel">%s</div>
-                      <div class="msg">%s</div>
+                  <div style="background:#ffffff; border:1px solid #e2e8f0; border-radius:14px; overflow:hidden;">
+                    <div style="padding:30px 32px 26px;">
+
+                      <p style="margin:0 0 6px; font-size:16px; font-weight:600; color:#0f172a;">Hello %s,</p>
+                      <p style="margin:0 0 24px; font-size:14px; line-height:1.65; color:#64748b;">
+                        Your %s <span style="color:#0f172a; font-weight:600;">%s</span> has sent you new feedback.
+                      </p>
+
+                      <div style="border-left:3px solid #4f46e5; padding:2px 0 2px 18px;">
+                        <div style="margin:0 0 10px; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.08em; color:#94a3b8;">%s</div>
+                        <div style="font-size:14.5px; line-height:1.7; color:#1e293b;">%s</div>
+                      </div>
+
                     </div>
                   </div>
-            
-                  <div class="foot">© 2026 InteliPath · All rights reserved</div>
+
+                  <p style="margin:18px 4px 0; font-size:11.5px; line-height:1.6; color:#94a3b8;">
+                    Sign in to InteliPath to reply or see the full history.<br />
+                    &copy; 2026 InteliPath
+                  </p>
+
                 </div>
               </body>
             </html>
@@ -362,22 +278,32 @@ public class EmailUtil {
      */
     public static String renderFeedbackBody(String raw) {
         if (raw == null || raw.isBlank()) {
-            return "<p></p>";
+            return "";
         }
         String escaped = escapeHtml(raw.trim()).replace("\r\n", "\n").replace("\r", "\n");
 
         // Bold before paragraphs: a **...** span never legitimately straddles a blank line,
         // and matching it first keeps the regex off the tags added below.
-        String bolded = escaped.replaceAll("\\*\\*(.+?)\\*\\*", "<strong>$1</strong>");
+        String bolded = escaped.replaceAll("\\*\\*(.+?)\\*\\*", "<strong" + BOLD_STYLE + ">$1</strong>");
 
-        StringBuilder html = new StringBuilder();
+        // Styles are inline here for the same reason as in the template: a <style> block
+        // would be dropped by Outlook, and a <p> falling back to the client's default
+        // margin re-opens the spacing this is meant to control.
+        List<String> blocks = new ArrayList<>();
         for (String block : bolded.split("\n{2,}")) {
             String paragraph = block.trim();
-            if (paragraph.isEmpty()) {
-                continue;
+            if (!paragraph.isEmpty()) {
+                blocks.add(paragraph.replace("\n", "<br />"));
             }
-            html.append("<p>").append(paragraph.replace("\n", "<br />")).append("</p>");
         }
-        return html.isEmpty() ? "<p></p>" : html.toString();
+
+        StringBuilder html = new StringBuilder();
+        for (int i = 0; i < blocks.size(); i++) {
+            String margin = i == blocks.size() - 1 ? "0" : "0 0 12px";
+            html.append("<p style=\"margin:").append(margin).append(";\">")
+                    .append(blocks.get(i))
+                    .append("</p>");
+        }
+        return html.toString();
     }
 }

@@ -15,8 +15,8 @@ class EmailUtilTest {
 
         String html = EmailUtil.renderFeedbackBody(raw);
 
-        assertTrue(html.contains("<strong>Strengths:</strong> Solid work"));
-        assertTrue(html.contains("<strong>Areas for Improvement:</strong> Testing"));
+        assertTrue(html.contains(">Strengths:</strong> Solid work"));
+        assertTrue(html.contains(">Areas for Improvement:</strong> Testing"));
         assertFalse(html.contains("**"));
         // Single newlines stay inside one paragraph, as line breaks.
         assertTrue(html.contains("<br />"));
@@ -26,7 +26,10 @@ class EmailUtilTest {
     void blankLinesBecomeSeparateParagraphs() {
         String html = EmailUtil.renderFeedbackBody("First point.\n\nSecond point.");
 
-        assertEquals("<p>First point.</p><p>Second point.</p>", html);
+        // Spacing is carried inline, and the last paragraph drops its margin so the quote
+        // block does not end with a gap the surrounding padding already provides.
+        assertEquals("<p style=\"margin:0 0 12px;\">First point.</p>"
+                + "<p style=\"margin:0;\">Second point.</p>", html);
     }
 
     @Test
@@ -36,13 +39,13 @@ class EmailUtilTest {
         assertFalse(html.contains("<script>"));
         assertTrue(html.contains("&lt;script&gt;"));
         // Escaping must not disarm the formatting the author did intend.
-        assertTrue(html.contains("<strong>bold</strong>"));
+        assertTrue(html.contains(">bold</strong>"));
     }
 
     @Test
     void emptyFeedbackStillProducesValidMarkup() {
-        assertEquals("<p></p>", EmailUtil.renderFeedbackBody(null));
-        assertEquals("<p></p>", EmailUtil.renderFeedbackBody("   "));
+        assertEquals("", EmailUtil.renderFeedbackBody(null));
+        assertEquals("", EmailUtil.renderFeedbackBody("   "));
     }
 
     @Test
