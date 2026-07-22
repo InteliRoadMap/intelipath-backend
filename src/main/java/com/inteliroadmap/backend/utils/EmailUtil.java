@@ -255,7 +255,7 @@ public class EmailUtil {
                     margin: 0 0 22px;
                   }
             
-                  .counselor {
+                  .sender {
                     color: #0284c7; 
                     background: #e0f2fe; 
                     padding: 2px 8px; 
@@ -284,8 +284,21 @@ public class EmailUtil {
                   .msg {
                     font-size: 14.5px;
                     color: #1e293b;
-                    line-height: 1.65;
+                    line-height: 1.7;
                     margin: 0;
+                  }
+
+                  .msg p {
+                    margin: 0 0 12px;
+                  }
+
+                  .msg p:last-child {
+                    margin-bottom: 0;
+                  }
+
+                  .msg strong {
+                    color: #0f172a;
+                    font-weight: 700;
                   }
             
                   .foot {
@@ -305,14 +318,14 @@ public class EmailUtil {
                   </div>
             
                   <div class="body">
-                    <p class="greeting">Hello, %s 👋</p>
+                    <p class="greeting">Hello, %s</p>
                     <p class="sub">
-                      Your counselor <strong class="counselor">%s</strong> has just sent you new feedback !!
+                      Your %s <strong class="sender">%s</strong> has sent you new feedback.
                     </p>
-            
+
                     <div class="card">
-                      <div class="clabel">💬 Counselor's message</div>
-                      <p class="msg">%s</p>
+                      <div class="clabel">%s</div>
+                      <div class="msg">%s</div>
                     </div>
                   </div>
             
@@ -321,4 +334,50 @@ public class EmailUtil {
               </body>
             </html>
             """;
+
+    /**
+     * Escapes text for safe interpolation into an email's HTML. Names and feedback bodies
+     * are written by users, so they reach this template as data and must never be able to
+     * close a tag or open one of their own.
+     */
+    public static String escapeHtml(String value) {
+        if (value == null) {
+            return "";
+        }
+        return value.replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;");
+    }
+
+    /**
+     * Renders a feedback body written with light Markdown as HTML.
+     *
+     * <p>Authors write feedback in the app's textarea using {@code **bold**} headings and
+     * line breaks, which an HTML email otherwise shows verbatim — a reader was sent
+     * "**Strengths:** ... **Areas for Improvement:**" as literal asterisks running together
+     * in one line. Only the two constructs people actually type are supported: bold spans,
+     * and blank lines as paragraph breaks. Escaping happens first, so the markup this emits
+     * is the only markup in the result.
+     */
+    public static String renderFeedbackBody(String raw) {
+        if (raw == null || raw.isBlank()) {
+            return "<p></p>";
+        }
+        String escaped = escapeHtml(raw.trim()).replace("\r\n", "\n").replace("\r", "\n");
+
+        // Bold before paragraphs: a **...** span never legitimately straddles a blank line,
+        // and matching it first keeps the regex off the tags added below.
+        String bolded = escaped.replaceAll("\\*\\*(.+?)\\*\\*", "<strong>$1</strong>");
+
+        StringBuilder html = new StringBuilder();
+        for (String block : bolded.split("\n{2,}")) {
+            String paragraph = block.trim();
+            if (paragraph.isEmpty()) {
+                continue;
+            }
+            html.append("<p>").append(paragraph.replace("\n", "<br />")).append("</p>");
+        }
+        return html.isEmpty() ? "<p></p>" : html.toString();
+    }
 }

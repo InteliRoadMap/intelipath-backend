@@ -108,6 +108,7 @@ public class FeedbackServiceImpl implements FeedbackService {
                 receiver.getEmail(),
                 receiver.getFullName(),
                 sender.getFullName(),
+                sender.getRole(),
                 request.getContent(),
                 files
         );

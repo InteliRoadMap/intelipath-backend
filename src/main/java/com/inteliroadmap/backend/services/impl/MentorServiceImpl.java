@@ -451,6 +451,7 @@ public class MentorServiceImpl implements MentorService {
                     receiver.getEmail(),
                     receiver.getFullName(),
                     sender.getFullName(),
+                    sender.getRole(),
                     request.getContent(),
                     null
             );
