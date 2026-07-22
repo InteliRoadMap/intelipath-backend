@@ -38,5 +38,17 @@ public class OauthAccount {
 
     @Column(name = "provider_name", nullable = false)
     private String providerName;
+
+    /**
+     * Provider OAuth access token, encrypted at rest via TokenCipher (never plaintext).
+     * Populated for GitHub logins with the 'repo' scope so the portfolio Sync flow can
+     * list the user's private repositories. Null for providers/logins without a stored token.
+     */
+    @Column(name = "access_token_enc", columnDefinition = "TEXT")
+    private String accessTokenEnc;
+
+    /** Space-separated scopes actually granted for the stored token, for reference/diagnostics. */
+    @Column(name = "token_scopes")
+    private String tokenScopes;
 }
 

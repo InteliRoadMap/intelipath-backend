@@ -45,6 +45,23 @@ public class Student {
     @Column(name = "github_profile")
     private String githubProfile;
 
+    /**
+     * GitHub sync credentials, populated only by the explicit "Connect GitHub" link flow
+     * (never by login). Stored on the student — not on the login-identity oauth_account — so
+     * a GitHub account whose emails map to several InteliPath users can't cross-link: the
+     * token always belongs to whoever authorised it while signed in. Token is AES-GCM
+     * encrypted (see TokenCipher).
+     */
+    @Column(name = "github_sync_token_enc", columnDefinition = "TEXT")
+    private String githubSyncTokenEnc;
+
+    @Column(name = "github_sync_scopes", length = 255)
+    private String githubSyncScopes;
+
+    /** The GitHub username that authorised sync, for display ("Connected as @login"). */
+    @Column(name = "github_login", length = 255)
+    private String githubLogin;
+
     @Column(name = "transcript_url", columnDefinition = "TEXT")
     private String transcriptUrl;
 

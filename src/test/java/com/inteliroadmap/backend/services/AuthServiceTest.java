@@ -10,6 +10,7 @@ import com.inteliroadmap.backend.domain.enums.UserRole;
 import com.inteliroadmap.backend.domain.enums.UserStatus;
 import com.inteliroadmap.backend.exceptions.UnauthorizedException;
 import com.inteliroadmap.backend.security.TokenHashUtil;
+import com.inteliroadmap.backend.repositories.PasswordResetTokenRepository;
 import com.inteliroadmap.backend.repositories.RefreshTokenRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.security.JwtService;
@@ -32,17 +33,22 @@ class AuthServiceTest {
 
     private UserRepository userRepository;
     private RefreshTokenRepository refreshTokenRepository;
+    private PasswordResetTokenRepository passwordResetTokenRepository;
     private JwtService jwtService;
     private PasswordEncoder passwordEncoder;
+    private EmailService emailService;
     private AuthService authService;
 
     @BeforeEach
     void setUp() {
         userRepository = mock(UserRepository.class);
         refreshTokenRepository = mock(RefreshTokenRepository.class);
+        passwordResetTokenRepository = mock(PasswordResetTokenRepository.class);
         jwtService = mock(JwtService.class);
         passwordEncoder = mock(PasswordEncoder.class);
-        authService = new AuthServiceImpl(userRepository, refreshTokenRepository, jwtService, passwordEncoder);
+        emailService = mock(EmailService.class);
+        authService = new AuthServiceImpl(userRepository, refreshTokenRepository, passwordResetTokenRepository,
+                jwtService, passwordEncoder, emailService);
     }
 
     @Test

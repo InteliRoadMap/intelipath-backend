@@ -69,7 +69,17 @@ import java.util.UUID;
 public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalizationService {
 
     private static final BigDecimal MIN_EVIDENCE_CONFIDENCE = new BigDecimal("0.70");
-    private static final BigDecimal PROFILE_SKILL_CONFIDENCE = new BigDecimal("0.80");
+
+    /**
+     * A student_skills row records what the student says about themselves, with no
+     * proof behind it, so it is the weakest source here - deliberately below the FLM
+     * transcript base (0.72) and far below an AI-analysed repository (up to 0.90).
+     * At 0.60 a bare self-declaration can only fast-track LOW-importance nodes; core
+     * and foundational skills still have to be earned through real evidence.
+     * Kept in step with SkillEvidenceServiceImpl.SELF_REPORT_CONFIDENCE, which stamps
+     * the matching MANUAL evidence row.
+     */
+    private static final BigDecimal PROFILE_SKILL_CONFIDENCE = new BigDecimal("0.60");
 
     /**
      * Confidence a skill's evidence must clear to fast-track a node, scaled by how

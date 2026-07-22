@@ -8,13 +8,17 @@ import com.inteliroadmap.backend.domain.entity.Skill;
 import com.inteliroadmap.backend.domain.entity.Student;
 import com.inteliroadmap.backend.domain.entity.StudentEducation;
 import com.inteliroadmap.backend.domain.entity.StudentSkill;
+import com.inteliroadmap.backend.domain.entity.StudentSkillEvidence;
 import com.inteliroadmap.backend.domain.entity.User;
+import com.inteliroadmap.backend.domain.enums.EvidenceType;
 import com.inteliroadmap.backend.repositories.SkillRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.stream.Collectors;
 import java.util.Optional;
 
@@ -24,10 +28,16 @@ public class PortfolioMapper {
 
     private final SkillRepository skillRepository;
 
+    /**
+     * @param evidence live evidence rows for the student, used to mark which skills are
+     *                 backed by a real source rather than by the student's own word
+     */
     public PortfolioResponse toPortfolioResponse(
             User user, Student student, PortfolioConfig config,
             List<StudentSkill> skills, List<PortfolioProject> projects,
-            List<StudentEducation> education) {
+            List<StudentEducation> education, List<StudentSkillEvidence> evidence) {
+
+        Map<String, EvidenceType> sourceBySkillName = strongestSourceBySkillName(evidence);
 
         PortfolioResponse.UserInfoResponse userInfo = PortfolioResponse.UserInfoResponse.builder()
                 .userId(user.getUserId())
@@ -59,10 +69,13 @@ public class PortfolioMapper {
                             skillName = opt.get().getSkillName();
                         }
                     }
+                    EvidenceType source = sourceBySkillName.get(skillName.toLowerCase());
                     return PortfolioResponse.StudentSkillResponse.builder()
                             .skillName(skillName)
                             .customDescription(s.getCustomDescription())
                             .techStack(s.getTechStack())
+                            .verified(source != null && source != EvidenceType.MANUAL)
+                            .evidenceSource(source)
                             .build();
                 })
                 .collect(Collectors.toList());
@@ -97,6 +110,29 @@ public class PortfolioMapper {
                 .projects(projectResponses)
                 .education(educationResponses)
                 .build();
+    }
+
+    /**
+     * Reduces a student's evidence rows to one source per skill. A skill proven by a
+     * repository or a transcript outranks the same skill merely declared by the student,
+     * so the portfolio shows the strongest claim the student can actually support.
+     */
+    private Map<String, EvidenceType> strongestSourceBySkillName(List<StudentSkillEvidence> evidence) {
+        if (evidence == null || evidence.isEmpty()) {
+            return Map.of();
+        }
+        Map<String, EvidenceType> strongest = new HashMap<>();
+        for (StudentSkillEvidence row : evidence) {
+            if (row.getSkillName() == null || row.getSourceType() == null) {
+                continue;
+            }
+            String key = row.getSkillName().toLowerCase();
+            EvidenceType current = strongest.get(key);
+            if (current == null || (current == EvidenceType.MANUAL && row.getSourceType() != EvidenceType.MANUAL)) {
+                strongest.put(key, row.getSourceType());
+            }
+        }
+        return strongest;
     }
 
     public List<PortfolioProject> toPortfolioProjects(List<PortfolioUpsertRequest.PortfolioProjectRequest> projectRequests, User user) {

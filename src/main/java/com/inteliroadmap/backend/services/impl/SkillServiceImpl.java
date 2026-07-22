@@ -15,6 +15,7 @@ import com.inteliroadmap.backend.repositories.CareerRequiredSkillRepository;
 import com.inteliroadmap.backend.repositories.CareerRoleRepository;
 import com.inteliroadmap.backend.repositories.SkillRepository;
 import com.inteliroadmap.backend.repositories.StudentSkillRepository;
+import com.inteliroadmap.backend.services.SkillEvidenceService;
 import com.inteliroadmap.backend.services.SkillService;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -42,6 +43,7 @@ public class SkillServiceImpl implements SkillService {
     private final CareerRoleRepository careerRoleRepository;
     private final CareerRequiredSkillRepository careerRequiredSkillRepository;
     private final AuthenticatedStudentService authenticatedStudentService;
+    private final SkillEvidenceService skillEvidenceService;
     private final SkillMapper skillMapper;
 
     /**
@@ -162,6 +164,15 @@ public class SkillServiceImpl implements SkillService {
         // Step 7: Save new student-skill records in one operation
         if (!newSkillsToSave.isEmpty()) {
             studentSkillRepository.saveAll(newSkillsToSave);
+
+            // Step 7b: Record where these skills came from. A self-declaration has to be
+            // traceable as such, otherwise it is indistinguishable downstream from a skill
+            // proven by a GitHub repository or a passed FPT subject.
+            List<Skill> declaredSkills = new ArrayList<>();
+            for (StudentSkill savedSkill : newSkillsToSave) {
+                declaredSkills.add(savedSkill.getSkill());
+            }
+            skillEvidenceService.recordSelfDeclaredEvidence(student.getUserId(), declaredSkills);
         }
 
         // Step 8: Return the complete selected skill list after the update

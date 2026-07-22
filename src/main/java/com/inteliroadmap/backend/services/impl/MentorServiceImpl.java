@@ -32,6 +32,7 @@ import com.inteliroadmap.backend.repositories.StudentRepository;
 import com.inteliroadmap.backend.repositories.StudentSkillRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.services.MentorService;
+import com.inteliroadmap.backend.services.EmailService;
 import com.inteliroadmap.backend.services.RoadmapService;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -69,6 +70,7 @@ public class MentorServiceImpl implements MentorService {
     private final SkillNodeRepository skillNodeRepository;
     private final IndustryMentorRepository industryMentorRepository;
     private final RoadmapService roadmapService;
+    private final EmailService emailService;
 
     private User getAuthenticatedMentor() {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -440,6 +442,21 @@ public class MentorServiceImpl implements MentorService {
         feedback.setContent(request.getContent());
         feedback.setType(request.getType());
         feedback = feedbackRepository.save(feedback);
+
+        // Notify the student by email, mirroring counselor feedback. Best-effort: a mail
+        // failure must not roll back the saved feedback or the review-request resolution
+        // below, so we swallow it here (the email helper otherwise throws).
+        try {
+            emailService.sendFeedbackNotificationEmail(
+                    receiver.getEmail(),
+                    receiver.getFullName(),
+                    sender.getFullName(),
+                    request.getContent(),
+                    null
+            );
+        } catch (Exception e) {
+            log.error("MentorServiceImpl: failed to send feedback notification email to {}", receiver.getEmail(), e);
+        }
 
         // Auto-resolve pending review requests from this student to this mentor
         List<PortfolioReviewRequest> pendingRequests = reviewRequestRepository.findByMentor_UserIdAndStatus(sender.getUserId(), ReviewStatus.PENDING, Pageable.unpaged()).getContent();

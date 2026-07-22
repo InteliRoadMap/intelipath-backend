@@ -9,7 +9,9 @@ import com.inteliroadmap.backend.domain.entity.PortfolioReviewRequest;
 import com.inteliroadmap.backend.domain.entity.Student;
 import com.inteliroadmap.backend.domain.entity.StudentEducation;
 import com.inteliroadmap.backend.domain.entity.StudentSkill;
+import com.inteliroadmap.backend.domain.entity.StudentSkillEvidence;
 import com.inteliroadmap.backend.domain.entity.User;
+import com.inteliroadmap.backend.domain.enums.EvidenceStatus;
 import com.inteliroadmap.backend.domain.enums.ReviewStatus;
 import com.inteliroadmap.backend.domain.enums.UserRole;
 import com.inteliroadmap.backend.exceptions.BadRequestException;
@@ -20,6 +22,7 @@ import com.inteliroadmap.backend.repositories.PortfolioProjectRepository;
 import com.inteliroadmap.backend.repositories.PortfolioReviewRequestRepository;
 import com.inteliroadmap.backend.repositories.StudentEducationRepository;
 import com.inteliroadmap.backend.repositories.StudentRepository;
+import com.inteliroadmap.backend.repositories.StudentSkillEvidenceRepository;
 import com.inteliroadmap.backend.repositories.StudentSkillRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.mappers.PortfolioMapper;
@@ -31,6 +34,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Implementation of the {@link PortfolioService} interface.
@@ -48,9 +52,19 @@ public class PortfolioServiceImpl implements PortfolioService {
     private final PortfolioProjectRepository portfolioProjectRepository;
     private final StudentEducationRepository studentEducationRepository;
     private final StudentSkillRepository studentSkillRepository;
+    private final StudentSkillEvidenceRepository studentSkillEvidenceRepository;
     private final PortfolioReviewRequestRepository portfolioReviewRequestRepository;
     private final StudentRepository studentRepository;
     private final UserRepository userRepository;
+
+    /**
+     * Evidence that still stands behind the student's skills. REJECTED rows are left out:
+     * a claim someone already turned down must not earn a verified badge on the portfolio.
+     */
+    private List<StudentSkillEvidence> liveEvidence(UUID userId) {
+        return studentSkillEvidenceRepository.findByUserIdAndStatusIn(
+                userId, List.of(EvidenceStatus.PENDING, EvidenceStatus.ACCEPTED));
+    }
 
     /**
      * Retrieves the portfolio for the currently authenticated student.
@@ -78,7 +92,9 @@ public class PortfolioServiceImpl implements PortfolioService {
         List<StudentEducation> education = studentEducationRepository.findByUser_UserId(student.getUserId());
 
         // Map the collected data into a PortfolioResponse object
-        return portfolioMapper.toPortfolioResponse(user, student, config, skills, projects, education);
+        List<StudentSkillEvidence> evidence = liveEvidence(student.getUserId());
+
+        return portfolioMapper.toPortfolioResponse(user, student, config, skills, projects, education, evidence);
     }
 
     /**
@@ -110,12 +126,14 @@ public class PortfolioServiceImpl implements PortfolioService {
         List<PortfolioProject> projects = portfolioProjectRepository.findByUser_UserId(user.getUserId());
         List<StudentEducation> education = studentEducationRepository.findByUser_UserId(student.getUserId());
 
-        return portfolioMapper.toPortfolioResponse(user, student, config, skills, projects, education);
+        List<StudentSkillEvidence> evidence = liveEvidence(student.getUserId());
+
+        return portfolioMapper.toPortfolioResponse(user, student, config, skills, projects, education, evidence);
     }
 
     @Transactional(readOnly = true)
     @Override
-    public PortfolioResponse getPortfolioByStudentId(java.util.UUID studentId) {
+    public PortfolioResponse getPortfolioByStudentId(UUID studentId) {
         Student student = studentRepository.findById(studentId)
                 .orElseThrow(() -> new ResourceNotFoundException("Portfolio not found for student: " + studentId));
         User user = userRepository.findById(student.getUserId())
@@ -126,7 +144,9 @@ public class PortfolioServiceImpl implements PortfolioService {
         List<PortfolioProject> projects = portfolioProjectRepository.findByUser_UserId(user.getUserId());
         List<StudentEducation> education = studentEducationRepository.findByUser_UserId(student.getUserId());
 
-        return portfolioMapper.toPortfolioResponse(user, student, config, skills, projects, education);
+        List<StudentSkillEvidence> evidence = liveEvidence(student.getUserId());
+
+        return portfolioMapper.toPortfolioResponse(user, student, config, skills, projects, education, evidence);
     }
 
     /**

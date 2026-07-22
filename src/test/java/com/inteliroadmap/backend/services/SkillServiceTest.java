@@ -7,6 +7,7 @@ import com.inteliroadmap.backend.domain.entity.Student;
 import com.inteliroadmap.backend.domain.entity.StudentSkill;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.services.AuthenticatedStudentService;
+import com.inteliroadmap.backend.services.impl.SkillServiceImpl;
 import com.inteliroadmap.backend.mappers.SkillMapper;
 import com.inteliroadmap.backend.repositories.CareerRequiredSkillRepository;
 import com.inteliroadmap.backend.repositories.CareerRoleRepository;
@@ -45,17 +46,20 @@ class SkillServiceTest {
     private CareerRequiredSkillRepository careerRequiredSkillRepository;
     @Mock
     private AuthenticatedStudentService authenticatedStudentService;
+    @Mock
+    private SkillEvidenceService skillEvidenceService;
 
     private SkillService skillService;
 
     @BeforeEach
     void setUp() {
-        skillService = new com.inteliroadmap.backend.services.impl.SkillServiceImpl(
+        skillService = new SkillServiceImpl(
                 skillRepository,
                 studentSkillRepository,
                 careerRoleRepository,
                 careerRequiredSkillRepository,
                 authenticatedStudentService,
+                skillEvidenceService,
                 new SkillMapper(skillRepository)
         );
     }
