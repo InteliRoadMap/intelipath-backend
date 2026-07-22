@@ -65,9 +65,27 @@ public class StudentCurriculumServiceImpl implements StudentCurriculumService {
 
     /** detectedBy prefix marking evidence this service owns. */
     private static final String FLM_PREFIX = "FLM:";
-    private static final BigDecimal CONFIDENCE_BASE = new BigDecimal("0.72");
-    private static final BigDecimal CONFIDENCE_STEP = new BigDecimal("0.06");
-    private static final BigDecimal CONFIDENCE_CAP = new BigDecimal("0.90");
+
+    /**
+     * How much a passed subject is worth as evidence, by how many passed subjects teach the
+     * same skill.
+     *
+     * <p>These land deliberately on the thresholds the roadmap actually checks
+     * (RoadmapPersonalizationServiceImpl: LOW 0.60, AVG 0.70, HIGH 0.85). The previous
+     * ladder drifted 0.72 / 0.78 / 0.84 / 0.90 in fixed 0.06 steps and stepped straight
+     * over 0.85, so a HIGH-importance skill — which is what every auto-completable Frontend
+     * node is — needed four separate subjects to unlock while three counted for nothing.
+     * A student who declared five terms unlocked zero nodes.
+     *
+     * <p>The rule now reads: one subject is ordinary evidence, two independent subjects
+     * covering the same skill are enough even for a core skill, three or more is as strong
+     * as this source ever gets.
+     */
+    private static final BigDecimal[] CONFIDENCE_BY_COVERAGE = {
+            new BigDecimal("0.75"), // 1 subject
+            new BigDecimal("0.85"), // 2 subjects — clears the HIGH-importance floor
+            new BigDecimal("0.90"), // 3+ subjects
+    };
     /** FPT cohort K = admission year − 2004 (2023 → K19, 2024 → K20). */
     private static final int COHORT_BASE_YEAR = 2004;
 
@@ -343,11 +361,10 @@ public class StudentCurriculumServiceImpl implements StudentCurriculumService {
                 userId, passed.size(), toCreate.size());
     }
 
-    /** base 0.72 + 0.06 per extra corroborating subject, capped at 0.90. */
-    private BigDecimal confidenceFor(int coveringSubjects) {
-        BigDecimal value = CONFIDENCE_BASE.add(
-                CONFIDENCE_STEP.multiply(BigDecimal.valueOf(Math.max(0, coveringSubjects - 1))));
-        return value.min(CONFIDENCE_CAP);
+    /** See {@link #CONFIDENCE_BY_COVERAGE}: 1 subject 0.75, 2 subjects 0.85, 3 or more 0.90. */
+    static BigDecimal confidenceFor(int coveringSubjects) {
+        int index = Math.max(1, coveringSubjects) - 1;
+        return CONFIDENCE_BY_COVERAGE[Math.min(index, CONFIDENCE_BY_COVERAGE.length - 1)];
     }
 
     /**
