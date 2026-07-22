@@ -74,6 +74,10 @@ public class OAuth2UserServiceImpl extends DefaultOAuth2UserService {
 
         // Retrieve existing local user or create a new one using the OAuth2 details
         User user = getOrCreateUser(userInfo);
+        // A student who signed up some other way and only later signs in with GitHub is
+        // still telling us their GitHub profile; createUser only ever recorded it for
+        // accounts born from this flow, so everyone else kept an empty github_profile.
+        backfillGithubProfile(user, userInfo);
         // Link the OAuth account to the user record (creating it if needed) and store the
         // encrypted access token so downstream features (e.g. GitHub repo sync) can reuse it.
         upsertOauthAccount(user, userInfo, provider, request);
@@ -196,6 +200,27 @@ public class OAuth2UserServiceImpl extends DefaultOAuth2UserService {
         studentRepository.save(student);
 
         return savedUser;
+    }
+
+    /**
+     * Records the GitHub profile URL on the student when we have one and they do not.
+     *
+     * <p>Only fills a blank: a student who edited the field by hand keeps their own value,
+     * and Google logins carry no profile URL so this is a no-op for them.
+     */
+    private void backfillGithubProfile(User user, OAuth2UserInfoInternal userInfo) {
+        String profileUrl = userInfo.getHtmlUrl();
+        if (profileUrl == null || profileUrl.isBlank()) {
+            return;
+        }
+        studentRepository.findById(user.getUserId()).ifPresent(student -> {
+            if (student.getGithubProfile() != null && !student.getGithubProfile().isBlank()) {
+                return;
+            }
+            student.setGithubProfile(profileUrl);
+            studentRepository.save(student);
+            log.info("OAuth2UserServiceImpl: Recorded GitHub profile for user {}", user.getUserId());
+        });
     }
 
     /**

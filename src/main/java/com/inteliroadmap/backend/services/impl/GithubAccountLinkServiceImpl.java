@@ -123,13 +123,21 @@ public class GithubAccountLinkServiceImpl implements GithubAccountLinkService {
         String accessToken = String.valueOf(tokenResponse.get("access_token"));
         String grantedScopes = tokenResponse.get("scope") != null ? String.valueOf(tokenResponse.get("scope")) : "";
 
-        // 2. Resolve the GitHub username so the UI can show who is connected.
-        String githubLogin = fetchGithubLogin(accessToken);
+        // 2. Resolve the GitHub identity so the UI can show who is connected.
+        GithubIdentity identity = fetchGithubIdentity(accessToken);
+        String githubLogin = identity.login();
 
         // 3. Persist the token (encrypted) on the authenticated student — not on any oauth_account.
         student.setGithubSyncTokenEnc(tokenCipher.encrypt(accessToken));
         student.setGithubSyncScopes(grantedScopes);
         student.setGithubLogin(githubLogin);
+        // Connecting an account is the most explicit "this is my GitHub" the product ever
+        // gets, so it fills the profile link too. Without this the student's github_profile
+        // stayed empty even though the app knew exactly which account they had authorised.
+        String profileUrl = identity.profileUrl();
+        if (profileUrl != null && !profileUrl.isBlank()) {
+            student.setGithubProfile(profileUrl);
+        }
         studentRepository.save(student);
 
         boolean repoAccess = grantedScopes.contains("repo");
@@ -217,7 +225,10 @@ public class GithubAccountLinkServiceImpl implements GithubAccountLinkService {
         }
     }
 
-    private String fetchGithubLogin(String accessToken) {
+    /** Who authorised the link: the username for display and the profile URL for the record. */
+    private record GithubIdentity(String login, String profileUrl) {}
+
+    private GithubIdentity fetchGithubIdentity(String accessToken) {
         try {
             Map<?, ?> user = restClient.get()
                     .uri(USER_URL)
@@ -225,11 +236,18 @@ public class GithubAccountLinkServiceImpl implements GithubAccountLinkService {
                     .header(HttpHeaders.ACCEPT, "application/vnd.github+json")
                     .retrieve()
                     .body(Map.class);
-            return user != null && user.get("login") != null ? String.valueOf(user.get("login")) : null;
+            if (user == null) {
+                return new GithubIdentity(null, null);
+            }
+            String login = user.get("login") != null ? String.valueOf(user.get("login")) : null;
+            // html_url comes back on the same call; deriving it from the login instead would
+            // guess at a URL GitHub already told us.
+            String profileUrl = user.get("html_url") != null ? String.valueOf(user.get("html_url")) : null;
+            return new GithubIdentity(login, profileUrl);
         } catch (Exception e) {
-            // Non-fatal: the token is what matters for sync; the login is only for display.
-            log.warn("GithubAccountLinkServiceImpl: could not fetch GitHub username: {}", e.getMessage());
-            return null;
+            // Non-fatal: the token is what matters for sync; the identity is for display.
+            log.warn("GithubAccountLinkServiceImpl: could not fetch GitHub identity: {}", e.getMessage());
+            return new GithubIdentity(null, null);
         }
     }
 
