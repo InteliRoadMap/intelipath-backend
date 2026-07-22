@@ -35,5 +35,13 @@ public class FlmSyncStatusResponse {
         private int skillLinks;
         private int unmatchedSkills;
         private int resources;
+        private int clos;
+        /** Subjects the overlay named but carried no detail for; their stored rows were kept. */
+        private int preservedSubjects;
+        /**
+         * The scrape found subjects but no detail whatsoever — almost always an expired FLM
+         * cookie rather than a real result. The import is reported, but not as a success.
+         */
+        private boolean suspect;
     }
 }

@@ -147,10 +147,19 @@ public class AdminFlmSyncServiceImpl implements AdminFlmSyncService {
             FlmSyncStatusResponse.Summary summary = ensureImported(jobId, status.path("overlay"));
             response.setState("imported");
             response.setSummary(summary);
-            if (summary != null) {
+            if (summary != null && summary.isSuspect()) {
+                // Say what went wrong, not just what was counted: the admin's next move is to
+                // fetch a fresh cookie, and a cheerful "imported 47 subjects" hides that.
                 response.setMessage(String.format(
-                        "Imported %d subjects, %d skill links, %d resources.",
-                        summary.getSubjects(), summary.getSkillLinks(), summary.getResources()));
+                        "Found %d subjects but no outcomes, skills or files for any of them. "
+                                + "The FLM cookie has most likely expired — existing data was kept "
+                                + "untouched. Re-run with a fresh cookie.",
+                        summary.getSubjects()));
+            } else if (summary != null) {
+                response.setMessage(String.format(
+                        "Imported %d subjects, %d skill links, %d outcomes, %d resources.",
+                        summary.getSubjects(), summary.getSkillLinks(),
+                        summary.getClos(), summary.getResources()));
             }
         }
         return response;
@@ -173,11 +182,36 @@ public class AdminFlmSyncServiceImpl implements AdminFlmSyncService {
                 .skillLinks(result.skillLinks())
                 .unmatchedSkills(result.unmatchedSkills())
                 .resources(result.resources())
+                .clos(result.clos())
+                .preservedSubjects(result.preservedSubjects())
+                .suspect(isSuspect(result))
                 .build();
         importedJobs.put(jobId, summary);
-        log.info("AdminFlmSync: imported overlay for job {} — {} subjects, {} resources.",
-                jobId, result.subjects(), result.resources());
+        if (summary.isSuspect()) {
+            log.warn("AdminFlmSync: job {} imported {} subjects but no skills, CLOs or resources for any "
+                            + "of them — the scrape most likely failed to authenticate. Existing detail was "
+                            + "left untouched; re-run with a fresh FLM cookie.",
+                    jobId, result.subjects());
+        } else {
+            log.info("AdminFlmSync: imported overlay for job {} — {} subjects, {} CLOs, {} resources "
+                            + "({} subject(s) carried no detail and kept what was stored).",
+                    jobId, result.subjects(), result.clos(), result.resources(), result.preservedSubjects());
+        }
         return summary;
+    }
+
+    /**
+     * A scrape that returned subject shells and nothing else. The scraper reaches the
+     * curriculum listing without a valid session but cannot open any syllabus, so "subjects
+     * found, detail empty" is what an expired cookie looks like — not a real curriculum.
+     * Worth flagging loudly, because the import itself succeeds and would otherwise be
+     * reported to the admin as a clean run.
+     */
+    private static boolean isSuspect(FptOverlayImportService.ImportSummary result) {
+        return result.subjects() > 0
+                && result.skillLinks() == 0
+                && result.clos() == 0
+                && result.resources() == 0;
     }
 
     private static String text(JsonNode node, String field) {

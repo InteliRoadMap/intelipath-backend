@@ -140,8 +140,10 @@ public class DatabaseSeeder implements CommandLineRunner {
             FptOverlayImportService.CurriculumRef ref =
                     new FptOverlayImportService.CurriculumRef("BIT_SE", "2507", true);
             FptOverlayImportService.ImportSummary summary = fptOverlayImportService.importOverlay(root, ref);
-            log.info("DatabaseSeeder: FPT import done — {} subjects, {} skill links ({} unmatched names), {} resources.",
-                    summary.subjects(), summary.skillLinks(), summary.unmatchedSkills(), summary.resources());
+            log.info("DatabaseSeeder: FPT import done — {} subjects, {} skill links ({} unmatched names), "
+                            + "{} CLOs, {} resources.",
+                    summary.subjects(), summary.skillLinks(), summary.unmatchedSkills(),
+                    summary.clos(), summary.resources());
         } catch (Exception e) {
             log.error("DatabaseSeeder: Error occurred while importing {}", FLM_OVERLAY, e);
         }
