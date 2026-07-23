@@ -1,11 +1,19 @@
 package com.inteliroadmap.backend.domain.entity;
 
-import jakarta.persistence.*;
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
+import java.util.List;
 import java.util.UUID;
 
 @Entity
@@ -21,9 +29,13 @@ public class Skill {
     @Column(name = "skill_id")
     private UUID skillId;
 
-    @Column(name = "name", nullable = false)
-    private String name;
-
-    @Column(name = "category")
     private String category;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "careers", columnDefinition = "jsonb")
+    private List<CareerRole> careers;
+
+    @Column(name = "skill_name", nullable = false)
+    private String skillName;
 }
+

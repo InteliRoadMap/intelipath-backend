@@ -1,30 +1,35 @@
 package com.inteliroadmap.backend.controllers;
 
+import com.inteliroadmap.backend.domain.dto.request.ForgotPasswordRequest;
 import com.inteliroadmap.backend.domain.dto.request.LoginRequest;
-import com.inteliroadmap.backend.domain.dto.request.RefreshRequest;
-import com.inteliroadmap.backend.domain.dto.request.RegisterRequest;
-import com.inteliroadmap.backend.domain.dto.response.RefreshResponse;
-import com.inteliroadmap.backend.domain.dto.response.RegisterResponse;
-import com.inteliroadmap.backend.domain.dto.response.UserResponse;
+import com.inteliroadmap.backend.domain.dto.request.ResetPasswordRequest;
+import com.inteliroadmap.backend.domain.dto.response.auth.RefreshResponse;
+import com.inteliroadmap.backend.security.AuthenticationCookieService;
 import com.inteliroadmap.backend.services.AuthService;
-import com.inteliroadmap.backend.services.OAuth2UserService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.server.ResponseStatusException;
+import org.springframework.web.bind.annotation.CookieValue;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 /**
  * Controller - Authentication API Endpoints
  * Provides endpoints:
- * - POST /auth/register - Register new student account
- * - POST /auth/login    - Login with email and password
+ * - POST /api/v1/auth/login   - Sign in with an FPT account's username and password
+ * - POST /api/v1/auth/refresh - Rotate a refresh token and issue new tokens
  */
 @RestController
 @RequestMapping("/api/v1/auth")
@@ -34,103 +39,58 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
-    private final OAuth2UserService oAuth2UserService;
+    private final AuthenticationCookieService authenticationCookieService;
 
     /**
-     * POST /auth/register - Register new student account
-     * @param registerRequest RegisterRequest containing email, password, fullName
-     * @return ResponseEntity containing ApiResponse with UserResponse
-     */
-    @PostMapping("/register")
-    @Operation(
-            summary = "Register new account",
-            description = "Register a new Student account using email and password"
-    )
-    @ApiResponses(value = {
-            @ApiResponse(
-                    responseCode = "201",
-                    description = "Account registered successfully",
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = UserResponse.class)
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "400",
-                    description = "Email already exists or invalid request payload"
-            )
-    })
-    public ResponseEntity<RegisterResponse> registerAccount(
-            @io.swagger.v3.oas.annotations.parameters.RequestBody(
-                    description = "Register request payload",
-                    required = true,
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = RegisterRequest.class)
-                    )
-            )
-            @RequestBody @Valid RegisterRequest registerRequest
-    ) {
-        log.info("Register request received for email: {}", registerRequest.getEmail());
-        return ResponseEntity.ok(authService.registerAccount(registerRequest));
-    }
-
-    /**
-     * POST /auth/login - Login with email and password
-     * @param loginRequest LoginRequest containing email and password
-     * @return ResponseEntity containing ApiResponse with UserResponse
+     * Signs in an FPT account provisioned by a counselor.
+     *
+     * @param request the submitted username and password
+     * @param servletResponse response the refresh token cookie is attached to
+     * @return response containing the newly issued access token
      */
     @PostMapping("/login")
     @Operation(
-            summary = "Login with email and password",
-            description = "Authenticate user and receive JWT access token"
+            summary = "Log in with username and password",
+            description = "Authenticate an FPT account and issue a JWT access token plus a refreshToken HttpOnly cookie"
     )
     @ApiResponses(value = {
             @ApiResponse(
                     responseCode = "200",
-                    description = "Login successful",
+                    description = "Logged in successfully",
                     content = @Content(
                             mediaType = "application/json",
-                            schema = @Schema(implementation = UserResponse.class)
+                            schema = @Schema(implementation = RefreshResponse.class)
                     )
             ),
             @ApiResponse(
                     responseCode = "401",
-                    description = "Wrong password"
+                    description = "Invalid username or password"
             ),
             @ApiResponse(
                     responseCode = "403",
-                    description = "Account is suspended"
-            ),
-            @ApiResponse(
-                    responseCode = "404",
-                    description = "Email not found"
+                    description = "Account is not active"
             )
     })
-    public ResponseEntity<UserResponse>loginAccount(
-            @io.swagger.v3.oas.annotations.parameters.RequestBody(
-                    description = "Login request payload",
-                    required = true,
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = LoginRequest.class)
-                    )
-            )
-            @RequestBody @Valid LoginRequest loginRequest
+    public ResponseEntity<RefreshResponse> login(
+            @Valid @RequestBody LoginRequest request,
+            HttpServletResponse servletResponse
     ) {
-        log.info("Login request received for email: {}", loginRequest.getEmail());
-        return ResponseEntity.ok(authService.loginAccount(loginRequest));
+        log.info("AuthController: Login request received");
+        RefreshResponse loginResponse = authService.login(request);
+        authenticationCookieService.addRefreshTokenCookie(servletResponse, loginResponse.getRefreshToken());
+        return ResponseEntity.ok(loginResponse);
     }
 
     /**
-     * POST /auth/refresh - Refresh access token using refresh token
-     * @param refreshRequest RefreshRequest containing refresh token
-     * @return ResponseEntity containing new access token
+     * Rotates a valid refresh token stored in an HttpOnly cookie and returns a new access token.
+     *
+     * @param refreshToken refresh token read from HttpOnly cookie
+     * @return response containing newly issued access token
      */
     @PostMapping("/refresh")
     @Operation(
             summary = "Refresh access token",
-            description = "Generate new JWT access token using refresh token"
+            description = "Read refreshToken from HttpOnly cookie, rotate it, and generate a new JWT access token"
     )
     @ApiResponses(value = {
             @ApiResponse(
@@ -151,20 +111,69 @@ public class AuthController {
             )
     })
     public ResponseEntity<RefreshResponse> refreshAccount(
-            @io.swagger.v3.oas.annotations.parameters.RequestBody(
-                    description = "Refresh token payload",
-                    required = true,
-                    content = @Content(
-                            mediaType = "application/json",
-                            schema = @Schema(implementation = RefreshRequest.class)
-                    )
-            )
-            @RequestBody @Valid RefreshRequest refreshRequest
+            @CookieValue(name = AuthenticationCookieService.REFRESH_TOKEN_COOKIE_NAME, required = false) String refreshToken,
+            HttpServletResponse servletResponse
     ) {
-        log.info("Refresh token request received");
-        return ResponseEntity.ok(
-                authService.refreshAccount(refreshRequest)
-        );
+        log.info("AuthController: Refresh token request received");
+        if (refreshToken == null || refreshToken.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Refresh token is missing");
+        }
+
+        RefreshResponse refreshResponse = authService.refreshAccount(refreshToken);
+        authenticationCookieService.addRefreshTokenCookie(servletResponse, refreshResponse.getRefreshToken());
+        return ResponseEntity.ok(refreshResponse);
+    }
+
+    /**
+     * Starts the magic-link password reset. Always returns 200 with a neutral message, whether or
+     * not the email maps to an account, so a caller cannot use this endpoint to discover which
+     * addresses are registered.
+     */
+    @PostMapping("/forgot-password")
+    @Operation(
+            summary = "Request a password reset link",
+            description = "If the email belongs to an account with a local password, emails a one-time reset link. Always returns 200."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Request accepted; a link is sent if the account exists")
+    })
+    public ResponseEntity<String> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        log.info("AuthController: Forgot-password request received");
+        authService.forgotPassword(request.getEmail());
+        return ResponseEntity.ok("If an account exists for that email, a reset link has been sent.");
+    }
+
+    /**
+     * Completes a password reset using the token from the emailed link.
+     */
+    @PostMapping("/reset-password")
+    @Operation(
+            summary = "Reset password with a token",
+            description = "Validates the one-time token from the emailed link and sets a new password."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Password reset successfully"),
+            @ApiResponse(responseCode = "400", description = "Reset link is invalid or has expired")
+    })
+    public ResponseEntity<String> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        log.info("AuthController: Reset-password request received");
+        authService.resetPassword(request.getToken(), request.getNewPassword());
+        return ResponseEntity.ok("Password has been reset successfully.");
+    }
+
+    @PostMapping("/logout")
+    @Operation(
+            summary = "Logout",
+            description = "Delete the refreshToken HttpOnly cookie and revoke it server-side when present"
+    )
+    public ResponseEntity<String> logout(
+            @CookieValue(name = AuthenticationCookieService.REFRESH_TOKEN_COOKIE_NAME, required = false) String refreshToken,
+            HttpServletResponse servletResponse
+    ) {
+        log.info("AuthController: Logout request received");
+        authService.logout(refreshToken);
+        authenticationCookieService.clearRefreshTokenCookie(servletResponse);
+        return ResponseEntity.ok("Logged out successfully");
     }
 
 }

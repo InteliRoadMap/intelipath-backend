@@ -5,24 +5,43 @@ spring:
   profiles:
     active: prod
 
+  servlet:
+    multipart:
+      # Container-level guardrail: reject oversized uploads before they reach the
+      # controllers. Per-endpoint type/size checks live in FileValidationUtil.
+      max-file-size: 10MB
+      max-request-size: 30MB
+
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${GOOGLE_EMAIL_USERNAME}
+    password: ${GOOGLE_EMAIL_PASSWORD}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
   datasource:
     url: ${DB_URL}
     username: ${DB_USERNAME}
     password: ${DB_PASSWORD}
     # HikariCP: Connection Pool giúp quản lý kết nối DB
     hikari:
-      # 5 connection idle
-      minimum-idle: 5
-      # 10 * 60 * 1000 = 10M : If idle over 10m Hikari will close connection
-      idle-timeout: 600000
-      # 18 * 60 * 1000 = 30M : Hikari will replace by new connection
-      max-lifetime: 1800000
-      # 3 * 1000 = 30ML : Time to give new connection for app
+      minimum-idle: 1
+      maximum-pool-size: 5
+      # Close excess idle connections after 5 minutes.
+      idle-timeout: 300000
+      # Refresh connections before long-lived pooler sessions become stale.
+      max-lifetime: 1200000
+      # Maximum time to wait for a connection from the pool.
       connection-timeout: 30000
 
   jpa:
     hibernate:
-      ddl-auto: update
+      ddl-auto: none
     properties:
       hibernate:
         format_sql: true
@@ -40,16 +59,98 @@ spring:
           github:
             client-id: ${CLIENT_ID_GITHUB}
             client-secret: ${CLIENT_SECRET_GITHUB}
+            # Login only needs identity. The invasive 'repo' scope is requested separately by
+            # the explicit "Connect GitHub" sync link flow (GithubAccountLinkService), so a
+            # plain login never asks for access to private repositories.
             scope:
               - user:email
               - read:user
 
-jwt:
-  secret: ${JWT_SECRET}
-  expiration: ${JWT_EXPIRATION:86400000}
+  ai:
+    openai:
+      api-key: ${OPENAI_API_KEY}
+      chat:
+        options:
+          model: ${OPENAI_MODEL}
+          # Lower = more consistent/deterministic answers (good for analysis).
+          # Raise toward 0.7 for more creative replies. Tune here.
+          temperature: ${OPENAI_TEMPERATURE:0.3}
+    vectorstore:
+      pgvector:
+        initialize-schema: true
+        index-type: HNSW
+        distance-type: COSINE_DISTANCE
+        dimensions: 1536
+    mcp:
+      client:
+        enabled: ${MCP_DOCUMENT_SERVICE_ENABLED:false}
+        initialized: ${MCP_DOCUMENT_SERVICE_ENABLED:false}
+        request-timeout: ${MCP_DOCUMENT_SERVICE_TIMEOUT:60s}
+        streamable-http:
+          connections:
+            document-tools:
+              # Spring's Streamable-HTTP client appends its MCP endpoint path (/mcp).
+              url: ${MCP_DOCUMENT_SERVICE_URL:http://localhost:8000}
+
+app:
+  # Base URL of the frontend, used to build the emailed password-reset link
+  # (FRONTEND_URL/reset-password?token=...). Override per environment via env.
+  frontend-url: ${FRONTEND_URL:http://localhost:5173}
+
+supabase:
+  url: ${SUPABASE_URL}
+  key: ${SUPABASE_KEY}
 
 springdoc:
   swagger-ui:
     path: /swagger-ui.html
   api-docs:
     path: /v3/api-docs
+
+ai-service:
+  base-url: ${AI_SERVICE_BASE_URL:http://localhost:8000}
+  api-key: ${AI_SERVICE_API_KEY:}
+  connect-timeout: ${AI_SERVICE_CONNECT_TIMEOUT:5s}
+  read-timeout: ${AI_SERVICE_READ_TIMEOUT:300s}
+
+mentor:
+  # RAG retrieval embeds every message and queries the vector store, adding
+  # latency. Set false to skip it and make chat noticeably faster when you are
+  # not using ingested knowledge. Tune here.
+  rag-enabled: ${MENTOR_RAG_ENABLED:true}
+
+# Credentials for the seeded dev accounts. Supplied from .env, never defaulted:
+# a password in the repo is a password everyone with repo access knows. Leave a
+# pair unset and that account seeds without a local credential (OAuth only).
+seed:
+  admin:
+    username: ${SEED_ADMIN_USERNAME:}
+    password: ${SEED_ADMIN_PASSWORD:}
+  counselor:
+    username: ${SEED_COUNSELOR_USERNAME:}
+    password: ${SEED_COUNSELOR_PASSWORD:}
+  student:
+    username: ${SEED_STUDENT_USERNAME:}
+    password: ${SEED_STUDENT_PASSWORD:}
+  mentor:
+    password: ${SEED_MENTOR_PASSWORD:}
+    username: ${SEED_MENTOR_USERNAME:}
+
+roadmap:
+  # A topic (spine) node auto-completes once this fraction of its child sub-skills'
+  # weight is COMPLETED (0.6 = 60%). Children unlock as soon as the topic is reached,
+  # and the student never marks a topic manually. Tune here.
+  parent-completion-threshold: ${ROADMAP_PARENT_COMPLETION_THRESHOLD:0.6}
+
+github:
+  # Optional app-level PAT used for public-repo reads when a student has no stored
+  # OAuth token (e.g. pasting a public repo URL). Leave blank to call GitHub anonymously.
+  token: ${GITHUB_TOKEN:}
+  # Base64 256-bit AES key for encrypting stored GitHub OAuth access tokens at rest.
+  # When blank, token storage is disabled and the "Sync GitHub" (private repos) flow is off.
+  token-enc-key: ${GITHUB_TOKEN_ENC_KEY:}
+  # Dedicated OAuth App for the "Connect GitHub" repo-sync link flow — SEPARATE from the
+  # login OAuth App above so its callback URL ({frontend}/github/callback) can be registered
+  # without disturbing login. Create a second OAuth App on GitHub and set these envs.
+  link-client-id: ${CLIENT_ID_GITHUB_LINK:}
+  link-client-secret: ${CLIENT_SECRET_GITHUB_LINK:}

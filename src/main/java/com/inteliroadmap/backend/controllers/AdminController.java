@@ -1,22 +1,35 @@
 package com.inteliroadmap.backend.controllers;
 
-import com.inteliroadmap.backend.domain.dto.request.admin.UpdateUserRoleRequest;
+import com.inteliroadmap.backend.services.SkillExtractionService;
+import com.inteliroadmap.backend.scheduler.JobScrapingScheduler;
+import com.inteliroadmap.backend.domain.dto.request.UpdateUserRoleRequest;
+import com.inteliroadmap.backend.domain.dto.request.UpdateUserStatusRequest;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminCourseMetricResponse;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminSystemHealthResponse;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminUserListItemResponse;
 import com.inteliroadmap.backend.domain.dto.response.admin.AdminUserMetricResponse;
-import com.inteliroadmap.backend.services.dashboard.AdminDashboardService;
+import com.inteliroadmap.backend.services.AdminService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
 
@@ -35,14 +48,72 @@ import java.util.List;
 @RequiredArgsConstructor
 @Slf4j
 @Tag(name = "Admin Dashboard", description = "Admin dashboard endpoints")
+@SecurityRequirement(name = "Bearer Authentication")
+@PreAuthorize("hasRole('ADMIN')")
 public class AdminController {
 
-    private final AdminDashboardService adminDashboardService;
+    private final AdminService adminService;
+    private final SkillExtractionService skillExtractionService;
+    private final JobScrapingScheduler jobScrapingScheduler;
+
+    /**
+     * POST /admin/dashboard/trigger-skill-extraction - Manually trigger skill extraction job.
+     */
+    @PostMapping("/trigger-skill-extraction")
+    @Operation(summary = "Trigger Skill Extraction", description = "Manually triggers the background AI skill extraction job.")
+    public ResponseEntity<String> triggerSkillExtraction() {
+        log.info("AdminController: Manual trigger for skill extraction received");
+        try {
+            skillExtractionService.extractAndRebuildSkillTrends();
+            return ResponseEntity.ok("Skill extraction via AI Service completed successfully.");
+        } catch (Exception e) {
+            log.error("AdminController: Error extracting skills", e);
+            return ResponseEntity.internalServerError().body("Error during extraction: " + e.getMessage());
+        }
+    }
+
+    /**
+     * POST /admin/dashboard/trigger-job-scraper - Manually trigger a scraping job.
+     * {@code source} selects the board (topcv | itviec); defaults to topcv for
+     * backward compatibility. ITviec is IT-focused and doesn't need a proxy;
+     * TopCV sits behind Cloudflare and may require SCRAPER_PROXY.
+     */
+    @PostMapping("/trigger-job-scraper")
+    @Operation(summary = "Trigger Job Scraper", description = "Manually triggers the Python AI scraper job to fetch new recruitments. Use source=topcv or source=itviec.")
+    public ResponseEntity<String> triggerJobScraper(
+            @RequestParam(name = "source", defaultValue = "topcv") String source) {
+        log.info("AdminController: Manual trigger for job scraper received (source={})", source);
+        final JobScrapingScheduler.Source target;
+        try {
+            target = JobScrapingScheduler.Source.valueOf(source.trim().toUpperCase());
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body("Unknown source '" + source + "'. Use 'topcv' or 'itviec'.");
+        }
+        try {
+            int posts = jobScrapingScheduler.fetchJobs(target);
+            return ResponseEntity.ok(target + " scraper finished — imported " + posts + " job post(s).");
+        } catch (org.springframework.web.client.ResourceAccessException e) {
+            // Timeouts / connection issues to the AI service surface here.
+            log.error("AdminController: Job scraper timed out or could not reach the AI service", e);
+            return ResponseEntity.status(504).body(
+                target + " scraper timed out. The scrape may still be running on the AI service — "
+                + "try a smaller SCRAPER_LIMIT or check the ai-service logs.");
+        } catch (org.springframework.web.client.RestClientResponseException e) {
+            // The AI service answered with an error (e.g. 502 Cloudflare block for TopCV).
+            // Surface its message cleanly instead of dumping a stack trace.
+            log.warn("AdminController: {} scraper rejected by AI service ({}): {}",
+                target, e.getStatusCode(), e.getResponseBodyAsString());
+            return ResponseEntity.status(e.getStatusCode().value()).body(
+                target + " scraper could not run: " + e.getResponseBodyAsString());
+        } catch (Exception e) {
+            log.error("AdminController: Error triggering job scraper", e);
+            return ResponseEntity.internalServerError().body("Error during trigger: " + e.getMessage());
+        }
+    }
 
     /**
      * GET /admin/dashboard/metrics/users - Get total users metric.
      *
-     * @param authorizationHeader Authorization header containing Bearer access token
      * @return ResponseEntity containing AdminUserMetricResponse
      */
     @GetMapping("/metrics/users")
@@ -69,18 +140,16 @@ public class AdminController {
             )
     })
     public ResponseEntity<AdminUserMetricResponse> getUserMetric(
-            @RequestHeader("Authorization") String authorizationHeader
     ) {
-        log.info("Admin Dashboard Controller: User metric request received");
+        log.info("AdminController: User metric request received");
         return ResponseEntity.ok(
-                adminDashboardService.getUserMetrics(authorizationHeader)
+                adminService.getUserMetrics()
         );
     }
 
     /**
      * GET /admin/dashboard/metrics/courses - Get total courses metric.
      *
-     * @param authorizationHeader Authorization header containing Bearer access token
      * @return ResponseEntity containing AdminCourseMetricResponse
      */
     @GetMapping("/metrics/courses")
@@ -107,18 +176,16 @@ public class AdminController {
             )
     })
     public ResponseEntity<AdminCourseMetricResponse> getCourseMetric(
-            @RequestHeader("Authorization") String authorizationHeader
     ) {
-        log.info("Admin Dashboard Controller: Course metric request received");
+        log.info("AdminController: Course metric request received");
         return ResponseEntity.ok(
-                adminDashboardService.getCourseMetrics(authorizationHeader)
+                adminService.getCourseMetrics()
         );
     }
 
     /**
      * GET /admin/dashboard/metrics/health - Get system health metric.
      *
-     * @param authorizationHeader Authorization header containing Bearer access token
      * @return ResponseEntity containing AdminSystemHealthResponse
      */
     @GetMapping("/metrics/health")
@@ -145,18 +212,16 @@ public class AdminController {
             )
     })
     public ResponseEntity<AdminSystemHealthResponse> getSystemHealth(
-            @RequestHeader("Authorization") String authorizationHeader
     ) {
-        log.info("Admin Dashboard Controller: System health request received");
+        log.info("AdminController: System health request received");
         return ResponseEntity.ok(
-                adminDashboardService.getSystemHealth(authorizationHeader)
+                adminService.getSystemHealth()
         );
     }
 
     /**
      * GET /admin/dashboard/users - Get latest users list.
      *
-     * @param authorizationHeader Authorization header containing Bearer access token
      * @return ResponseEntity containing list of AdminUserListItemResponse
      */
     @GetMapping("/users")
@@ -167,7 +232,11 @@ public class AdminController {
     @ApiResponses(value = {
             @ApiResponse(
                     responseCode = "200",
-                    description = "Users list retrieved successfully"
+                    description = "Users list retrieved successfully",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = AdminUserListItemResponse.class)
+                    )
             ),
             @ApiResponse(
                     responseCode = "401",
@@ -179,18 +248,16 @@ public class AdminController {
             )
     })
     public ResponseEntity<List<AdminUserListItemResponse>> getUsers(
-            @RequestHeader("Authorization") String authorizationHeader
     ) {
-        log.info("Admin Dashboard Controller: Users list request received");
+        log.info("AdminController: Users list request received");
         return ResponseEntity.ok(
-                adminDashboardService.getUsers(authorizationHeader)
+                adminService.getUsers()
         );
     }
 
     /**
      * PATCH /admin/dashboard/users/{userId}/role - Update a user's role.
      *
-     * @param authorizationHeader Authorization header containing Bearer access token
      * @param userId              User id to update
      * @param request             Request payload containing the new role
      * @return ResponseEntity containing updated AdminUserListItemResponse
@@ -227,7 +294,6 @@ public class AdminController {
             )
     })
     public ResponseEntity<AdminUserListItemResponse> updateUserRole(
-            @RequestHeader("Authorization") String authorizationHeader,
             @PathVariable String userId,
             @io.swagger.v3.oas.annotations.parameters.RequestBody(
                     description = "Update user role request payload",
@@ -239,16 +305,59 @@ public class AdminController {
             )
             @RequestBody @Valid UpdateUserRoleRequest request
     ) {
-        log.info("Admin Dashboard Controller: Update user role request received. userId: {}", userId);
+        log.info("AdminController: Update user role request received. userId: {}", userId);
         return ResponseEntity.ok(
-                adminDashboardService.updateUserRole(authorizationHeader, userId, request)
+                adminService.updateUserRole(userId, request)
+        );
+    }
+
+    /**
+     * PATCH /admin/dashboard/users/{userId}/status - Suspend / reactivate a user.
+     *
+     * @param userId              User id to update
+     * @param request             Request payload containing the new account status
+     * @return ResponseEntity containing updated AdminUserListItemResponse
+     */
+    @PatchMapping("/users/{userId}/status")
+    @Operation(
+            summary = "Update user account status",
+            description = "Suspend, deactivate or reactivate a user's account (soft account control)"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(
+                    responseCode = "200",
+                    description = "User status updated successfully",
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = AdminUserListItemResponse.class)
+                    )
+            ),
+            @ApiResponse(responseCode = "400", description = "Invalid user id or admin cannot suspend own account"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized or invalid token"),
+            @ApiResponse(responseCode = "403", description = "Admin access required"),
+            @ApiResponse(responseCode = "404", description = "User not found")
+    })
+    public ResponseEntity<AdminUserListItemResponse> updateUserStatus(
+            @PathVariable String userId,
+            @io.swagger.v3.oas.annotations.parameters.RequestBody(
+                    description = "Update user status request payload",
+                    required = true,
+                    content = @Content(
+                            mediaType = "application/json",
+                            schema = @Schema(implementation = UpdateUserStatusRequest.class)
+                    )
+            )
+            @RequestBody @Valid UpdateUserStatusRequest request
+    ) {
+        log.info("AdminController: Update user status request received. userId: {}", userId);
+        return ResponseEntity.ok(
+                adminService.updateUserStatus(userId, request)
         );
     }
 
     /**
      * DELETE /admin/dashboard/users/{userId} - Delete a user.
      *
-     * @param authorizationHeader Authorization header containing Bearer access token
      * @param userId              User id to delete
      * @return ResponseEntity with no content
      */
@@ -280,11 +389,10 @@ public class AdminController {
             )
     })
     public ResponseEntity<Void> deleteUser(
-            @RequestHeader("Authorization") String authorizationHeader,
             @PathVariable String userId
     ) {
-        log.info("Admin Dashboard Controller: Delete user request received. userId: {}", userId);
-        adminDashboardService.deleteUser(authorizationHeader, userId);
+        log.info("AdminController: Delete user request received. userId: {}", userId);
+        adminService.deleteUser(userId);
         return ResponseEntity.noContent().build();
     }
 }

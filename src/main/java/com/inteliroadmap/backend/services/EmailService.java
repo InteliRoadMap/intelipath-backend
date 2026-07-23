@@ -1,42 +1,27 @@
-//package com.inteliroadmap.backend.services;
-//
-//import com.inteliroadmap.backend.utils.EmailUtil;
-//import jakarta.mail.MessagingException;
-//import jakarta.mail.internet.MimeMessage;
-//import lombok.RequiredArgsConstructor;
-//import lombok.extern.slf4j.Slf4j;
-//import org.springframework.mail.javamail.JavaMailSender;
-//import org.springframework.mail.javamail.MimeMessageHelper;
-//import org.springframework.stereotype.Service;
-//
-//@Service
-//@RequiredArgsConstructor
-//@Slf4j
-//public class EmailService {
-//
-//    private final JavaMailSender mailSender;
-//
-//    public void sendOtpEmail(String email, String fullName, String otp) {
-//        log.info("Email Module: Preparing OTP email for {}", email);
-//
-//        try {
-//            MimeMessage message = mailSender.createMimeMessage();
-//            MimeMessageHelper helper =
-//                    new MimeMessageHelper(message, true, "UTF-8");
-//
-//            String htmlContent = EmailUtil.RESET_PASSWORD_OTP.formatted(fullName, otp);
-//            helper.setTo(email);
-//
-//            helper.setSubject("🔐 Password Reset OTP - InteliPath");
-//            helper.setText(htmlContent, true);
-//
-//            mailSender.send(message);
-//            log.info("Email Module: OTP email successfully sent to {}", email);
-//
-//        } catch (MessagingException e) {
-//            log.error("Email Module: Failed to send OTP email", e);
-//            throw new RuntimeException("Email Module: Failed to send OTP email");
-//        }
-//    }
-//}
-//
+package com.inteliroadmap.backend.services;
+
+import com.inteliroadmap.backend.domain.enums.UserRole;
+import org.springframework.web.multipart.MultipartFile;
+import java.util.List;
+
+public interface EmailService {
+
+    /**
+     * Notifies a student that someone reviewed their work.
+     *
+     * @param senderRole who wrote it. The email names the sender's role to the reader, so a
+     *                   mentor's review must not arrive introduced as a counselor's.
+     */
+    void sendFeedbackNotificationEmail(String email, String receiverName, String senderName,
+                                       UserRole senderRole, String content,
+                                       List<MultipartFile> attachments);
+
+    /**
+     * Sends the password-reset magic link.
+     *
+     * @param email     recipient address
+     * @param fullName  recipient display name for the greeting
+     * @param resetLink the one-time reset URL (frontend route with the raw token)
+     */
+    void sendPasswordResetEmail(String email, String fullName, String resetLink);
+}

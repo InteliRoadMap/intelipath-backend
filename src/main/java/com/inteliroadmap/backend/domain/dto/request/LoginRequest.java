@@ -1,26 +1,22 @@
 package com.inteliroadmap.backend.domain.dto.request;
 
-
-import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
-import lombok.AllArgsConstructor;
-import lombok.Builder;
+import jakarta.validation.constraints.Size;
 import lombok.Data;
-import lombok.NoArgsConstructor;
 
+/**
+ * Credentials for an account that was provisioned rather than self-registered:
+ * staff (counselor, mentor, admin) and FPT students. Accounts created through
+ * OAuth have no username or password and cannot sign in this way.
+ */
 @Data
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
 public class LoginRequest {
 
-    // The  email used to identify the user logging in.
-    @NotBlank(message = "Email is required")
-    @Email(message = "Email is invalid")
-    private String email;
+    @NotBlank(message = "Username is required")
+    @Size(max = 100, message = "Username must not exceed 100 characters")
+    private String username;
 
-    // The plain-text password provided by the user to authenticate.
     @NotBlank(message = "Password is required")
+    @Size(max = 200, message = "Password must not exceed 200 characters")
     private String password;
-
 }

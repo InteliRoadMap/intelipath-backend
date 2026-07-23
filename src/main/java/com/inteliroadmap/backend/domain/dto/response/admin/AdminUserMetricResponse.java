@@ -1,6 +1,9 @@
 package com.inteliroadmap.backend.domain.dto.response.admin;
 
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Data
 @NoArgsConstructor
