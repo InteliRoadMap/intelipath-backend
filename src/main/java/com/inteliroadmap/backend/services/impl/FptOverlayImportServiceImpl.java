@@ -48,7 +48,7 @@ public class FptOverlayImportServiceImpl implements FptOverlayImportService {
         JsonNode subjects = root.path("subjects");
         if (!subjects.isArray()) {
             log.warn("FptOverlayImport: overlay has no 'subjects' array. Nothing imported.");
-            return new ImportSummary(0, 0, 0, 0);
+            return new ImportSummary(0, 0, 0, 0, 0, 0);
         }
 
         FptCurriculum curriculum = upsertCurriculum(ref);
@@ -60,6 +60,7 @@ public class FptOverlayImportServiceImpl implements FptOverlayImportService {
         int resourceCount = 0;
         int cloCount = 0;
         int unmatchedSkills = 0;
+        int preservedSubjects = 0;
         for (JsonNode s : subjects) {
             String code = s.path("code").asText("").trim();
             if (code.isEmpty()) continue;
@@ -85,32 +86,59 @@ public class FptOverlayImportServiceImpl implements FptOverlayImportService {
                     .comboName(textOr(s, "combo_name", null))
                     .build());
 
-            // Rebuild this subject's skills + resources (scoped bulk delete + re-insert).
-            fptSubjectSkillRepository.deleteBySubjectCode(code);
-            for (JsonNode sk : s.path("skills")) {
-                String skillName = sk.asText("").trim();
-                if (skillName.isEmpty()) continue;
-                Skill skill = skillRepository.findBySkillName(skillName);
-                if (skill == null) unmatchedSkills++;
-                fptSubjectSkillRepository.save(FptSubjectSkill.builder()
-                        .subjectCode(code)
-                        .skillId(skill != null ? skill.getSkillId() : null)
-                        .skillName(skillName)
-                        .build());
-                skillCount++;
+            // Rebuild a facet only when the overlay actually carries it. Deleting first and
+            // re-inserting nothing is how an empty scrape erases good data: on 2026-07-22 a
+            // sync returned 47 bare subjects and took every CLO and every mirrored file with
+            // it, orphaning files that were still sitting in storage.
+            boolean carriedAnything = false;
+
+            if (hasEntries(s, "skills")) {
+                carriedAnything = true;
+                fptSubjectSkillRepository.deleteBySubjectCode(code);
+                for (JsonNode sk : s.path("skills")) {
+                    String skillName = sk.asText("").trim();
+                    if (skillName.isEmpty()) continue;
+                    Skill skill = skillRepository.findBySkillName(skillName);
+                    if (skill == null) unmatchedSkills++;
+                    fptSubjectSkillRepository.save(FptSubjectSkill.builder()
+                            .subjectCode(code)
+                            .skillId(skill != null ? skill.getSkillId() : null)
+                            .skillName(skillName)
+                            .build());
+                    skillCount++;
+                }
             }
 
-            fptSubjectCloRepository.deleteBySubjectCode(code);
-            cloCount += importSubjectClos(code, s);
+            if (hasEntries(s, "clos")) {
+                carriedAnything = true;
+                fptSubjectCloRepository.deleteBySubjectCode(code);
+                cloCount += importSubjectClos(code, s);
+            }
 
-            fptSubjectResourceRepository.deleteBySubjectCode(code);
-            resourceCount += importSubjectResources(code, s);
+            if (hasEntries(s, "materials") || hasEntries(s, "sessions")) {
+                carriedAnything = true;
+                fptSubjectResourceRepository.deleteBySubjectCode(code);
+                resourceCount += importSubjectResources(code, s);
+            }
+
+            if (!carriedAnything) {
+                preservedSubjects++;
+            }
         }
 
         log.info("FptOverlayImport: curriculum {} — {} subjects, {} skill links ({} unmatched), "
-                        + "{} CLOs, {} resources.",
-                curriculum.getCode(), subjectCount, skillCount, unmatchedSkills, cloCount, resourceCount);
-        return new ImportSummary(subjectCount, skillCount, unmatchedSkills, resourceCount);
+                        + "{} CLOs, {} resources. {} subject(s) carried no detail; their stored "
+                        + "skills/CLOs/resources were left untouched.",
+                curriculum.getCode(), subjectCount, skillCount, unmatchedSkills, cloCount,
+                resourceCount, preservedSubjects);
+        return new ImportSummary(subjectCount, skillCount, unmatchedSkills, resourceCount,
+                cloCount, preservedSubjects);
+    }
+
+    /** True when the overlay carries at least one entry under {@code field} for this subject. */
+    private static boolean hasEntries(JsonNode subject, String field) {
+        JsonNode node = subject.path(field);
+        return node.isArray() && node.size() > 0;
     }
 
     /** Upsert the curriculum row by code, parsing program/cohort/batch from the code. */

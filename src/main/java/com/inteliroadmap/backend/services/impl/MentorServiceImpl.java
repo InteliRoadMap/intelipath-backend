@@ -32,6 +32,7 @@ import com.inteliroadmap.backend.repositories.StudentRepository;
 import com.inteliroadmap.backend.repositories.StudentSkillRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.services.MentorService;
+import com.inteliroadmap.backend.services.EmailService;
 import com.inteliroadmap.backend.services.RoadmapService;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -69,6 +70,7 @@ public class MentorServiceImpl implements MentorService {
     private final SkillNodeRepository skillNodeRepository;
     private final IndustryMentorRepository industryMentorRepository;
     private final RoadmapService roadmapService;
+    private final EmailService emailService;
 
     private User getAuthenticatedMentor() {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -145,7 +147,7 @@ public class MentorServiceImpl implements MentorService {
 
     private String getRelativeTime(LocalDateTime time) {
         if (time == null) return "Unknown";
-        long days = java.time.Duration.between(time, LocalDateTime.now()).toDays();
+        long days = Duration.between(time, LocalDateTime.now()).toDays();
         if (days == 0) return "Today";
         if (days == 1) return "1 day ago";
         return days + " days ago";
@@ -162,13 +164,14 @@ public class MentorServiceImpl implements MentorService {
             User studentUser = userRepository.findById(req.getStudent().getUserId()).orElse(null);
             
             String name = studentUser != null ? studentUser.getFullName() : "Unknown";
-            String yob = studentUser != null && studentUser.getYob() != null ? String.valueOf(studentUser.getYob().getYear()) : "Unknown";
+            String yob = studentUser != null && studentUser.getYob() != null ? String.valueOf(studentUser.getYob()) : "Unknown";
             String university = student != null && student.getUniversityName() != null ? student.getUniversityName() : "Unknown";
             String career = student != null && student.getCareerRole() != null ? student.getCareerRole().getCareerName() : "Unknown";
 
             return MentorPendingReviewResponse.builder()
                     .id(req.getRequestId().toString())
                     .studentId(req.getStudent().getUserId().toString())
+                    .portfolioSlug(student != null ? student.getPortfolioSlug() : null)
                     .studentName(name)
                     .yob(yob)
                     .targetCareer(career)
@@ -201,6 +204,7 @@ public class MentorServiceImpl implements MentorService {
 
             dtos.add(MentorStudentResponse.builder()
                     .id(userSt.getUserId().toString())
+                    .portfolioSlug(student.getPortfolioSlug())
                     .fullName(userSt.getFullName())
                     .email(userSt.getEmail())
                     .career(career)
@@ -438,6 +442,22 @@ public class MentorServiceImpl implements MentorService {
         feedback.setContent(request.getContent());
         feedback.setType(request.getType());
         feedback = feedbackRepository.save(feedback);
+
+        // Notify the student by email, mirroring counselor feedback. Best-effort: a mail
+        // failure must not roll back the saved feedback or the review-request resolution
+        // below, so we swallow it here (the email helper otherwise throws).
+        try {
+            emailService.sendFeedbackNotificationEmail(
+                    receiver.getEmail(),
+                    receiver.getFullName(),
+                    sender.getFullName(),
+                    sender.getRole(),
+                    request.getContent(),
+                    null
+            );
+        } catch (Exception e) {
+            log.error("MentorServiceImpl: failed to send feedback notification email to {}", receiver.getEmail(), e);
+        }
 
         // Auto-resolve pending review requests from this student to this mentor
         List<PortfolioReviewRequest> pendingRequests = reviewRequestRepository.findByMentor_UserIdAndStatus(sender.getUserId(), ReviewStatus.PENDING, Pageable.unpaged()).getContent();

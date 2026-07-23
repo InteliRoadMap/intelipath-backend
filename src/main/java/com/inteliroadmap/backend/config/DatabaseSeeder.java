@@ -21,6 +21,7 @@ import com.inteliroadmap.backend.repositories.StudentRepository;
 import com.inteliroadmap.backend.repositories.StudentSkillRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.services.FptOverlayImportService;
+import com.inteliroadmap.backend.services.PortfolioSlugService;
 import com.opencsv.CSVReader;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -62,6 +63,7 @@ public class DatabaseSeeder implements CommandLineRunner {
     private final FptSubjectSkillRepository fptSubjectSkillRepository;
     private final FptOverlayImportService fptOverlayImportService;
     private final PasswordEncoder passwordEncoder;
+    private final PortfolioSlugService portfolioSlugService;
     private final SeedAccountsProperties seedAccounts;
 
     // v2 seed data: id-based tree + selection semantics (see intelipath-service/scripts/migrate_roadmap.py).
@@ -89,6 +91,7 @@ public class DatabaseSeeder implements CommandLineRunner {
         importFptSubjectData();
         importMockUsersData();
         importMockReviewRequests();
+        backfillPortfolioSlugs();
 
         log.info("DatabaseSeeder: =====================================================");
         log.info("DatabaseSeeder:  SEEDING SUMMARY NOTIFICATION ");
@@ -137,8 +140,10 @@ public class DatabaseSeeder implements CommandLineRunner {
             FptOverlayImportService.CurriculumRef ref =
                     new FptOverlayImportService.CurriculumRef("BIT_SE", "2507", true);
             FptOverlayImportService.ImportSummary summary = fptOverlayImportService.importOverlay(root, ref);
-            log.info("DatabaseSeeder: FPT import done — {} subjects, {} skill links ({} unmatched names), {} resources.",
-                    summary.subjects(), summary.skillLinks(), summary.unmatchedSkills(), summary.resources());
+            log.info("DatabaseSeeder: FPT import done — {} subjects, {} skill links ({} unmatched names), "
+                            + "{} CLOs, {} resources.",
+                    summary.subjects(), summary.skillLinks(), summary.unmatchedSkills(),
+                    summary.clos(), summary.resources());
         } catch (Exception e) {
             log.error("DatabaseSeeder: Error occurred while importing {}", FLM_OVERLAY, e);
         }
@@ -476,6 +481,35 @@ public class DatabaseSeeder implements CommandLineRunner {
     }
 
     /**
+     * Gives a slug to any student still missing one.
+     *
+     * The DDL declares portfolio_slug NOT NULL, but that only binds databases
+     * created after the change: 01_init_intelipath.sql runs once, on an empty
+     * volume. Databases seeded before it hold rows with a null slug, and every
+     * one of them is a portfolio nobody can open. This repairs them in place.
+     *
+     * Cheap when there is nothing to do — one indexed query returning no rows.
+     */
+    private void backfillPortfolioSlugs() {
+        List<Student> unslugged = studentRepository.findByPortfolioSlugIsNullOrPortfolioSlugEquals("");
+        if (unslugged.isEmpty()) {
+            return;
+        }
+
+        log.info("DatabaseSeeder: Backfilling portfolio slugs for {} student(s)...", unslugged.size());
+        for (Student student : unslugged) {
+            User user = userRepository.findById(student.getUserId()).orElse(null);
+            if (user == null) {
+                log.warn("DatabaseSeeder: Student {} has no user row; cannot build a slug.", student.getUserId());
+                continue;
+            }
+            student.setPortfolioSlug(portfolioSlugService.allocateFor(user));
+            studentRepository.save(student);
+        }
+        log.info("DatabaseSeeder: Portfolio slug backfill done.");
+    }
+
+    /**
      * Portfolio review requests aimed at the seeded mentor.
      *
      * This is the only relationship between a mentor and a student that exists:
@@ -556,7 +590,8 @@ public class DatabaseSeeder implements CommandLineRunner {
         if (counselor == null) {
             counselor = AcademicCounselor.builder()
                     .userId(userCou.getUserId())
-                    .department("Software Engineering")
+                    .universityName(FPT_UNIVERSITY_NAME)
+                    .department("Software Engineer")
                     .build();
         }
         counselor.setDepartment("Software Engineer");
@@ -607,6 +642,10 @@ public class DatabaseSeeder implements CommandLineRunner {
         st.setUniversityName(FPT_UNIVERSITY_NAME);
         st.setCareerRole(careerRoleRepository.findByCareerName("Frontend"));
         st.setMajor("Software Engineer");
+        // Re-derived rather than filled-only: this account's identity is defined here,
+        // and it has been renamed since it was first seeded, so a slug left over from
+        // the old name would still be pointing at it.
+        st.setPortfolioSlug(portfolioSlugService.allocateFor(userSt));
         studentRepository.save(st);
 
         // ------------------- Random Student Accounts ------------------ //
@@ -635,13 +674,23 @@ public class DatabaseSeeder implements CommandLineRunner {
                     .email("fe_student" + i + "@example.com")
                     .fullName("Frontend Student " + i)
                     .role(UserRole.STUDENT)
-                    // Non-FPT bulk students: they see roadmap.sh resources only.
+                    // FPT on purpose, despite the plan once calling for OTHER here.
+                    //
+                    // These rows are fixtures, not accounts: they get no username and no
+                    // password, and login goes through findByUsername, so nobody can ever
+                    // sign in as one. That makes accountType irrelevant to FPT resource
+                    // gating for them -- there is no session to gate -- and leaves it
+                    // meaning exactly one thing: whether the FPT counselor can see them
+                    // (StudentRepository.findStudentInfos scopes on accountType).
+                    // Flipping these to OTHER would empty the counselor's list down to the
+                    // single credentialed seed student.
                     .accountType(AccountType.FPT)
                     .build();
             sUser = userRepository.save(sUser);
 
             Student stu = Student.builder()
                     .userId(sUser.getUserId())
+                    .portfolioSlug(portfolioSlugService.allocateFor(sUser))
                     .careerRole(frontend)
                     .universityName(FPT_UNIVERSITY_NAME)
                     .admissionDate(LocalDate.now().minusYears(random.nextInt(4)).withMonth(9).withDayOfMonth(1))

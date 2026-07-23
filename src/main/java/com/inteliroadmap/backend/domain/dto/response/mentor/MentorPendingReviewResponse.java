@@ -12,6 +12,7 @@ import lombok.NoArgsConstructor;
 public class MentorPendingReviewResponse {
     private String id;
     private String studentId;
+    private String portfolioSlug;
     private String studentName;
     private String yob;
     private String targetCareer;

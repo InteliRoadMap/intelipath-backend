@@ -59,6 +59,9 @@ spring:
           github:
             client-id: ${CLIENT_ID_GITHUB}
             client-secret: ${CLIENT_SECRET_GITHUB}
+            # Login only needs identity. The invasive 'repo' scope is requested separately by
+            # the explicit "Connect GitHub" sync link flow (GithubAccountLinkService), so a
+            # plain login never asks for access to private repositories.
             scope:
               - user:email
               - read:user
@@ -88,6 +91,11 @@ spring:
             document-tools:
               # Spring's Streamable-HTTP client appends its MCP endpoint path (/mcp).
               url: ${MCP_DOCUMENT_SERVICE_URL:http://localhost:8000}
+
+app:
+  # Base URL of the frontend, used to build the emailed password-reset link
+  # (FRONTEND_URL/reset-password?token=...). Override per environment via env.
+  frontend-url: ${FRONTEND_URL:http://localhost:5173}
 
 supabase:
   url: ${SUPABASE_URL}
@@ -133,3 +141,16 @@ roadmap:
   # weight is COMPLETED (0.6 = 60%). Children unlock as soon as the topic is reached,
   # and the student never marks a topic manually. Tune here.
   parent-completion-threshold: ${ROADMAP_PARENT_COMPLETION_THRESHOLD:0.6}
+
+github:
+  # Optional app-level PAT used for public-repo reads when a student has no stored
+  # OAuth token (e.g. pasting a public repo URL). Leave blank to call GitHub anonymously.
+  token: ${GITHUB_TOKEN:}
+  # Base64 256-bit AES key for encrypting stored GitHub OAuth access tokens at rest.
+  # When blank, token storage is disabled and the "Sync GitHub" (private repos) flow is off.
+  token-enc-key: ${GITHUB_TOKEN_ENC_KEY:}
+  # Dedicated OAuth App for the "Connect GitHub" repo-sync link flow — SEPARATE from the
+  # login OAuth App above so its callback URL ({frontend}/github/callback) can be registered
+  # without disturbing login. Create a second OAuth App on GitHub and set these envs.
+  link-client-id: ${CLIENT_ID_GITHUB_LINK:}
+  link-client-secret: ${CLIENT_SECRET_GITHUB_LINK:}

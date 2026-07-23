@@ -14,6 +14,7 @@ import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.security.CustomOAuth2User;
 import com.inteliroadmap.backend.repositories.StudentRepository;
 import com.inteliroadmap.backend.domain.entity.Student;
+import com.inteliroadmap.backend.services.PortfolioSlugService;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -45,6 +46,7 @@ public class OAuth2UserServiceImpl extends DefaultOAuth2UserService {
     private final UserRepository userRepository;
     private final OauthAccountRepository oauthAccountRepository;
     private final StudentRepository studentRepository;
+    private final PortfolioSlugService portfolioSlugService;
 
     /**
      * Loads user info from OAuth2 provider and creates or updates local user data.
@@ -72,8 +74,13 @@ public class OAuth2UserServiceImpl extends DefaultOAuth2UserService {
 
         // Retrieve existing local user or create a new one using the OAuth2 details
         User user = getOrCreateUser(userInfo);
-        // Link the OAuth account to the user record if not already linked
-        linkOauthAccountIfNeeded(user, userInfo, provider);
+        // A student who signed up some other way and only later signs in with GitHub is
+        // still telling us their GitHub profile; createUser only ever recorded it for
+        // accounts born from this flow, so everyone else kept an empty github_profile.
+        backfillGithubProfile(user, userInfo);
+        // Link the OAuth account to the user record (creating it if needed) and store the
+        // encrypted access token so downstream features (e.g. GitHub repo sync) can reuse it.
+        upsertOauthAccount(user, userInfo, provider, request);
 
         log.info("OAuth2UserServiceImpl: OAuth2 login completed for email: {}, role: {}", user.getEmail(), user.getRole());
 
@@ -188,12 +195,32 @@ public class OAuth2UserServiceImpl extends DefaultOAuth2UserService {
         Student student = Student.builder()
                 .userId(savedUser.getUserId())
                 .githubProfile(userInfo.getHtmlUrl())
-                // Generate a unique portfolio slug based on the user's name and ID
-                .portfolioSlug(com.inteliroadmap.backend.utils.SlugUtils.generateSlug(savedUser.getFullName(), savedUser.getUserId()))
+                .portfolioSlug(portfolioSlugService.allocateFor(savedUser))
                 .build();
         studentRepository.save(student);
 
         return savedUser;
+    }
+
+    /**
+     * Records the GitHub profile URL on the student when we have one and they do not.
+     *
+     * <p>Only fills a blank: a student who edited the field by hand keeps their own value,
+     * and Google logins carry no profile URL so this is a no-op for them.
+     */
+    private void backfillGithubProfile(User user, OAuth2UserInfoInternal userInfo) {
+        String profileUrl = userInfo.getHtmlUrl();
+        if (profileUrl == null || profileUrl.isBlank()) {
+            return;
+        }
+        studentRepository.findById(user.getUserId()).ifPresent(student -> {
+            if (student.getGithubProfile() != null && !student.getGithubProfile().isBlank()) {
+                return;
+            }
+            student.setGithubProfile(profileUrl);
+            studentRepository.save(student);
+            log.info("OAuth2UserServiceImpl: Recorded GitHub profile for user {}", user.getUserId());
+        });
     }
 
     /**
@@ -223,39 +250,38 @@ public class OAuth2UserServiceImpl extends DefaultOAuth2UserService {
     }
 
     /**
-     * Links the OAuth2 provider account to the local user if it is not linked yet.
+     * Links the OAuth2 provider account to the local user (creating the link on first login)
+     * and refreshes the stored, encrypted access token on every login so it stays current.
      *
      * @param user local user entity
      * @param userInfo normalized OAuth2 user information
      * @param provider OAuth2 provider name
+     * @param request the OAuth2 user request carrying the freshly issued access token
      */
-    private void linkOauthAccountIfNeeded(
+    private void upsertOauthAccount(
             User user,
             OAuth2UserInfoInternal userInfo,
-            String provider
+            String provider,
+            OAuth2UserRequest request
     ) {
-        // Check if an OAuth link for this provider and user already exists
-        boolean exists = oauthAccountRepository
+        OauthAccount account = oauthAccountRepository
                 .findByProviderIdAndProviderName(userInfo.getProviderId(), provider)
-                .isPresent();
+                .orElseGet(() -> OauthAccount.builder()
+                        .user(User.builder().userId(user.getUserId()).build())
+                        .providerId(userInfo.getProviderId())
+                        .providerName(provider)
+                        .build());
 
-        if (exists) {
-            // Already linked, no action needed
-            log.debug("OAuth2UserServiceImpl: OAuth2 account already linked. provider: {}, providerId: {}", provider, userInfo.getProviderId());
-            return;
-        }
+        boolean isNew = account.getOauthAccountId() == null;
 
-        // Create a new OauthAccount record to link the external provider ID to the local user
-        OauthAccount oauthAccount = OauthAccount.builder()
-                .user(User.builder().userId(user.getUserId()).build())
-                .providerId(userInfo.getProviderId())
-                .providerName(provider)
-                .build();
+        // NOTE: login no longer stores the GitHub access token. The portfolio "Sync GitHub"
+        // token is captured only by the dedicated Connect-GitHub link flow
+        // (GithubAccountLinkService) and stored on the student, so a GitHub account whose
+        // emails map to several InteliPath users never cross-links a token during login.
 
-        // Persist the mapping
-        oauthAccountRepository.save(oauthAccount);
-        log.info("OAuth2UserServiceImpl: Linked OAuth2 account. user: {}, provider: {}, providerId: {}",
-                user.getEmail(), provider, userInfo.getProviderId());
+        oauthAccountRepository.save(account);
+        log.info("OAuth2UserServiceImpl: {} OAuth2 account. user: {}, provider: {}, providerId: {}",
+                isNew ? "Linked" : "Refreshed", user.getEmail(), provider, userInfo.getProviderId());
     }
 
     /**

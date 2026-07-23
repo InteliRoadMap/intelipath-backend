@@ -1,6 +1,8 @@
 package com.inteliroadmap.backend.controllers;
 
+import com.inteliroadmap.backend.domain.dto.request.ForgotPasswordRequest;
 import com.inteliroadmap.backend.domain.dto.request.LoginRequest;
+import com.inteliroadmap.backend.domain.dto.request.ResetPasswordRequest;
 import com.inteliroadmap.backend.domain.dto.response.auth.RefreshResponse;
 import com.inteliroadmap.backend.security.AuthenticationCookieService;
 import com.inteliroadmap.backend.services.AuthService;
@@ -120,6 +122,43 @@ public class AuthController {
         RefreshResponse refreshResponse = authService.refreshAccount(refreshToken);
         authenticationCookieService.addRefreshTokenCookie(servletResponse, refreshResponse.getRefreshToken());
         return ResponseEntity.ok(refreshResponse);
+    }
+
+    /**
+     * Starts the magic-link password reset. Always returns 200 with a neutral message, whether or
+     * not the email maps to an account, so a caller cannot use this endpoint to discover which
+     * addresses are registered.
+     */
+    @PostMapping("/forgot-password")
+    @Operation(
+            summary = "Request a password reset link",
+            description = "If the email belongs to an account with a local password, emails a one-time reset link. Always returns 200."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Request accepted; a link is sent if the account exists")
+    })
+    public ResponseEntity<String> forgotPassword(@Valid @RequestBody ForgotPasswordRequest request) {
+        log.info("AuthController: Forgot-password request received");
+        authService.forgotPassword(request.getEmail());
+        return ResponseEntity.ok("If an account exists for that email, a reset link has been sent.");
+    }
+
+    /**
+     * Completes a password reset using the token from the emailed link.
+     */
+    @PostMapping("/reset-password")
+    @Operation(
+            summary = "Reset password with a token",
+            description = "Validates the one-time token from the emailed link and sets a new password."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Password reset successfully"),
+            @ApiResponse(responseCode = "400", description = "Reset link is invalid or has expired")
+    })
+    public ResponseEntity<String> resetPassword(@Valid @RequestBody ResetPasswordRequest request) {
+        log.info("AuthController: Reset-password request received");
+        authService.resetPassword(request.getToken(), request.getNewPassword());
+        return ResponseEntity.ok("Password has been reset successfully.");
     }
 
     @PostMapping("/logout")

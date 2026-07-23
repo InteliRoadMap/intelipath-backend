@@ -55,14 +55,17 @@ CREATE TABLE IF NOT EXISTS students (
     user_id             UUID PRIMARY KEY,
     career_id           UUID,
     -- Free text, display only. FPT material access is decided by users.account_type.
-    university_name      VARCHAR(255),
-    -- A full date, not a year: the counselor enters it from the admission record.
+    university_name     VARCHAR(255),
     admission_date      DATE,
     major               VARCHAR(255),
     github_profile      VARCHAR(255),
     transcript_url      TEXT,
-    portfolio_slug      VARCHAR(100) UNIQUE,
+    portfolio_slug      VARCHAR(100) NOT NULL UNIQUE,
     fpt_curriculum_id   UUID,
+    -- GitHub "Sync" credentials, set only by the explicit Connect-GitHub link flow (not login).
+    github_sync_token_enc TEXT,
+    github_sync_scopes    VARCHAR(255),
+    github_login          VARCHAR(255),
     CONSTRAINT fk_st_user
         FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE,
     CONSTRAINT fk_st_career
@@ -71,6 +74,7 @@ CREATE TABLE IF NOT EXISTS students (
 
 CREATE TABLE IF NOT EXISTS academic_counselor (
     user_id             UUID PRIMARY KEY,
+    university_name     VARCHAR(255),
     department          VARCHAR(255),
     admission_date      DATE,
     CONSTRAINT fk_ac_user
@@ -457,14 +461,22 @@ CREATE TABLE IF NOT EXISTS recruitment_posts (
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS oauth_accounts (
-    oauth_acc_id  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id       UUID NOT NULL,
-    provider_id   VARCHAR(255) NOT NULL,
-    provider_name VARCHAR(255) NOT NULL,
+    oauth_acc_id     UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id          UUID NOT NULL,
+    provider_id      VARCHAR(255) NOT NULL,
+    provider_name    VARCHAR(255) NOT NULL,
+    -- Provider OAuth access token, AES-GCM encrypted at rest (never plaintext). Used by the
+    -- portfolio "Sync GitHub" flow to list a student's private repos. See TokenCipher.
+    access_token_enc TEXT,
+    token_scopes     VARCHAR(255),
     CONSTRAINT uq_oauth_provider UNIQUE (provider_name, provider_id),
     CONSTRAINT fk_oa_user
         FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE
 );
+
+-- Backfill columns on databases created before the Sync-GitHub feature.
+ALTER TABLE oauth_accounts ADD COLUMN IF NOT EXISTS access_token_enc TEXT;
+ALTER TABLE oauth_accounts ADD COLUMN IF NOT EXISTS token_scopes     VARCHAR(255);
 
 CREATE TABLE IF NOT EXISTS refresh_tokens (
     id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -472,6 +484,21 @@ CREATE TABLE IF NOT EXISTS refresh_tokens (
     token      TEXT NOT NULL UNIQUE,
     expired_at TIMESTAMP NOT NULL,
     CONSTRAINT fk_rt_user
+        FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE
+);
+
+-- Password reset (magic link). Only the SHA-256 digest of the token is stored, the
+-- raw token travels once in the emailed link. used_at makes a token single-use;
+-- expires_at bounds the window (~30 min) so a leaked or scanner-prefetched link
+-- stops working quickly.
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+    id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id    UUID NOT NULL,
+    token_hash TEXT NOT NULL UNIQUE,
+    expires_at TIMESTAMP NOT NULL,
+    used_at    TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT now(),
+    CONSTRAINT fk_prt_user
         FOREIGN KEY (user_id) REFERENCES users (user_id) ON DELETE CASCADE
 );
 
@@ -534,6 +561,7 @@ CREATE INDEX IF NOT EXISTS idx_recruitment_posts_company_id      ON recruitment_
 CREATE INDEX IF NOT EXISTS idx_recruitment_posts_recruitment_id  ON recruitment_posts (recruitment_id);
 CREATE INDEX IF NOT EXISTS idx_oauth_accounts_user_id            ON oauth_accounts (user_id);
 CREATE INDEX IF NOT EXISTS idx_refresh_tokens_user_id            ON refresh_tokens (user_id);
+CREATE INDEX IF NOT EXISTS idx_password_reset_tokens_user_id      ON password_reset_tokens (user_id);
 CREATE INDEX IF NOT EXISTS idx_chat_sessions_user_id             ON chat_sessions (user_id);
 CREATE INDEX IF NOT EXISTS idx_chat_messages_session_id          ON chat_messages (session_id);
 
@@ -703,6 +731,12 @@ ALTER TABLE fpt_curriculum_subjects ADD COLUMN IF NOT EXISTS combo_code VARCHAR(
 ALTER TABLE fpt_curriculum_subjects ADD COLUMN IF NOT EXISTS combo_name TEXT;
 ALTER TABLE students                ADD COLUMN IF NOT EXISTS fpt_combo_code VARCHAR(40);
 CREATE INDEX IF NOT EXISTS idx_fcs_curriculum_combo ON fpt_curriculum_subjects (curriculum_id, combo_code);
+
+-- GitHub "Sync" credentials live on the student (per-user), never on the login-identity
+-- oauth_account, so a GitHub account with several emails/roles can't cross-link tokens.
+ALTER TABLE students ADD COLUMN IF NOT EXISTS github_sync_token_enc TEXT;
+ALTER TABLE students ADD COLUMN IF NOT EXISTS github_sync_scopes    VARCHAR(255);
+ALTER TABLE students ADD COLUMN IF NOT EXISTS github_login          VARCHAR(255);
 
 -- Admission moves from a bare year to a full date: the counselor enters it from the
 -- admission record, so the day and month are real data rather than something the form

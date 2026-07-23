@@ -5,6 +5,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.LocalDate;
 import java.util.UUID;
 
 @Data
@@ -15,7 +16,7 @@ public class MentorProfileResponse {
     private UUID userId;
     private String email;
     private String fullName;
-    private java.time.LocalDate yob;
+    private LocalDate yob;
     private String bio;
     private String avatar;
     private String role;

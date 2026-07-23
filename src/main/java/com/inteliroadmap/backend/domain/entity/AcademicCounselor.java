@@ -24,6 +24,9 @@ public class AcademicCounselor {
     @Column(name = "user_id")
     private UUID userId;
 
+    @Column(name = "university_name")
+    private String universityName;
+
     @Column(name = "department")
     private String department;
 

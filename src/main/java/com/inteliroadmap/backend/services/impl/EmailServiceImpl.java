@@ -1,5 +1,6 @@
 package com.inteliroadmap.backend.services.impl;
 
+import com.inteliroadmap.backend.domain.enums.UserRole;
 import com.inteliroadmap.backend.services.EmailService;
 import com.inteliroadmap.backend.utils.EmailUtil;
 import jakarta.mail.MessagingException;
@@ -47,12 +48,44 @@ public class EmailServiceImpl implements EmailService {
 //    }
 
     /**
-     * Sends a general notification email to the specified email address.
-     * 
+     * Sends the password-reset magic link. Failures propagate so the caller can log
+     * them, but the controller still returns a neutral 200 so a caller cannot probe
+     * which addresses exist.
+     */
+    @Override
+    public void sendPasswordResetEmail(String email, String fullName, String resetLink) {
+        log.info("EmailServiceImpl: Preparing password reset email for {}", email);
+
+        try {
+            MimeMessage message = mailSender.createMimeMessage();
+            MimeMessageHelper helper =
+                    new MimeMessageHelper(message, true, "UTF-8");
+
+            String htmlContent = EmailUtil.RESET_PASSWORD_LINK.formatted(
+                    fullName == null ? "there" : fullName, resetLink, resetLink);
+            helper.setTo(email);
+            helper.setSubject("Reset your InteliPath password");
+            helper.setText(htmlContent, true);
+
+            mailSender.send(message);
+            log.info("EmailServiceImpl: Password reset email successfully sent to {}", email);
+
+        } catch (MessagingException e) {
+            log.error("EmailServiceImpl: Failed to send password reset email", e);
+            throw new RuntimeException("Email Module: Failed to send password reset email");
+        }
+    }
+
+    /**
+     * Tells a student that a counselor or mentor has reviewed their work, quoting the
+     * review itself so they can read it without signing in.
+     *
      * @param email The recipient's email address
      */
     @Override
-    public void sendFeedbackNotificationEmail(String email, String receiverName, String senderName, String content, List<MultipartFile> attachments) {
+    public void sendFeedbackNotificationEmail(String email, String receiverName, String senderName,
+                                              UserRole senderRole, String content,
+                                              List<MultipartFile> attachments) {
         log.info("EmailServiceImpl: Preparing Feedback Notification email for {}", email);
 
         try {
@@ -60,10 +93,16 @@ public class EmailServiceImpl implements EmailService {
             MimeMessageHelper helper =
                     new MimeMessageHelper(message, true, "UTF-8");
 
-            String htmlContent = EmailUtil.FEEDBACK_NOTIFICATION_EMAIL.formatted(receiverName, senderName, content);
+            String roleLabel = roleLabel(senderRole);
+            String htmlContent = EmailUtil.FEEDBACK_NOTIFICATION_EMAIL.formatted(
+                    EmailUtil.escapeHtml(receiverName),
+                    roleLabel,
+                    EmailUtil.escapeHtml(senderName),
+                    roleLabel + "'s message",
+                    EmailUtil.renderFeedbackBody(content));
             helper.setTo(email);
 
-            helper.setSubject("You Have A Feedback Notification !!");
+            helper.setSubject("New feedback from your " + roleLabel);
             helper.setText(htmlContent, true);
 
             if (attachments != null && !attachments.isEmpty()) {
@@ -86,6 +125,21 @@ public class EmailServiceImpl implements EmailService {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    /**
+     * How the sender is introduced to the student. Anyone other than a counselor or a
+     * mentor falls back to "reviewer" rather than guessing at a title the reader would
+     * have to interpret.
+     */
+    private static String roleLabel(UserRole role) {
+        if (role == UserRole.COUNSELOR) {
+            return "counselor";
+        }
+        if (role == UserRole.MENTOR) {
+            return "mentor";
+        }
+        return "reviewer";
     }
 }
 

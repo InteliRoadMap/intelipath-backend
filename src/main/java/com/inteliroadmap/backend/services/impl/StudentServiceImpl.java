@@ -1,5 +1,7 @@
 package com.inteliroadmap.backend.services.impl;
 
+import java.time.LocalDate;
+
 import com.inteliroadmap.backend.components.RoadmapProgressCalculator;
 import com.inteliroadmap.backend.domain.dto.request.SetupStudentProfileRequest;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.RequiredSkillResponse;
@@ -14,7 +16,6 @@ import com.inteliroadmap.backend.domain.entity.Student;
 import com.inteliroadmap.backend.domain.entity.StudentProgress;
 import com.inteliroadmap.backend.domain.entity.StudentSkill;
 import com.inteliroadmap.backend.domain.entity.User;
-import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.services.AuthenticatedStudentService;
 import com.inteliroadmap.backend.services.DocumentIngestionService;
@@ -42,7 +43,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.time.LocalDate;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -111,7 +111,7 @@ public class StudentServiceImpl implements StudentService {
         }
 
         if (request.getGithubProfile() != null) {
-            student.setGithubProfile(request.getGithubProfile().trim());
+            student.setGithubProfile(normalizeGithubProfile(request.getGithubProfile()));
         }
 
         if (request.getCareerId() != null) {
@@ -129,7 +129,7 @@ public class StudentServiceImpl implements StudentService {
             userChanged = true;
         }
         if (request.getYob() != null && !request.getYob().trim().isEmpty()) {
-            user.setYob(LocalDate.parse(request.getYob()));
+            user.setYob(LocalDate.parse(request.getYob().trim()));
             userChanged = true;
         }
 
@@ -332,5 +332,31 @@ public class StudentServiceImpl implements StudentService {
         student.setTranscriptUrl(transcriptUrl);
         studentRepository.save(student);
         return studentMapper.toProfileResponse(student);
+    }
+
+    /**
+     * Stores the GitHub profile as something a reader can actually click.
+     *
+     * <p>People type what they think of as their profile — "dangp", "@dangp",
+     * "github.com/dangp" — and the field was saved verbatim, leaving a value nothing could
+     * link to. Anything already carrying a scheme is left alone; the rest is resolved
+     * against github.com. Blank clears the field rather than storing an empty string.
+     */
+    // Package-private and static so the URL rules can be tested without standing up the
+    // service's dependency graph.
+    static String normalizeGithubProfile(String raw) {
+        String value = raw.trim();
+        if (value.isEmpty()) {
+            return null;
+        }
+        if (value.startsWith("http://") || value.startsWith("https://")) {
+            return value;
+        }
+        if (value.startsWith("github.com/") || value.startsWith("www.github.com/")) {
+            return "https://" + value;
+        }
+        // A bare handle, with or without the @ people prefix it with.
+        String handle = value.startsWith("@") ? value.substring(1) : value;
+        return handle.isEmpty() ? null : "https://github.com/" + handle;
     }
 }
