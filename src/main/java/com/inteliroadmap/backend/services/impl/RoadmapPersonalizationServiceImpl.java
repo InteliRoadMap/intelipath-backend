@@ -12,6 +12,7 @@ import com.inteliroadmap.backend.domain.entity.RoadmapRecommendationItem;
 import com.inteliroadmap.backend.domain.entity.Skill;
 import com.inteliroadmap.backend.domain.entity.SkillNode;
 import com.inteliroadmap.backend.domain.entity.Student;
+import com.inteliroadmap.backend.domain.entity.StudentNodeSelection;
 import com.inteliroadmap.backend.domain.entity.StudentProgress;
 import com.inteliroadmap.backend.domain.entity.StudentSkill;
 import com.inteliroadmap.backend.domain.entity.StudentSkillEvidence;
@@ -27,6 +28,7 @@ import com.inteliroadmap.backend.repositories.CareerRequiredSkillRepository;
 import com.inteliroadmap.backend.repositories.RoadmapRecommendationItemRepository;
 import com.inteliroadmap.backend.repositories.RoadmapRecommendationRepository;
 import com.inteliroadmap.backend.repositories.SkillNodeRepository;
+import com.inteliroadmap.backend.repositories.StudentNodeSelectionRepository;
 import com.inteliroadmap.backend.repositories.StudentProgressRepository;
 import com.inteliroadmap.backend.repositories.StudentSkillEvidenceRepository;
 import com.inteliroadmap.backend.repositories.StudentSkillRepository;
@@ -99,12 +101,19 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
      */
     private static final String EVIDENCE_ALLOWED_POLICY = "EVIDENCE_ALLOWED";
 
+    /**
+     * Matches RoadmapSelectionServiceImpl.CHOOSE_ONE: a node whose children are mutually
+     * exclusive alternatives (e.g. "Pick a language" -> Java/Python/Go/...).
+     */
+    private static final String CHOOSE_ONE_SELECTION = "CHOOSE_ONE";
+
     private final AuthenticatedStudentService authenticatedStudentService;
     private final RoadmapRecommendationRepository recommendationRepository;
     private final RoadmapRecommendationItemRepository recommendationItemRepository;
     private final StudentSkillEvidenceRepository evidenceRepository;
     private final StudentProgressRepository studentProgressRepository;
     private final StudentSkillRepository studentSkillRepository;
+    private final StudentNodeSelectionRepository selectionRepository;
     private final SkillNodeRepository skillNodeRepository;
     private final CareerRequiredSkillRepository careerRequiredSkillRepository;
     private final RoadmapRecommendationMapper recommendationMapper;
@@ -300,6 +309,14 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
                     // when the node it belongs to named it outright.
                     matched = nodesByKeyword.getOrDefault(skillName, List.of());
                 }
+                if (matched.isEmpty()) {
+                    // Still nothing: AI/GitHub-extracted skill names rarely match the
+                    // roadmap's canonical wording exactly ("React.js" vs "React", "Node"
+                    // vs "Node.js"). Without this, that evidence can never surface in any
+                    // recommendation and is stuck PENDING forever. Fall back to a
+                    // whole-word substring match in either direction.
+                    matched = fuzzyMatchNodes(skillName, nodesBySkillName, nodesByKeyword);
+                }
                 for (SkillNode node : matched) {
                     offerCandidate(candidates, excludedNodeIds, node, confidence, reason, evidence.getEvidenceId(), importanceBySkillId);
                 }
@@ -307,6 +324,37 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
         }
 
         return candidates;
+    }
+
+    /** Minimum length either side of a fuzzy match must have, to avoid short generic words matching everything. */
+    private static final int MIN_FUZZY_MATCH_LENGTH = 3;
+
+    /**
+     * Whole-word-ish substring fallback for when an evidence skill name doesn't exactly equal
+     * a roadmap skill name or evidence_keywords entry (e.g. "React.js" vs "React", "Node" vs
+     * "Node.js"). Matches in either direction so both a broader and a narrower name still hit.
+     */
+    private static List<SkillNode> fuzzyMatchNodes(String skillName,
+                                                    Map<String, List<SkillNode>> nodesBySkillName,
+                                                    Map<String, List<SkillNode>> nodesByKeyword) {
+        if (skillName.length() < MIN_FUZZY_MATCH_LENGTH) {
+            return List.of();
+        }
+        Map<UUID, SkillNode> matched = new LinkedHashMap<>();
+        for (Map<String, List<SkillNode>> source : List.of(nodesBySkillName, nodesByKeyword)) {
+            for (Map.Entry<String, List<SkillNode>> entry : source.entrySet()) {
+                String candidateKey = entry.getKey();
+                if (candidateKey.length() < MIN_FUZZY_MATCH_LENGTH) {
+                    continue;
+                }
+                if (skillName.contains(candidateKey) || candidateKey.contains(skillName)) {
+                    for (SkillNode node : entry.getValue()) {
+                        matched.put(node.getNodeId(), node);
+                    }
+                }
+            }
+        }
+        return List.copyOf(matched.values());
     }
 
     /** Adds or merges a candidate, keeping the highest confidence and every supporting evidence id. */
@@ -453,9 +501,32 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
                 continue;
             }
             upsertCompletedProgress(student, node);
+            syncChosenAlternative(student, node);
             completedNodes.add(node);
         }
         return completedNodes;
+    }
+
+    /**
+     * When the completed node is one alternative of a CHOOSE_ONE group (e.g. "Java" under
+     * "Pick a language"), record it as the student's chosen alternative too. Without this,
+     * accepting a recommendation only writes student_progress: the roadmap UI's "picked"
+     * highlight reads exclusively from student_node_selections (RoadmapSelectionServiceImpl),
+     * so the node showed as completed but never as the chosen option in its picker group.
+     */
+    private void syncChosenAlternative(Student student, SkillNode node) {
+        SkillNode group = node.getParentNode();
+        if (group == null || !CHOOSE_ONE_SELECTION.equalsIgnoreCase(group.getSelection())) {
+            return;
+        }
+        StudentNodeSelection selection = selectionRepository
+                .findByStudent_UserIdAndGroupNode_NodeId(student.getUserId(), group.getNodeId())
+                .orElseGet(() -> StudentNodeSelection.builder()
+                        .student(Student.builder().userId(student.getUserId()).build())
+                        .groupNode(group)
+                        .build());
+        selection.setChosenNode(node);
+        selectionRepository.save(selection);
     }
 
     private void upsertCompletedProgress(Student student, SkillNode node) {

@@ -9,3 +9,13 @@ logging:
   level:
     org.springframework.security: INFO
     com.inteliroadmap: INFO
+
+# Swagger UI / OpenAPI JSON are dev-only tooling: they enumerate every endpoint,
+# DTO shape, and (via "Try it out") let anyone probe the live API. Off by default
+# since "prod" is also the base spring.profiles.active — only application-dev.yaml
+# users see docs, matching the intended dev-only exposure.
+springdoc:
+  swagger-ui:
+    enabled: false
+  api-docs:
+    enabled: false

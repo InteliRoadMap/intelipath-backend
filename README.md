@@ -1,12 +1,24 @@
 # intelipath-backend
 
-## 🚀 Quick Start
+Spring Boot backend for InteliPath.
 
-### Prerequisites
-- Docker Desktop installed
+## 🚀 Running the full stack
 
-### Run with Docker Compose
-1. Clone repo
-2. Copy `.env.example` → `.env` and fill in credentials
-3. Run `docker-compose up -d`
-4. Open `http://localhost:8080/swagger-ui.html`
+Docker Compose orchestration (Postgres + this backend + the AI service) lives in the
+separate [`infrastructure`](https://github.com/InteliRoadMap/infrastructure) repo. Clone it
+next to this repo and the two app repos:
+
+```
+BackEnd/
+  infrastructure/
+  intelipath-backend/   <- this repo
+  intelipath-service/
+```
+
+Then follow the quick-start in the infrastructure repo's README.
+
+## Prerequisites
+
+- Copy `.env.example` → `.env` and fill in credentials before starting the stack.
+- Swagger UI (`http://localhost:8080/swagger-ui.html`) is available only under the `dev`
+  Spring profile; it is disabled in `prod`.
