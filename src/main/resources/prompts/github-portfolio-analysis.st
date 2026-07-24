@@ -9,10 +9,10 @@ Analyze the metadata below and return a structured JSON result.
    - Only include categories that are actually present. Skip empty ones.
    - Be specific: prefer "Spring Boot" over "Java", "PostgreSQL" over "SQL".
 
-2. **summary**: Write exactly 2 sentences in Vietnamese describing what this project does.
+2. **summary**: Write exactly 2 sentences in English describing what this project does.
    - Sentence 1: What the project is and its main purpose.
    - Sentence 2: Key technologies used and what makes it notable.
-   - Keep it professional and suitable for a portfolio. No filler like "Đây là một dự án...".
+   - Keep it professional and suitable for a portfolio. No filler like "This is a project...".
 
 3. **matchedSkills**: From the SKILL CATALOG below, decide which skills this repository
    genuinely demonstrates and how strongly.

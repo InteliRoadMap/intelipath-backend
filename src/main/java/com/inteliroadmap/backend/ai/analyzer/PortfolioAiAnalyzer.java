@@ -49,7 +49,7 @@ public class PortfolioAiAnalyzer {
                     .entity(AiGithubSummary.class);
         } catch (Exception e) {
             log.error("PortfolioAiAnalyzer: AI analysis failed for project: {}", repoName, e);
-            return new AiGithubSummary("Dự án " + repoName + ": " + description, new HashMap<>(), List.of());
+            return new AiGithubSummary("Project " + repoName + ": " + description, new HashMap<>(), List.of());
         }
     }
 
