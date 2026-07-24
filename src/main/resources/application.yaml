@@ -154,3 +154,5 @@ github:
   # without disturbing login. Create a second OAuth App on GitHub and set these envs.
   link-client-id: ${CLIENT_ID_GITHUB_LINK:}
   link-client-secret: ${CLIENT_SECRET_GITHUB_LINK:}
+server:
+  forward-headers-strategy: framework
