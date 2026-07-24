@@ -17,6 +17,7 @@ import com.inteliroadmap.backend.exceptions.BadRequestException;
 import com.inteliroadmap.backend.mappers.CounselorMapper;
 import com.inteliroadmap.backend.repositories.*;
 import com.inteliroadmap.backend.services.CounselorService;
+import com.inteliroadmap.backend.services.PortfolioSlugService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -61,6 +62,7 @@ public class CounselorServiceImpl implements CounselorService {
     private final StudentSkillRepository studentSkillRepository;
     private final FptCurriculumRepository fptCurriculumRepository;
     private final PasswordEncoder passwordEncoder;
+    private final PortfolioSlugService portfolioSlugService;
 
 
     /**
@@ -448,7 +450,7 @@ public class CounselorServiceImpl implements CounselorService {
                 username = stUser.getUsername();
             } else {
                 // Generate username as "Curriculum program + @ + email"
-                username = curriculum.getProgram() + "@" + account.getEmail().replaceAll("@\\s+", "");
+                username = curriculum.getProgram() + "@" + account.getEmail().split("@")[0];
 
                 // Generates random password from the last set of strings in UUID (12 char)
                 String randomPassword = UUID.randomUUID().toString().split("-")[4];
@@ -476,6 +478,7 @@ public class CounselorServiceImpl implements CounselorService {
                         .admissionDate(account.getAdmissionDate())
                         .major(account.getMajor())
                         .fptCurriculumId(curriculum.getId())
+                        .portfolioSlug(portfolioSlugService.allocateFor(stUser))
                         .build();
                 studentRepository.save(student);
             }

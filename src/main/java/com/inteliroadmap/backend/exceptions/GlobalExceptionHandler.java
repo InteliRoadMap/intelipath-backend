@@ -206,16 +206,13 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<ErrorResponse> handleMethodArgumentTypeMismatchException(
             MethodArgumentTypeMismatchException exception, WebRequest request) {
-        ErrorResponse errorResponse = ErrorResponse.builder()
-                .timestamp(LocalDateTime.now())
-                .status(HttpStatus.BAD_REQUEST.value())
-                .error("BAD_REQUEST")
-                .message("Request parameter contains invalid data type")
-                .details(exception.getMessage())
-                .path(request.getDescription(false).replace("uri=", ""))
-                .build();
-
-        return new ResponseEntity<>(errorResponse, HttpStatus.BAD_REQUEST);
+        // exception.getMessage() embeds the raw invalid value and the target Java type/class
+        // name (internal implementation detail) — log it server-side only, same pattern as
+        // handleHttpMessageNotReadableException above.
+        log.warn("GlobalExceptionHandler: type mismatch on {}: {}",
+                request.getDescription(false).replace("uri=", ""), exception.getMessage());
+        return build(HttpStatus.BAD_REQUEST, "BAD_REQUEST",
+                "Request parameter contains invalid data type", request);
     }
 
     /**

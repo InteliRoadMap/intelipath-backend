@@ -308,7 +308,7 @@ data
 data/RoadmapDataTemplate.csv
 data/SkillDataTemplate.csv
 data/CareerDataTemplate.csv
-
+docs
 
 src/main/java/com/inteliroadmap/backend/config/MockDataSeeder.java
 

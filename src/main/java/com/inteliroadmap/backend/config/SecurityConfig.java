@@ -1,5 +1,7 @@
 package com.inteliroadmap.backend.config;
 
+import com.inteliroadmap.backend.security.AiRateLimitFilter;
+import com.inteliroadmap.backend.security.AuthRateLimitFilter;
 import com.inteliroadmap.backend.security.OAuth2AuthenticationFailureHandler;
 import com.inteliroadmap.backend.security.OAuth2AuthenticationSuccessHandler;
 import com.inteliroadmap.backend.security.HttpCookieOAuth2AuthorizationRequestRepository;
@@ -26,6 +28,8 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
     private final JwtAuthenticationFilter jwtAuthenticationFilter;
+    private final AuthRateLimitFilter authRateLimitFilter;
+    private final AiRateLimitFilter aiRateLimitFilter;
     private final OAuth2UserServiceImpl oAuth2UserService;
     private final OAuth2AuthenticationSuccessHandler oAuth2AuthenticationSuccessHandler;
     private final OAuth2AuthenticationFailureHandler oAuth2AuthenticationFailureHandler;
@@ -94,6 +98,16 @@ public class SecurityConfig {
                 .addFilterBefore(
                         jwtAuthenticationFilter,
                         UsernamePasswordAuthenticationFilter.class
+                )
+                .addFilterBefore(
+                        authRateLimitFilter,
+                        JwtAuthenticationFilter.class
+                )
+                // After the JWT filter so the SecurityContext is populated: this
+                // throttle keys on the authenticated user, not the IP.
+                .addFilterAfter(
+                        aiRateLimitFilter,
+                        JwtAuthenticationFilter.class
                 );
 
         return http.build();

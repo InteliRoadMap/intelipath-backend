@@ -23,6 +23,11 @@ WORKDIR /app
 # Copy the built JAR from the builder stage
 COPY --from=builder /app/target/*.jar app.jar
 
+# Run as a non-root, unprivileged user: a container escape or RCE in the app
+# then can't touch anything outside its own file ownership.
+RUN addgroup -S spring && adduser -S spring -G spring
+USER spring
+
 # Expose the application port
 EXPOSE 8080
 
