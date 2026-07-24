@@ -131,24 +131,6 @@ public class PortfolioServiceImpl implements PortfolioService {
         return portfolioMapper.toPortfolioResponse(user, student, config, skills, projects, education, evidence);
     }
 
-    @Transactional(readOnly = true)
-    @Override
-    public PortfolioResponse getPortfolioByStudentId(UUID studentId) {
-        Student student = studentRepository.findById(studentId)
-                .orElseThrow(() -> new ResourceNotFoundException("Portfolio not found for student: " + studentId));
-        User user = userRepository.findById(student.getUserId())
-                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-
-        PortfolioConfig config = portfolioConfigRepository.findByUser_UserId(student.getUserId());
-        List<StudentSkill> skills = studentSkillRepository.findByStudent_UserId(student.getUserId());
-        List<PortfolioProject> projects = portfolioProjectRepository.findByUser_UserId(user.getUserId());
-        List<StudentEducation> education = studentEducationRepository.findByUser_UserId(student.getUserId());
-
-        List<StudentSkillEvidence> evidence = liveEvidence(student.getUserId());
-
-        return portfolioMapper.toPortfolioResponse(user, student, config, skills, projects, education, evidence);
-    }
-
     /**
      * Upserts (updates or inserts) the portfolio data for the currently authenticated student.
      *
