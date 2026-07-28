@@ -116,9 +116,10 @@ public class CounselorController {
     public ResponseEntity<CounselorFeedbackResponse> getStudentInfos(
             @RequestParam(required = false) String search,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int size,
+            @RequestParam(required = false) String career) {
         log.info("CounselorController: Assigned students info retrieval request received");
-        return ResponseEntity.ok(counselorService.getStudentInfos(search, page, size));
+        return ResponseEntity.ok(counselorService.getStudentInfos(search, page, size, career));
     }
 
     /**
