@@ -88,6 +88,33 @@ public class AiServiceClient {
                 .body(ScraperResponse.class);
     }
 
+    public record ScrapeStartResponse(String jobId) {}
+
+    /**
+     * Queue a scrape on the AI service and return the job id to poll.
+     *
+     * <p>The synchronous {@code /scrape/...} routes hold the connection open for the whole
+     * run, so anything but a small limit outlives the read timeout and the finished result
+     * is thrown away. Starting a job returns immediately instead.
+     *
+     * @return the job id to poll, or {@code null} if the service returned nothing.
+     */
+    public String startScrape(String source, int limit) {
+        ScrapeStartResponse response = scraperClient.post()
+                .uri("/api/v1/scraper/jobs/{source}/{limit}", source, limit)
+                .retrieve()
+                .body(ScrapeStartResponse.class);
+        return response != null ? response.jobId() : null;
+    }
+
+    /** Poll a scrape job. Returns the raw status node (state/phase/message/error/result). */
+    public JsonNode getScrapeStatus(String jobId) {
+        return scraperClient.get()
+                .uri("/api/v1/scraper/jobs/{jobId}", jobId)
+                .retrieve()
+                .body(JsonNode.class);
+    }
+
     public record FlmSyncStartResponse(String jobId) {}
 
     /**
