@@ -32,9 +32,10 @@ public class CounselorMapper {
                 .build();
     }
 
-    public CounselorFeedbackResponse toGetStudentInfos(List<Map<String, Object>> stInfos, int totalPages, int currentPage) {
+    public CounselorFeedbackResponse toGetStudentInfos(List<Map<String, Object>> stInfos, List<String> careers, int totalPages, int currentPage) {
         return CounselorFeedbackResponse.builder()
                 .students(stInfos)
+                .careers(careers)
                 .totalPages(totalPages)
                 .currentPage(currentPage)
                 .build();
