@@ -35,6 +35,19 @@ public class AiServiceProperties {
     private Duration scrapeTimeout = Duration.ofSeconds(900);
 
     /**
+     * How long to keep polling a background scrape before giving up on it.
+     *
+     * <p>This, not {@link #scrapeTimeout}, is what bounds a scrape now that the work runs
+     * as a job on the AI service: the HTTP calls that start and poll it return instantly.
+     * A posting costs a detail fetch plus an LLM enrichment call — around six seconds all
+     * in — so this budget is what decides the largest workable SCRAPER_LIMIT.
+     */
+    private Duration scrapeJobTimeout = Duration.ofMinutes(40);
+
+    /** Gap between polls of a running scrape. */
+    private Duration scrapePollInterval = Duration.ofSeconds(10);
+
+    /**
      * Short timeout used only by the liveness probe, so a slow or down service
      * never hangs the admin dashboard.
      */
@@ -86,5 +99,21 @@ public class AiServiceProperties {
 
     public void setHealthTimeout(Duration healthTimeout) {
         this.healthTimeout = healthTimeout;
+    }
+
+    public Duration getScrapeJobTimeout() {
+        return scrapeJobTimeout;
+    }
+
+    public void setScrapeJobTimeout(Duration scrapeJobTimeout) {
+        this.scrapeJobTimeout = scrapeJobTimeout;
+    }
+
+    public Duration getScrapePollInterval() {
+        return scrapePollInterval;
+    }
+
+    public void setScrapePollInterval(Duration scrapePollInterval) {
+        this.scrapePollInterval = scrapePollInterval;
     }
 }

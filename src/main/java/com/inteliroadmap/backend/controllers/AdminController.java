@@ -92,12 +92,15 @@ public class AdminController {
         try {
             int posts = jobScrapingScheduler.fetchJobs(target);
             return ResponseEntity.ok(target + " scraper finished — imported " + posts + " job post(s).");
+        } catch (IllegalStateException e) {
+            // The scrape ran as a job and either failed or outlived its polling budget.
+            log.error("AdminController: {} scrape did not complete: {}", target, e.getMessage());
+            return ResponseEntity.status(504).body(e.getMessage());
         } catch (org.springframework.web.client.ResourceAccessException e) {
-            // Timeouts / connection issues to the AI service surface here.
-            log.error("AdminController: Job scraper timed out or could not reach the AI service", e);
+            // Timeouts / connection issues reaching the AI service itself surface here.
+            log.error("AdminController: Job scraper could not reach the AI service", e);
             return ResponseEntity.status(504).body(
-                target + " scraper timed out. The scrape may still be running on the AI service — "
-                + "try a smaller SCRAPER_LIMIT or check the ai-service logs.");
+                target + " scraper could not reach the AI service — check that it is running.");
         } catch (org.springframework.web.client.RestClientResponseException e) {
             // The AI service answered with an error (e.g. 502 Cloudflare block for TopCV).
             // Surface its message cleanly instead of dumping a stack trace.
