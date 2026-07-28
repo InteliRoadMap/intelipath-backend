@@ -18,7 +18,7 @@ public interface CounselorService {
 
     CounselorDashboardResponse getAllFeedbacksSentByMe();
 
-    CounselorFeedbackResponse getStudentInfos(String search, int page, int size);
+    CounselorFeedbackResponse getStudentInfos(String search, int page, int size, String career);
 
     CounselorFeedbackResponse getStudentStatisticAndFeedback(UUID studentId);
 

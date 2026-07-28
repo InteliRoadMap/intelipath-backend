@@ -211,9 +211,10 @@ public class CounselorServiceImpl implements CounselorService {
      */
     @Transactional
     @Override
-    public CounselorFeedbackResponse getStudentInfos(String search, int page, int size) {
+    public CounselorFeedbackResponse getStudentInfos(String search, int page, int size, String career) {
         log.info("CounselorServiceImpl: Get students info request received");
         if (search == null) search = "";
+        if (career == null) career = "";
 
         // Students are scoped to the counselor's own account type, so an FPT counselor
         // sees every FPT student and no OTHER ones.
@@ -224,8 +225,11 @@ public class CounselorServiceImpl implements CounselorService {
         // Pageable get Student from (Offset + 1) to (Offset + size)
         Pageable pageable = PageRequest.of(page, size);
         // Fetch the specific page of students from the database using projection
-        Page<StudentInfoProjection> studentPage = studentRepository.findStudentInfos(search, accountType, pageable);
+        Page<StudentInfoProjection> studentPage = studentRepository.findStudentInfos(search, career, accountType, pageable);
         
+        AcademicCounselor counselor = getAuthenticatedCounselor();
+        List<String> careers = studentRepository.findDistinctCareerNamesByUniversityName(counselor.getUniversityName());
+
         List<Map<String, Object>> stInfos = new ArrayList<>();
 
         // Construct a summary object for each student on the current page using projection data
@@ -242,7 +246,7 @@ public class CounselorServiceImpl implements CounselorService {
         }
 
         log.info("CounselorServiceImpl: Get students info successfully");
-        return counselorMapper.toGetStudentInfos(stInfos, studentPage.getTotalPages(), studentPage.getNumber());
+        return counselorMapper.toGetStudentInfos(stInfos, careers, studentPage.getTotalPages(), studentPage.getNumber());
     }
 
     /**

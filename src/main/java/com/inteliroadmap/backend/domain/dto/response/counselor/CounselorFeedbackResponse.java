@@ -18,6 +18,7 @@ import java.util.UUID;
 @Builder
 public class CounselorFeedbackResponse {
     private List<Map<String, Object>> students;
+    private List<String> careers;
     private Map<String, Object> studentInfo;
     private List<String> missingSkills;
     private List<FeedbackResponse> feedbacks;
