@@ -36,7 +36,8 @@ public interface StudentRepository extends JpaRepository<Student, UUID> {
            "WHERE (LOWER(u.fullName) LIKE LOWER(CONCAT('%', :search, '%')) OR LOWER(u.email) LIKE LOWER(CONCAT('%', :search, '%'))) " +
            "AND u.accountType = :accountType " +
            "AND (:careerName IS NULL OR :careerName = '' OR c.careerName = :careerName) " +
-           "AND u.role = com.inteliroadmap.backend.domain.enums.UserRole.STUDENT",
+           "AND u.role = com.inteliroadmap.backend.domain.enums.UserRole.STUDENT " +
+           "ORDER BY u.createdAt DESC",
            countQuery = "SELECT COUNT(s) " +
            "FROM Student s " +
            "JOIN User u ON s.userId = u.userId " +
