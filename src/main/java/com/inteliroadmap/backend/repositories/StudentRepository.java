@@ -20,7 +20,8 @@ import java.util.UUID;
 @Repository
 public interface StudentRepository extends JpaRepository<Student, UUID> {
     Student findByUserId(UUID userId);
-    List<Student> findByCareerRole(CareerRole career);
+    List<Student> findByCareerRoleAndUniversityName(CareerRole career, String universityName);
+    List<Student> findByUniversityName(String universityName);
 
     // The accountType predicate is the counselor tenant boundary: it must stay identical in
     // the main query and countQuery, or the list and its page count disagree.

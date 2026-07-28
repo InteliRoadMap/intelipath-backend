@@ -1,5 +1,6 @@
 package com.inteliroadmap.backend.controllers;
 
+import com.inteliroadmap.backend.domain.dto.request.ChangePasswordRequest;
 import com.inteliroadmap.backend.domain.dto.request.UserRequest;
 import com.inteliroadmap.backend.domain.dto.request.SetupUserProfileRequest;
 import com.inteliroadmap.backend.domain.dto.response.auth.UserResponse;
@@ -170,5 +171,25 @@ public class UserController {
             @RequestParam("file") MultipartFile file
     ) {
         return ResponseEntity.ok(userService.updateAvatar(file));
+    }
+
+    /**
+     * PATCH /users/profile/password - Change the current password for the authenticated
+     * account. Works the same for every role since it acts on the shared users table.
+     */
+    @PatchMapping("/profile/password")
+    @Operation(
+            summary = "Change password",
+            description = "Change the password of the currently authenticated account, for any role"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Password changed successfully"),
+            @ApiResponse(responseCode = "400", description = "Current password is incorrect, new password is invalid, or the account has no local password"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized or invalid access token")
+    })
+    public ResponseEntity<String> changePassword(@Valid @RequestBody ChangePasswordRequest request) {
+        log.info("UserController: Change password request received");
+        userService.changePassword(request);
+        return ResponseEntity.ok("Password changed successfully.");
     }
 }

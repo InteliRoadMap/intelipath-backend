@@ -1,12 +1,15 @@
 package com.inteliroadmap.backend.services.impl;
 
+import com.inteliroadmap.backend.domain.dto.request.ChangePasswordRequest;
 import com.inteliroadmap.backend.domain.dto.request.SetupUserProfileRequest;
 import com.inteliroadmap.backend.domain.dto.request.UserRequest;
 import com.inteliroadmap.backend.domain.dto.response.auth.UserResponse;
 import com.inteliroadmap.backend.domain.entity.User;
+import com.inteliroadmap.backend.exceptions.BadRequestException;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.exceptions.UnauthorizedException;
 import com.inteliroadmap.backend.mappers.UserMapper;
+import com.inteliroadmap.backend.repositories.RefreshTokenRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.services.SupabaseStorageService;
 import com.inteliroadmap.backend.services.UserService;
@@ -14,6 +17,7 @@ import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -31,6 +35,8 @@ public class UserServiceImpl implements UserService {
     private final UserRepository userRepository;
     private final UserMapper userMapper;
     private final SupabaseStorageService supabaseStorageService;
+    private final RefreshTokenRepository refreshTokenRepository;
+    private final PasswordEncoder passwordEncoder;
 
     /**
      * Retrieves the information of the currently authenticated user.
@@ -140,5 +146,41 @@ public class UserServiceImpl implements UserService {
         userRepository.save(user);
 
         return userMapper.toUserResponse(user);
+    }
+
+    /**
+     * Changes the password of the currently authenticated account. Works the same for every
+     * role (student, mentor, counselor, admin) since they all share the {@code users} table
+     * and this reads the account from the security context rather than a role-specific path.
+     *
+     * @throws BadRequestException if the account has no local password (OAuth-only) or the
+     *                              submitted current password does not match
+     */
+    @Transactional
+    @Override
+    public void changePassword(ChangePasswordRequest request) {
+        log.info("UserServiceImpl: Change password request received");
+
+        String email = SecurityContextHolder.getContext().getAuthentication().getName();
+        User user = userRepository.findByEmail(email);
+        if (user == null) {
+            throw new ResourceNotFoundException("User not found");
+        }
+
+        if (user.getPasswordHash() == null) {
+            throw new BadRequestException("This account signs in via OAuth and has no password to change");
+        }
+
+        if (!passwordEncoder.matches(request.getCurrentPassword(), user.getPasswordHash())) {
+            throw new BadRequestException("Current password is incorrect");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+        userRepository.save(user);
+
+        // A password change should end existing sessions on other devices, same as a
+        // magic-link reset.
+        refreshTokenRepository.deleteByUser_UserId(user.getUserId());
+        log.info("UserServiceImpl: Password changed successfully for user: {}", user.getEmail());
     }
 }

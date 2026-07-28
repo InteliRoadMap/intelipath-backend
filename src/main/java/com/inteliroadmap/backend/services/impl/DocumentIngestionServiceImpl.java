@@ -47,12 +47,18 @@ public class DocumentIngestionServiceImpl implements DocumentIngestionService {
         List<Document> documents = splitMarkdownIntoDocuments(markdown, file.getOriginalFilename());
         log.info("DocumentIngestionServiceImpl: Split Markdown into {} page-level documents.", documents.size());
 
-        TokenTextSplitter tokenTextSplitter = new TokenTextSplitter(
-                800,
-                200,
-                5,
-                10000,
-                true, List.of());
+        // Built rather than constructed so the splitter keeps Spring AI's default
+        // punctuation marks: the all-args constructor takes them as its last argument, and
+        // passing an empty list there fails validation ("punctuationMarks must not be
+        // empty"), which aborted every transcript upload. Chunk sizes stay as tuned —
+        // minChunkSizeChars is deliberately 200, below the builder's own 350 default.
+        TokenTextSplitter tokenTextSplitter = TokenTextSplitter.builder()
+                .withChunkSize(800)
+                .withMinChunkSizeChars(200)
+                .withMinChunkLengthToEmbed(5)
+                .withMaxNumChunks(10000)
+                .withKeepSeparator(true)
+                .build();
         List<Document> chunkedDocuments = tokenTextSplitter.apply(documents);
 
         for (Document doc : chunkedDocuments) {
