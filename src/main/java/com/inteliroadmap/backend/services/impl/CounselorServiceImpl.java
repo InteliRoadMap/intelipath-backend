@@ -110,27 +110,29 @@ public class CounselorServiceImpl implements CounselorService {
     @Override
     public CounselorDashboardResponse getCareerStatistics() {
         log.info("CounselorServiceImpl: Get careers statistic request received");
-        getAuthenticatedCounselor();
+        AcademicCounselor counselor = getAuthenticatedCounselor();
+        String universityName = counselor.getUniversityName();
 
         // Initialize a map to hold the count of students per career
         Map<String, Integer> careerStatistics = new HashMap<>();
 
-        int total = 0;
+        int totalStudents = studentRepository.findByUniversityName(universityName).size();
+        int noCareerStudents = totalStudents;
         // Fetch all possible career roles
         List<CareerRole> careers = careerRoleRepository.findAll();
 
         // Iterate through each career and count the number of students assigned to it
         for(CareerRole career: careers) {
-            List<Student> students = studentRepository.findByCareerRole(career);
-            int number =  students.size();
-            if(number > 0) {
-                careerStatistics.put(career.getCareerName(), number);
-            }
-            total += number;
+            List<Student> students = studentRepository.findByCareerRoleAndUniversityName(career, universityName);
+            if(!students.isEmpty()) careerStatistics.put(career.getCareerName(), students.size());
+
+            noCareerStudents -= students.size();
         }
 
+        if(noCareerStudents > 0) careerStatistics.put("Career path not selected", noCareerStudents);
+
         log.info("CounselorServiceImpl: Careers statistic retrieval successful");
-        return counselorMapper.toRoadmapStatisticResponse(total, careerStatistics);
+        return counselorMapper.toRoadmapStatisticResponse(totalStudents, careerStatistics);
     }
 
     /**
@@ -145,7 +147,8 @@ public class CounselorServiceImpl implements CounselorService {
     @Override
     public CounselorDashboardResponse getStudentsMissingSkills(String searchName) {
         log.info("CounselorServiceImpl: Get students skill gap of a career request received");
-        getAuthenticatedCounselor();
+        AcademicCounselor counselor = getAuthenticatedCounselor();
+        String universityName = counselor.getUniversityName();
 
         // Look up careers matching the provided search name (case-insensitive)
         List<CareerRole> matchingCareers = careerRoleRepository
@@ -172,7 +175,7 @@ public class CounselorServiceImpl implements CounselorService {
             totalMissingSkills.put(skillName, count);
         }
 
-        int totalStudent = studentRepository.findByCareerRole(matchedCareer).size();
+        int totalStudent = studentRepository.findByCareerRoleAndUniversityName(matchedCareer, universityName).size();
 
         log.info("CounselorServiceImpl: Get students skill gap of a career successfully");
         return counselorMapper
