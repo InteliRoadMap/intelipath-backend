@@ -38,4 +38,25 @@ public class GithubRepoRankResponse {
 
     /** Short human-readable reasons that drove the score, for UI hints (e.g. "12★", "recent"). */
     private java.util.List<String> highlights;
+
+    /**
+     * Every signal that fed {@code qualityScore}, including the ones worth zero.
+     *
+     * <p>The score was previously a bare number next to a repository, which invites the
+     * reading that an AI judged the project. Nothing here is AI: this is arithmetic over
+     * GitHub metadata, and it is shown in full so a student can disagree with it. The
+     * zero-point lines are the useful ones — "no description, 0 of 10" is the only part
+     * of this the student can actually act on.
+     */
+    private java.util.List<ScoreLine> scoreBreakdown;
+
+    /**
+     * One signal's contribution.
+     *
+     * @param label  what was measured, e.g. {@code Recent activity}
+     * @param points what it added, {@code 0} included
+     * @param max    the most this signal could have added, so a student can see the gap
+     * @param detail the underlying fact, e.g. {@code last push 5 day(s) ago}
+     */
+    public record ScoreLine(String label, int points, int max, String detail) {}
 }

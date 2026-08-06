@@ -22,7 +22,10 @@ import com.inteliroadmap.backend.repositories.StudentSkillRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.services.FptOverlayImportService;
 import com.inteliroadmap.backend.services.PortfolioSlugService;
+import com.opencsv.CSVParserBuilder;
 import com.opencsv.CSVReader;
+import com.opencsv.CSVReaderBuilder;
+import com.opencsv.ICSVParser;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.CommandLineRunner;
@@ -40,6 +43,7 @@ import java.time.LocalDateTime;
 import java.util.*;
 
 import org.springframework.transaction.annotation.Transactional;
+import com.inteliroadmap.backend.components.SkillNameCanonicalizer;
 
 @Component
 @RequiredArgsConstructor
@@ -47,6 +51,14 @@ import org.springframework.transaction.annotation.Transactional;
 public class DatabaseSeeder implements CommandLineRunner {
 
     private final SkillRepository skillRepository;
+    /**
+     * The catalog's identity function. The seeder runs on every application start and
+     * used to look skills up with findBySkillName - an exact, CASE-SENSITIVE compare -
+     * so it was the widest of the three doors through which the catalog forked, and the
+     * only one that re-opened after every restart. Merging the forks without closing it
+     * would have re-created "Fast API" beside "FastAPI" the next time the app came up.
+     */
+    private final SkillNameCanonicalizer skillNameCanonicalizer;
     private final CareerRoleRepository careerRoleRepository;
     private final SkillNodeRepository skillNodeRepository;
     private final CareerRequiredSkillRepository careerRequiredSkillRepository;
@@ -67,8 +79,42 @@ public class DatabaseSeeder implements CommandLineRunner {
     private final SeedAccountsProperties seedAccounts;
 
     // v2 seed data: id-based tree + selection semantics (see intelipath-service/scripts/migrate_roadmap.py).
-    private static final String ROADMAP_TEMPLATE = "data/v2/roadmap_nodes.csv";
-    private static final String SKILL_TEMPLATE = "data/v2/skills.csv";
+    // v3 adds a status column produced by scripts/merge_incoming.py: the pool holds far more
+    // nodes than have been curated, and only graded ones may reach a student.
+    // v4 adds scripts/assign_node_skills.py: skill_group is resolved against skills_v4.csv
+    // instead of holding the node's parent group name, so SkillNode.skill actually links.
+    // v5 fixes two faults in the grading that v4 shipped with: a spine heading
+    // carrying a single link lost its GROUP exemption and took its whole subtree
+    // down (258 headings, which is why Java disappeared), and every source
+    // roadmap emptied its spine into the career's top level (backend held 623
+    // roots drawn from 23 roadmaps). Each imported roadmap is now its own
+    // sub-tree, hung under the node it belongs to where one exists.
+    // v6 adds scripts/extract_prerequisites.py: the `prerequisite` column, filled
+    // from the source roadmaps' own previous_id. It was empty in every row, which
+    // left the ordering logic guessing from node_level and stage.
+    private static final String ROADMAP_TEMPLATE = "data/v2/roadmap_nodes_v6.csv";
+    private static final String ROADMAP_TEMPLATE_FALLBACK = "data/v2/roadmap_nodes.csv";
+
+    /**
+     * Node grades that are allowed into the database.
+     *
+     * READY carries a summary and the two resource links FR2.3 requires. CHECKPOINT nodes are
+     * deliverables ("Checkpoint - Simple CRUD Apps") rather than reading material, and GROUP
+     * nodes are the headings roadmap.sh draws as frames; demanding links of either is a
+     * category error, and dropping them would orphan everything beneath.
+     */
+    private static final Set<String> PUBLISHABLE_STATUS = Set.of("READY", "CHECKPOINT", "GROUP");
+    // v4 catalog: name, career_id, importance, category, sources — built by
+    // scripts/build_skill_catalog.py from the scraper's market data, the
+    // imported roadmap.sh nodes, and five classified third-party sources
+    // (linguist, devicon, O*NET, Wikidata, StackOverflow tag synonyms).
+    // v5 removes the 90 catalog entries that are not skills — "Introduction",
+    // "Components", "Learn the Basics", "Pick a Framework". They came from
+    // roadmap.sh section headings, were never confirmed by a job posting, and fed
+    // straight into the assessment and the learning plan: a step titled
+    // "Introduction" is not advice. See scripts/filter_skill_catalog.py.
+    private static final String SKILL_TEMPLATE = "data/v2/skills_v5.csv";
+    private static final String SKILL_TEMPLATE_FALLBACK = "data/v2/skills.csv";
     private static final String CAREER_TEMPLATE = "data/v2/careers.csv";
     private static final String FPT_UNIVERSITY_NAME = "FPT University";
     // FLM curriculum overlay (subjects + skill coverage + lesson resources).
@@ -162,7 +208,7 @@ public class DatabaseSeeder implements CommandLineRunner {
         // Prerequisites reference other careers by name, so upsert every career first
         // (pass 1) and only then wire up the prerequisite links (pass 2).
         List<String[]> rows = new ArrayList<>();
-        try (CSVReader reader = new CSVReader(new FileReader(careerDataFile))) {
+        try (CSVReader reader = openSeedCsv(careerDataFile)) {
             String[] line;
             int rowNum = 0;
             while ((line = reader.readNext()) != null) {
@@ -218,15 +264,22 @@ public class DatabaseSeeder implements CommandLineRunner {
         // ------------------------------ IMPORT SKILL DATA ----------------------------- //
         File skillDataFile = new File(SKILL_TEMPLATE);
         if (!skillDataFile.exists()) {
-            log.warn("DatabaseSeeder: SkillDataTemplate.csv not found. Skipping import.");
-            return;
+            skillDataFile = new File(SKILL_TEMPLATE_FALLBACK);
+            if (!skillDataFile.exists()) {
+                log.warn("DatabaseSeeder: neither {} nor {} found. Skipping skill import.",
+                        SKILL_TEMPLATE, SKILL_TEMPLATE_FALLBACK);
+                return;
+            }
+            log.info("DatabaseSeeder: {} not found, falling back to {}.",
+                    SKILL_TEMPLATE, SKILL_TEMPLATE_FALLBACK);
         }
 
         log.info("DatabaseSeeder: Starting CSV Import for Skill...");
-        // v2 skills.csv columns: name, career_id (slug), importance. One row per
-        // (skill, career): a skill shared by two careers appears twice. Keep a single
+        // Columns: name, career_id (slug), importance, [category]. category is v4-only —
+        // the v2 fallback file has 3 columns, so it is read only when present. One row
+        // per (skill, career): a skill shared by two careers appears twice. Keep a single
         // Skill entity per name and accumulate its careers across rows.
-        try (CSVReader reader = new CSVReader(new FileReader(skillDataFile))) {
+        try (CSVReader reader = openSeedCsv(skillDataFile)) {
             String[] line;
             int rowNum = 0;
 
@@ -239,6 +292,7 @@ public class DatabaseSeeder implements CommandLineRunner {
                 String skillName = line[0].trim();
                 String careerSlug = line[1].trim();
                 String importanceLevel = line[2].trim();
+                String category = line.length > 3 ? line[3].trim() : null;
                 if (skillName.isEmpty()) continue;
 
                 CareerRole role = careerBySlug.get(careerSlug);
@@ -247,20 +301,32 @@ public class DatabaseSeeder implements CommandLineRunner {
                     continue;
                 }
 
-                Skill skill = skillRepository.findBySkillName(skillName);
+                Skill skill = skillNameCanonicalizer.resolve(skillName);
+                boolean newToCatalog = skill == null;
                 if (skill == null) {
                     skill = Skill.builder()
                             .skillName(skillName)
+                            .category(blankToNull(category))
                             .careers(new ArrayList<>(List.of(role)))
                             .build();
-                } else if (skill.getCareers() == null || skill.getCareers().stream()
-                        .noneMatch(c -> c.getCareerId().equals(role.getCareerId()))) {
-                    List<CareerRole> careers = skill.getCareers() != null
-                            ? new ArrayList<>(skill.getCareers()) : new ArrayList<>();
-                    careers.add(role);
-                    skill.setCareers(careers);
+                } else {
+                    if (skill.getCategory() == null && category != null && !category.isEmpty()) {
+                        skill.setCategory(category);
+                    }
+                    if (skill.getCareers() == null || skill.getCareers().stream()
+                            .noneMatch(c -> c.getCareerId().equals(role.getCareerId()))) {
+                        List<CareerRole> careers = skill.getCareers() != null
+                                ? new ArrayList<>(skill.getCareers()) : new ArrayList<>();
+                        careers.add(role);
+                        skill.setCareers(careers);
+                    }
                 }
                 skill = skillRepository.save(skill);
+                if (newToCatalog) {
+                    // Keep the canonicaliser's index current without rebuilding it: the
+                    // very next CSV row may be this skill's plural.
+                    skillNameCanonicalizer.remember(skill);
+                }
 
                 // Skip mappings that already exist so re-running the seeder
                 // (every app restart) does not violate uq_career_skill.
@@ -298,14 +364,39 @@ public class DatabaseSeeder implements CommandLineRunner {
             R_IS_CHECKPOINT = 9, R_SELECTION = 10, R_CHOOSE_COUNT = 11, R_WEIGHT = 12,
             R_COMPLETION_POLICY = 13, R_REQUIRED_PROFICIENCY = 14, R_EVIDENCE_KEYWORDS = 15,
             R_PARENT_ID = 16, R_PREVIOUS_ID = 17, R_DESCRIPTION = 18, R_LINK1 = 19, R_LINK2 = 20,
-            R_LINK3 = 21;
+            R_LINK3 = 21, R_STATUS = 22, R_PREREQUISITE = 23;
+
+    /**
+     * Reader for the seed CSVs, with OpenCSV's backslash escaping disabled.
+     *
+     * OpenCSV treats {@code \} as an escape character by default, which RFC 4180 does not:
+     * a quoted field is ended only by its closing quote. The roadmap descriptions come from
+     * upstream prose and contain backslashes (regex snippets, CLI examples), so the default
+     * parser mis-reads those rows and then keeps consuming following rows until the quotes
+     * happen to rebalance. Twenty-seven backslashes silently swallowed 915 nodes.
+     */
+    private static CSVReader openSeedCsv(File file) throws java.io.IOException {
+        return new CSVReaderBuilder(new FileReader(file))
+                .withCSVParser(new CSVParserBuilder()
+                        .withEscapeChar(ICSVParser.NULL_CHARACTER)
+                        .build())
+                .build();
+    }
 
     private void importRoadmapData() {
         // ----------------------------- IMPORT ROADMAP DATA ---------------------------- //
         File roadmapDataFile = new File(ROADMAP_TEMPLATE);
         if (!roadmapDataFile.exists()) {
-            log.warn("DatabaseSeeder: {} not found. Skipping roadmap import.", ROADMAP_TEMPLATE);
-            return;
+            // A checkout without the graded file still seeds: the v2 file has no status
+            // column, and an absent column reads as blank, which the filter lets through.
+            roadmapDataFile = new File(ROADMAP_TEMPLATE_FALLBACK);
+            if (!roadmapDataFile.exists()) {
+                log.warn("DatabaseSeeder: neither {} nor {} found. Skipping roadmap import.",
+                        ROADMAP_TEMPLATE, ROADMAP_TEMPLATE_FALLBACK);
+                return;
+            }
+            log.info("DatabaseSeeder: {} not found, falling back to {}.",
+                    ROADMAP_TEMPLATE, ROADMAP_TEMPLATE_FALLBACK);
         }
 
         // Rows have no natural unique key, so re-importing a career would duplicate
@@ -321,7 +412,7 @@ public class DatabaseSeeder implements CommandLineRunner {
 
         log.info("DatabaseSeeder: Starting CSV Import for Roadmap Nodes...");
         ObjectMapper mapper = new ObjectMapper();
-        try (CSVReader reader = new CSVReader(new FileReader(roadmapDataFile))) {
+        try (CSVReader reader = openSeedCsv(roadmapDataFile)) {
             // v2 refs are stable slug ids (parent_id/previous_id), which may point
             // forward in the file. Import in two passes: create every node first
             // (indexed by its slug), then wire up parent/previous edges.
@@ -330,6 +421,7 @@ public class DatabaseSeeder implements CommandLineRunner {
 
             String[] line;
             int rowNum = 0;
+            int skippedByStatus = 0, skippedByCareer = 0;
             while ((line = reader.readNext()) != null) {
                 rowNum++;
                 if (rowNum <= 1) continue; // header
@@ -338,8 +430,20 @@ public class DatabaseSeeder implements CommandLineRunner {
                 String nodeSlug = cell(line, R_NODE_ID);
                 if (nodeSlug.isEmpty()) continue;
 
+                // Blank means the v2 file, which predates grading and is entirely curated.
+                String status = cell(line, R_STATUS);
+                if (!status.isEmpty() && !PUBLISHABLE_STATUS.contains(status)) {
+                    skippedByStatus++;
+                    continue;
+                }
+
                 CareerRole career = careerBySlug.get(cell(line, R_CAREER_ID));
-                if (career == null) continue;
+                if (career == null) {
+                    // The pool covers roadmaps beyond the careers this system offers
+                    // (mobile, product, blockchain, ...). They stay out until a career exists.
+                    skippedByCareer++;
+                    continue;
+                }
                 if (careersAlreadySeeded.contains(career.getCareerId())) continue;
 
                 ArrayNode links = mapper.createArrayNode();
@@ -357,8 +461,23 @@ public class DatabaseSeeder implements CommandLineRunner {
                     }
                 }
 
+                // What must come before this node, as the roadmap's own author
+                // ordered it. Malformed JSON is dropped rather than failing the
+                // import: a bad prerequisite costs one ordering hint, a failed
+                // import costs the whole roadmap.
+                JsonNode prerequisite = null;
+                String prerequisiteJson = cell(line, R_PREREQUISITE);
+                if (!prerequisiteJson.isEmpty()) {
+                    try {
+                        prerequisite = mapper.readTree(prerequisiteJson);
+                    } catch (IOException e) {
+                        log.warn("DatabaseSeeder: unreadable prerequisite on node '{}', skipping it: {}",
+                                nodeSlug, e.getMessage());
+                    }
+                }
+
                 String skillName = cell(line, R_SKILL_GROUP);
-                Skill skill = skillName.isEmpty() ? null : skillRepository.findBySkillName(skillName);
+                Skill skill = skillName.isEmpty() ? null : skillNameCanonicalizer.resolve(skillName);
 
                 // Stage/weight still live on NodeType. The v2 schema no longer carries
                 // stage-unlock keys, so gating is driven purely by parent/previous edges.
@@ -380,6 +499,7 @@ public class DatabaseSeeder implements CommandLineRunner {
                         .completionPolicy(blankToNull(cell(line, R_COMPLETION_POLICY)))
                         .requiredProficiency(parseInt(cell(line, R_REQUIRED_PROFICIENCY), 0))
                         .evidenceKeywords(evidenceKeywords)
+                        .prerequisite(prerequisite)
                         .selection(defaultTo(cell(line, R_SELECTION), "ALL"))
                         .chooseCount(parseNullableInt(cell(line, R_CHOOSE_COUNT)))
                         .nodeKind(defaultTo(cell(line, R_NODE_KIND), "CORE"))
@@ -404,7 +524,9 @@ public class DatabaseSeeder implements CommandLineRunner {
                 skillNodeRepository.save(node);
             }
 
-            log.info("DatabaseSeeder: roadmap_nodes.csv import completed successfully ({} nodes).", nodesBySlug.size());
+            log.info("DatabaseSeeder: {} import completed ({} nodes seeded; "
+                            + "{} skipped as ungraded, {} skipped for an unknown career).",
+                    roadmapDataFile.getName(), nodesBySlug.size(), skippedByStatus, skippedByCareer);
         } catch (Exception e) {
             log.error("DatabaseSeeder: Error occurred while importing {}", ROADMAP_TEMPLATE, e);
         }
@@ -640,7 +762,7 @@ public class DatabaseSeeder implements CommandLineRunner {
             st = Student.builder().userId(userSt.getUserId()).build();
         }
         st.setUniversityName(FPT_UNIVERSITY_NAME);
-        st.setCareerRole(careerRoleRepository.findByCareerName("Frontend"));
+        st.setCareerRole(careerRoleRepository.findByCareerName("Backend"));
         st.setMajor("Software Engineer");
         // Re-derived rather than filled-only: this account's identity is defined here,
         // and it has been renamed since it was first seeded, so a slug left over from

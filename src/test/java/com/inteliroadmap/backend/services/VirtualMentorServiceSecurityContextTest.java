@@ -56,6 +56,7 @@ class VirtualMentorServiceSecurityContextTest {
                 chatClient,
                 vectorStore,
                 aiServiceClient,
+                mock(StudentLevelService.class),
                 systemPrompt,
                 ragPrompt
         );

@@ -1,13 +1,31 @@
 package com.inteliroadmap.backend.services.impl;
 
+import com.inteliroadmap.backend.components.ResolvedOrder;
+import com.inteliroadmap.backend.components.RoadmapEdgeResolver;
 import com.inteliroadmap.backend.components.RoadmapProgressCalculator;
 import com.inteliroadmap.backend.components.RoadmapSelectionResolver;
+import com.inteliroadmap.backend.components.PersonalizedPlanBuilder;
+import com.inteliroadmap.backend.components.RoadmapVisibilityFilter;
+import com.inteliroadmap.backend.components.SeniorityCalculator;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.CoreSkillResponse;
+import com.inteliroadmap.backend.components.RoadmapTierResolver;
+import com.inteliroadmap.backend.components.SubRoadmapClassifier;
+import com.inteliroadmap.backend.domain.dto.response.plan.LearningPlanResponse;
 import com.inteliroadmap.backend.components.SelectionView;
+import com.inteliroadmap.backend.components.StudentRoadmapContext;
+import com.inteliroadmap.backend.domain.dto.response.student.StudentLevelResponse;
+import com.inteliroadmap.backend.domain.enums.ImportanceLevel;
+import com.inteliroadmap.backend.domain.enums.SeniorityLevel;
+import com.inteliroadmap.backend.mappers.RoadmapEdgeMapper;
+import com.inteliroadmap.backend.services.StudentLevelService;
 import com.inteliroadmap.backend.domain.dto.request.UpdateNodeProgressRequest;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.FptNodeCoverageResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.FptNodeResourceResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapNodeResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.StudentRoadmapResponse;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapCrumbResponse;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapRootResponse;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.SubRoadmapResponse;
 import com.inteliroadmap.backend.domain.entity.CareerRequiredSkill;
 import com.inteliroadmap.backend.domain.entity.CareerRole;
 import com.inteliroadmap.backend.domain.entity.FptSubject;
@@ -37,7 +55,9 @@ import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.exceptions.ForbiddenException;
 import com.inteliroadmap.backend.security.SecurityUtils;
+import com.inteliroadmap.backend.domain.dto.response.market.SkillDemandResponse;
 import com.inteliroadmap.backend.services.AuthenticatedStudentService;
+import com.inteliroadmap.backend.services.MarketDemandService;
 import com.inteliroadmap.backend.services.RoadmapSelectionService;
 import com.inteliroadmap.backend.services.RoadmapService;
 import lombok.RequiredArgsConstructor;
@@ -47,7 +67,10 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
@@ -82,7 +105,16 @@ public class RoadmapServiceImpl implements RoadmapService {
     private final FptSubjectSkillRepository fptSubjectSkillRepository;
     private final FptSubjectResourceRepository fptSubjectResourceRepository;
     private final RoadmapSelectionService roadmapSelectionService;
+    private final MarketDemandService marketDemandService;
     private final RoadmapSelectionResolver roadmapSelectionResolver;
+    private final RoadmapEdgeResolver roadmapEdgeResolver;
+    private final SeniorityCalculator seniorityCalculator;
+    private final RoadmapVisibilityFilter roadmapVisibilityFilter;
+    private final SubRoadmapClassifier subRoadmapClassifier;
+    private final RoadmapTierResolver roadmapTierResolver;
+    private final PersonalizedPlanBuilder personalizedPlanBuilder;
+    private final RoadmapEdgeMapper roadmapEdgeMapper;
+    private final StudentLevelService studentLevelService;
 
     private static final String COMPLETED_STATUS = "COMPLETED";
     private static final String FRONTEND_COMPLETED_STATUS = "completed";
@@ -127,6 +159,12 @@ public class RoadmapServiceImpl implements RoadmapService {
     @Transactional(readOnly = true)
     @Override
     public StudentRoadmapResponse getStudentRoadmap() {
+        return getStudentRoadmap(Set.of());
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public StudentRoadmapResponse getStudentRoadmap(Set<UUID> expandedNodeIds) {
         log.info("RoadmapServiceImpl: Fetching authenticated student roadmap");
 
         // Fetch authenticated student
@@ -151,7 +189,7 @@ public class RoadmapServiceImpl implements RoadmapService {
         // Look up the career role and associated skill nodes
         CareerRole careerRole = careerRoleRepository.findByCareerId(student.getCareerRole().getCareerId());
         List<SkillNode> nodes = skillNodeRepository
-                .findByCareerRole_CareerIdOrderByNodeLevelAscNodeNameAsc(careerRole.getCareerId());
+                .findPublishedForCareerLegacyOrder(careerRole.getCareerId());
 
         if (nodes.isEmpty()) {
             return StudentRoadmapResponse.builder()
@@ -172,10 +210,47 @@ public class RoadmapServiceImpl implements RoadmapService {
         // Resolve the student's CHOOSE_ONE picks: which alternatives are off-path.
         SelectionView selectionView = roadmapSelectionResolver.resolve(student.getUserId(), nodes);
 
+        // Market demand for this career's skills, fetched once and reused by both
+        // the ordering below and the per-node decoration in the tree. Career-scoped:
+        // the same skill ranks differently depending on the role it is read against.
+        Map<UUID, SkillDemandResponse> demandBySkill = marketDemandSafe(careerRole.getCareerId());
+
+        // Order the nodes for THIS student. Everything downstream — the unlock
+        // gates, the per-node previousNode on the wire, the edge list — reads this
+        // one result, so what the student sees and what unlocks cannot diverge.
+        StudentRoadmapContext context = studentRoadmapContext(student, careerRole, demandBySkill);
+        ResolvedOrder order = roadmapEdgeResolver.resolve(nodes, context, selectionView);
+
         // Compute frontend statuses (e.g., locked, current, completed) and overall progress.
         // Progress counts the active path only, so picking a language never dilutes the %.
-        Map<UUID, String> statusByNodeId = buildFrontendStatusMap(nodes, progressByNodeId, selectionView);
+        Map<UUID, String> statusByNodeId = buildFrontendStatusMap(nodes, progressByNodeId, selectionView, order);
+        // Progress counts the WHOLE career, not the slice being drawn: a percentage
+        // that moved because the student expanded a topic would be meaningless.
         int progress = calculateProgress(selectionView.activePathNodes(nodes), progressByNodeId);
+
+        // Which of those nodes are worth sending. Statuses above were computed over
+        // the full set first, so hiding a node can never change what a visible one
+        // says about itself.
+        Set<UUID> visibleIds = new HashSet<>(roadmapVisibilityFilter.visibleNodeIds(
+                nodes, statusByNodeId, context.level(), expandedNodeIds,
+                RoadmapVisibilityFilter.DEFAULT_MAX_DEPTH));
+        // Selecting, not hiding. Once the student has picked Java, Laravel's 49
+        // descendants are not their roadmap greyed out — they are not their
+        // roadmap. The alternatives' own nodes stay, so the choice remains visible
+        // and reversible; only what hangs below them goes.
+        visibleIds.removeAll(selectionView.offPathDescendants());
+        // A node carrying a curriculum inside it (Java 71, Python 122, ASP.NET
+        // Core 157) is a place to go, not a step to walk past. Its contents come
+        // off the path; the node itself always stays, which is what keeps this
+        // safe to apply to every career including the ones that are nothing but
+        // imported roadmaps.
+        Map<UUID, Integer> subtreeSizes = subRoadmapClassifier.subtreeSizes(nodes);
+        Set<UUID> enterableIds = subRoadmapClassifier.enterableNodes(nodes);
+        visibleIds.removeAll(subRoadmapClassifier.nodesInsideEnterables(nodes, null));
+        Map<UUID, Integer> hiddenChildren = roadmapVisibilityFilter.hiddenChildCounts(nodes, visibleIds);
+        List<SkillNode> visibleNodes = nodes.stream()
+                .filter(n -> visibleIds.contains(n.getNodeId()))
+                .toList();
 
         // FPT material is only offered to FPT accounts; everyone else gets the public
         // roadmap.sh links that every node already carries.
@@ -183,11 +258,373 @@ public class RoadmapServiceImpl implements RoadmapService {
         boolean fptAccount = user != null && user.getAccountType() == AccountType.FPT;
 
         // Build the hierarchical roadmap tree
-        return StudentRoadmapResponse.builder()
+        return withReadiness(StudentRoadmapResponse.builder()
                 .targetCareerRole(careerRole.getCareerName())
                 .progress(progress)
-                .nodes(buildRoadmapTree(nodes, statusByNodeId, progressByNodeId, selectionView, fptAccount))
+                .nodes(buildRoadmapTree(visibleNodes, statusByNodeId, progressByNodeId, selectionView,
+                        fptAccount, order, demandBySkill, hiddenChildren, nodes,
+                        heldSkillsBySkillId(student.getUserId()), subtreeSizes, enterableIds,
+                        context))
+                // Only edges whose BOTH ends survived the filter: an edge pointing at
+                // a node that was not sent would draw into empty space.
+                .edges(roadmapEdgeMapper.toResponses(order.edges().stream()
+                        .filter(e -> visibleIds.contains(e.source()) && visibleIds.contains(e.target()))
+                        .toList()))
+                .subRoadmaps(subRoadmapCards(nodes, statusByNodeId, null))
+                .coreSkills(coreSkillsSafe(student, careerRole, demandBySkill)),
+                readinessSafe(student, careerRole))
                 .build();
+    }
+
+    /**
+     * One sub-roadmap, opened.
+     *
+     * <p>Everything below {@code rootNodeId} and nothing else — but sliced the
+     * same way the career roadmap is, rather than served whole.
+     *
+     * <p><b>This reverses an earlier decision, deliberately.</b> The rule used to
+     * be "the student asked for this specific track by clicking into it, so
+     * answering with a slice would be the same mistake as the '+13' badge that
+     * delivered one node." That reasoning holds for the <em>level</em> filter and
+     * is kept: nothing here is withheld because of a student's tier. It does not
+     * hold for depth. Measured on the live data, entering {@code C#} drew 269
+     * nodes at once, {@code Scala} 156 and {@code Golang} 124, five levels deep,
+     * with no way to fold any of it away — because {@code hiddenChildren} was
+     * passed as {@code null}, the "+N" affordance that makes the career view
+     * navigable was not merely unused here, it could not appear.
+     *
+     * <p>So the depth cap and {@code ?expand=} come back, which is the same
+     * contract as {@link #getStudentRoadmap(Set)} and the opposite of the old
+     * failure: a badge that delivers a whole topic rather than one node.
+     *
+     * <p><b>Tier is still shown, never removed.</b> {@code tierLocked} continues
+     * to travel on every node — see {@link RoadmapTierResolver} — so a beginner
+     * opening C# still sees that its 134 advanced nodes exist and are waiting.
+     * A locked node is a promise; a missing node is a shorter roadmap.
+     */
+    @Override
+    @Transactional(readOnly = true)
+    public StudentRoadmapResponse getStudentSubRoadmap(UUID rootNodeId, Set<UUID> expandedNodeIds) {
+        log.info("RoadmapServiceImpl: Fetching sub-roadmap {}", rootNodeId);
+        Student student = getAuthenticatedStudent();
+
+        SkillNode root = skillNodeRepository.findById(rootNodeId)
+                .orElseThrow(() -> new ResourceNotFoundException("Roadmap node not found: " + rootNodeId));
+
+        CareerRole careerRole = root.getCareerRole();
+        List<SkillNode> careerNodes = skillNodeRepository
+                .findPublishedForCareerLegacyOrder(careerRole.getCareerId());
+
+        Map<UUID, List<SkillNode>> childrenByParent = new HashMap<>();
+        for (SkillNode node : careerNodes) {
+            if (node.getParentNode() != null) {
+                childrenByParent
+                        .computeIfAbsent(node.getParentNode().getNodeId(), key -> new ArrayList<>())
+                        .add(node);
+            }
+        }
+
+        Set<UUID> subtreeIds = new HashSet<>();
+        Deque<SkillNode> pending = new ArrayDeque<>();
+        pending.push(root);
+        while (!pending.isEmpty()) {
+            SkillNode current = pending.pop();
+            if (!subtreeIds.add(current.getNodeId())) {
+                continue;
+            }
+            for (SkillNode child : childrenByParent.getOrDefault(current.getNodeId(), List.of())) {
+                pending.push(child);
+            }
+        }
+        // The root is named by the breadcrumb, so drawing it again would waste the
+        // one slot at depth 0 — and leave it as the only node there, which is what
+        // collapsed the sub-roadmap into a single column. Dropping it promotes its
+        // children to the top level, where the layout can lay them out as a path.
+        List<SkillNode> subtree = careerNodes.stream()
+                .filter(node -> subtreeIds.contains(node.getNodeId()))
+                .filter(node -> !node.getNodeId().equals(rootNodeId))
+                .map(node -> relativeDepth(node, root))
+                .toList();
+
+        Map<UUID, StudentProgress> progressByNodeId = mapProgressByNodeId(
+                studentProgressRepository.findByStudent_UserIdAndSkillNode_NodeIdIn(
+                        student.getUserId(), subtree.stream().map(SkillNode::getNodeId).toList()));
+
+        Map<UUID, SkillDemandResponse> demandBySkill = marketDemandSafe(careerRole.getCareerId());
+        SelectionView selectionView = roadmapSelectionResolver.resolve(student.getUserId(), subtree);
+        StudentRoadmapContext context = studentRoadmapContext(student, careerRole, demandBySkill);
+        ResolvedOrder order = roadmapEdgeResolver.resolve(subtree, context, selectionView);
+        Map<UUID, String> statusByNodeId =
+                buildFrontendStatusMap(subtree, progressByNodeId, selectionView, order);
+
+        // Statuses and progress above were computed over the WHOLE subtree, before
+        // anything was hidden, exactly as the career view does it — so folding a
+        // branch away can never change what a visible node says about itself, and
+        // the percentage does not move when the student opens a topic.
+        int progress = calculateProgress(selectionView.activePathNodes(subtree), progressByNodeId);
+
+        // Depth only, stage rule off — see the overload's javadoc. The student
+        // opened this track on purpose; capping it at a stage band would answer a
+        // question they did not ask, and tierLocked already says "not yet" without
+        // making the roadmap look shorter than it is.
+        Set<UUID> visibleIds = new HashSet<>(roadmapVisibilityFilter.visibleNodeIds(
+                subtree, statusByNodeId, context.level(), expandedNodeIds,
+                RoadmapVisibilityFilter.DEFAULT_MAX_DEPTH, false));
+        // A rejected alternative's descendants are not this student's roadmap; the
+        // alternatives themselves stay, so the choice remains visible and
+        // reversible. Same rule as the career view.
+        visibleIds.removeAll(selectionView.offPathDescendants());
+        Map<UUID, Integer> subtreeSizes = subRoadmapClassifier.subtreeSizes(subtree);
+        Set<UUID> enterableIds = subRoadmapClassifier.enterableNodes(subtree);
+        // A track nested inside this one (C# holds several) is a door, not a
+        // branch to unfold in place.
+        visibleIds.removeAll(subRoadmapClassifier.nodesInsideEnterables(subtree, null));
+        Map<UUID, Integer> hiddenChildren = roadmapVisibilityFilter.hiddenChildCounts(subtree, visibleIds);
+        List<SkillNode> visibleNodes = subtree.stream()
+                .filter(node -> visibleIds.contains(node.getNodeId()))
+                .toList();
+
+        User user = userRepository.findByUserId(student.getUserId());
+        boolean fptAccount = user != null && user.getAccountType() == AccountType.FPT;
+
+        return withReadiness(StudentRoadmapResponse.builder()
+                .targetCareerRole(root.getNodeName())
+                .progress(progress)
+                .nodes(buildRoadmapTree(visibleNodes, statusByNodeId, progressByNodeId, selectionView,
+                        fptAccount, order, demandBySkill, hiddenChildren, subtree,
+                        heldSkillsBySkillId(student.getUserId()),
+                        subtreeSizes, enterableIds, context))
+                // Only edges with both ends still on screen: an edge into a folded
+                // branch would draw into empty space.
+                .edges(roadmapEdgeMapper.toResponses(order.edges().stream()
+                        .filter(e -> visibleIds.contains(e.source()) && visibleIds.contains(e.target()))
+                        .toList()))
+                .breadcrumb(breadcrumbTo(root, careerRole))
+                .rootNode(rootNodeOf(root, subtree))
+                .coreSkills(coreSkillsSafe(student, careerRole, demandBySkill)),
+                readinessSafe(student, careerRole))
+                .build();
+    }
+
+    /**
+     * A copy of the node whose depth is measured from the view's root rather than
+     * from the career's.
+     *
+     * <p>Depth is what tells every consumer — the filter, the layout, the client —
+     * what the top level is. Inside a sub-roadmap the top level is the root's
+     * children, so leaving the career-wide depth on them would put nothing at
+     * level zero and everything one step below it.
+     */
+    private SkillNode relativeDepth(SkillNode node, SkillNode viewRoot) {
+        if (node.getDepth() == null || viewRoot.getDepth() == null) {
+            return node;
+        }
+        SkillNode copy = new SkillNode();
+        org.springframework.beans.BeanUtils.copyProperties(node, copy);
+        copy.setDepth((short) Math.max(0, node.getDepth() - viewRoot.getDepth() - 1));
+        // A node whose parent is the view root has no parent inside this view.
+        if (node.getParentNode() != null
+                && node.getParentNode().getNodeId().equals(viewRoot.getNodeId())) {
+            copy.setParentNode(null);
+        }
+        return copy;
+    }
+
+    /**
+     * The view's root, described but not drawn.
+     *
+     * <p>{@code optionCount} is measured on the depth-relative subtree, where
+     * depth 0 means "direct child of the root" — see {@link #relativeDepth}. So
+     * for {@code Pick a Language} it is nine, and the client can tell a real
+     * fork from a group with one option left after the publication gate.
+     */
+    private RoadmapRootResponse rootNodeOf(SkillNode root, List<SkillNode> subtree) {
+        long options = subtree.stream()
+                .filter(node -> node.getDepth() != null && node.getDepth() == 0)
+                .count();
+        return RoadmapRootResponse.builder()
+                .nodeId(root.getNodeId())
+                .name(root.getNodeName())
+                .selection(root.getSelection())
+                .chooseCount(root.getChooseCount())
+                .nodeKind(root.getNodeKind())
+                .optionCount((int) options)
+                .build();
+    }
+
+    /** The trail from the career down to this node, outermost first. */
+    private List<RoadmapCrumbResponse> breadcrumbTo(SkillNode node, CareerRole careerRole) {
+        Deque<RoadmapCrumbResponse> trail = new ArrayDeque<>();
+        SkillNode current = node;
+        // Bounded rather than while(true): a parent cycle in the data would
+        // otherwise hang the request, and a wrong breadcrumb beats a hung page.
+        for (int guard = 0; current != null && guard < 32; guard++) {
+            trail.push(RoadmapCrumbResponse.builder()
+                    .nodeId(current.getNodeId())
+                    .name(current.getNodeName())
+                    .build());
+            current = current.getParentNode();
+        }
+        trail.push(RoadmapCrumbResponse.builder()
+                .name(careerRole == null ? null : careerRole.getCareerName())
+                .build());
+        return new ArrayList<>(trail);
+    }
+
+    /**
+     * The cards offering each standalone roadmap under this career.
+     *
+     * <p>Counts come from the full node set, not the filtered one: a card that
+     * said "12 nodes" because the depth filter had trimmed the rest would
+     * misdescribe what the student is about to enter.
+     */
+    private List<SubRoadmapResponse> subRoadmapCards(List<SkillNode> nodes,
+                                                     Map<UUID, String> statusByNodeId,
+                                                     UUID chosenNodeId) {
+        Map<UUID, List<SkillNode>> childrenByParent = new HashMap<>();
+        for (SkillNode node : nodes) {
+            if (node.getParentNode() != null) {
+                childrenByParent
+                        .computeIfAbsent(node.getParentNode().getNodeId(), key -> new ArrayList<>())
+                        .add(node);
+            }
+        }
+
+        List<SubRoadmapResponse> cards = new ArrayList<>();
+        Set<UUID> enterable = subRoadmapClassifier.enterableNodes(nodes);
+        for (SkillNode root : nodes.stream()
+                .filter(n -> enterable.contains(n.getNodeId()))
+                .filter(n -> n.getParentNode() == null || !enterable.contains(n.getParentNode().getNodeId()))
+                .toList()) {
+            Set<UUID> subtree = new HashSet<>();
+            Deque<SkillNode> pending = new ArrayDeque<>();
+            pending.push(root);
+            while (!pending.isEmpty()) {
+                SkillNode current = pending.pop();
+                if (!subtree.add(current.getNodeId())) {
+                    continue;
+                }
+                for (SkillNode child : childrenByParent.getOrDefault(current.getNodeId(), List.of())) {
+                    pending.push(child);
+                }
+            }
+            int completed = (int) subtree.stream()
+                    .filter(id -> FRONTEND_COMPLETED_STATUS.equals(statusByNodeId.get(id)))
+                    .count();
+            cards.add(SubRoadmapResponse.builder()
+                    .nodeId(root.getNodeId())
+                    .name(root.getNodeName())
+                    .description(root.getDescription())
+                    .nodeCount(subtree.size())
+                    .completedCount(completed)
+                    .chosen(root.getNodeId().equals(chosenNodeId))
+                    .build());
+        }
+        cards.sort(Comparator.comparing(SubRoadmapResponse::getChosen, Comparator.reverseOrder())
+                .thenComparing(c -> c.getName() == null ? "" : c.getName()));
+        return cards;
+    }
+
+    /**
+     * Gathers the profile facts that can change the order of a roadmap.
+     *
+     * <p>Every lookup here is fail-soft. A student with no assessment, no skills
+     * and no market data yields an empty context, and an empty context is exactly
+     * what makes {@link RoadmapEdgeResolver} fall back to the static order — so
+     * the worst case of this whole feature is today's roadmap, not a broken one.
+     */
+    private StudentRoadmapContext studentRoadmapContext(
+            Student student,
+            CareerRole careerRole,
+            Map<UUID, SkillDemandResponse> demandBySkill
+    ) {
+        Map<UUID, Short> proficiencyBySkillId = new HashMap<>();
+        Set<String> heldSkillNamesLower = new HashSet<>();
+        for (StudentSkill studentSkill : studentSkillRepository.findByStudent_UserId(student.getUserId())) {
+            if (studentSkill.getSkill() == null) {
+                continue;
+            }
+            // A row with no proficiency still proves the student holds the skill —
+            // that is what the roadmap sync writes — so it counts for ordering even
+            // though it carries no level.
+            proficiencyBySkillId.put(studentSkill.getSkill().getSkillId(),
+                    studentSkill.getProficiency() != null ? studentSkill.getProficiency() : (short) 0);
+            if (studentSkill.getSkill().getSkillName() != null) {
+                heldSkillNamesLower.add(studentSkill.getSkill().getSkillName().trim().toLowerCase());
+            }
+        }
+
+        Map<UUID, ImportanceLevel> importanceBySkillId = new HashMap<>();
+        for (CareerRequiredSkill required : careerRequiredSkillRepository
+                .findByCareerRole_CareerId(careerRole.getCareerId())) {
+            if (required.getSkill() != null && required.getImportanceLevel() != null) {
+                importanceBySkillId.put(required.getSkill().getSkillId(), required.getImportanceLevel());
+            }
+        }
+
+        return new StudentRoadmapContext(proficiencyBySkillId, heldSkillNamesLower,
+                studentLevelSafe(student.getUserId()), demandBySkill, importanceBySkillId);
+    }
+
+    /**
+     * The student's level, or null when they skipped the assessment or it cannot
+     * be computed. Null is a real answer here — it disables readiness scoring
+     * rather than pretending the student is a FRESHER.
+     */
+    private SeniorityLevel studentLevelSafe(UUID userId) {
+        try {
+            return studentLevelService.levelOf(userId)
+                    .map(StudentLevelResponse::getLevel)
+                    .map(SeniorityLevel::fromString)
+                    .orElse(null);
+        } catch (Exception e) {
+            log.warn("RoadmapServiceImpl: level unavailable for ordering, using the static "
+                    + "roadmap order: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public LearningPlanResponse getStudentPlan() {
+        Student student = getAuthenticatedStudent();
+        if (student.getCareerRole() == null || student.getCareerRole().getCareerId() == null) {
+            return LearningPlanResponse.builder()
+                    .summary("Pick a target role first — until then there is nothing to measure a gap against.")
+                    .steps(List.of())
+                    .alreadyCovered(List.of())
+                    .requiredSkillCount(0)
+                    .coveredSkillCount(0)
+                    .build();
+        }
+        CareerRole careerRole = careerRoleRepository.findByCareerId(student.getCareerRole().getCareerId());
+        List<SkillNode> nodes = skillNodeRepository
+                .findPublishedForCareerLegacyOrder(careerRole.getCareerId());
+
+        // Statuses come from the roadmap's own gating, so the plan never offers a
+        // node as "next" that the roadmap would refuse to let them start.
+        Map<UUID, StudentProgress> progressByNodeId = mapProgressByNodeId(
+                studentProgressRepository.findByStudent_UserIdAndSkillNode_NodeIdIn(
+                        student.getUserId(), nodes.stream().map(SkillNode::getNodeId).toList()));
+        SelectionView selectionView = roadmapSelectionResolver.resolve(student.getUserId(), nodes);
+        Map<UUID, SkillDemandResponse> demandBySkill = marketDemandSafe(careerRole.getCareerId());
+        StudentRoadmapContext context = studentRoadmapContext(student, careerRole, demandBySkill);
+        ResolvedOrder order = roadmapEdgeResolver.resolve(nodes, context, selectionView);
+        Map<UUID, String> statusByNodeId =
+                buildFrontendStatusMap(nodes, progressByNodeId, selectionView, order);
+
+        return personalizedPlanBuilder.build(
+                careerRole.getCareerName(),
+                context.level(),
+                // Core only. The full table is the career-scoped catalog — 504 rows
+                // for Frontend — and a plan measured against that reports "0 of
+                // 504 covered", which tells the student nothing.
+                careerRequiredSkillRepository.findByCareerRole_CareerIdAndImportanceLevelIn(
+                        careerRole.getCareerId(), SeniorityCalculator.CORE_IMPORTANCE),
+                studentSkillRepository.findByStudent_UserId(student.getUserId()),
+                nodes,
+                demandBySkill,
+                statusByNodeId);
     }
 
     /**
@@ -206,7 +643,7 @@ public class RoadmapServiceImpl implements RoadmapService {
 
         CareerRole careerRole = careerRoleOptional.get();
         List<SkillNode> nodes = skillNodeRepository
-                .findByCareerRole_CareerIdOrderByNodeLevelAscNodeNameAsc(careerId);
+                .findPublishedForCareerLegacyOrder(careerId);
         List<RoadmapNodeResponse> nodeDtos = nodes.stream()
                 .map(node -> mapToLegacyNodeDto(node, "not_started"))
                 .toList();
@@ -228,7 +665,7 @@ public class RoadmapServiceImpl implements RoadmapService {
     @Override
     public Integer getCareerProgress(UUID careerId) {
         Student student = getStudentFromContext();
-        List<SkillNode> nodes = skillNodeRepository.findByCareerRole_CareerId(careerId);
+        List<SkillNode> nodes = skillNodeRepository.findPublishedForCareer(careerId);
         if (nodes.isEmpty()) {
             return 0;
         }
@@ -326,13 +763,30 @@ public class RoadmapServiceImpl implements RoadmapService {
                     studentProgressRepository.findByStudent_UserIdAndSkillNode_NodeIdIn(
                             student.getUserId(),
                             careerNodes.stream().map(SkillNode::getNodeId).toList()));
-            String computedStatus = buildFrontendStatusMap(careerNodes, progressByNode, selectionView).get(node.getNodeId());
+            // Same resolver as the read path, or the student could be refused a node
+            // the roadmap had just shown them as unlocked.
+            ResolvedOrder order = roadmapEdgeResolver.resolve(careerNodes,
+                    studentRoadmapContext(student, node.getCareerRole(),
+                            marketDemandSafe(node.getCareerRole() == null
+                                    ? null : node.getCareerRole().getCareerId())),
+                    selectionView);
+            String computedStatus =
+                    buildFrontendStatusMap(careerNodes, progressByNode, selectionView, order).get(node.getNodeId());
             if (FRONTEND_LOCKED_STATUS.equals(computedStatus)) {
                 throw new ForbiddenException("This node is locked; complete its prerequisites first.");
             }
         }
 
         progress.setStatus(newStatus);
+        // Leaving COMPLETED has to drop the date with it. The stamp is guarded by
+        // `getCompletedAt() == null`, so a node taken back to in-progress and then
+        // completed again would keep the first date forever — the card would show
+        // "06 Aug 2026" under work finished in September. Nothing could un-complete
+        // a node from the canvas before, so the path was unreachable; the status bar
+        // on the card makes it a click.
+        if (RoadmapStepStatus.COMPLETED != newStatus) {
+            progress.setCompletedAt(null);
+        }
         if (RoadmapStepStatus.COMPLETED == newStatus
                 && progress.getCompletedAt() == null) {
             progress.setCompletedAt(java.time.LocalDateTime.now());
@@ -516,16 +970,20 @@ public class RoadmapServiceImpl implements RoadmapService {
     private Map<UUID, String> buildFrontendStatusMap(
             List<SkillNode> nodes,
             Map<UUID, StudentProgress> progressByNodeId,
-            SelectionView selectionView
+            SelectionView selectionView,
+            ResolvedOrder order
     ) {
         Map<UUID, String> statusByNodeId = new HashMap<>();
         Set<String> passedStages = findPassedStages(nodes, progressByNodeId);
         Set<UUID> topicIds = topicParentIds(nodes);
         Map<UUID, List<SkillNode>> childrenByParent = childrenByParent(nodes);
 
-        // Parents/previous nodes must be classified before their dependants,
-        // regardless of the level/name order the nodes were fetched in.
-        for (SkillNode node : orderDependenciesFirst(nodes)) {
+        // Parents/previous nodes must be classified before their dependants. The
+        // resolver's visitOrder already guarantees that for the computed chain;
+        // walking `nodes` in database order instead would leave a predecessor
+        // unclassified, and an unknown gate reads as locked — which would lock
+        // everything behind it.
+        for (SkillNode node : orderDependenciesFirst(nodes, order)) {
             // Unchosen alternative of a decided CHOOSE_ONE group (and its subtree):
             // greyed out, off the active path — bypass the normal gating rules.
             if (selectionView.isGreyedAlternative(node.getNodeId())) {
@@ -549,7 +1007,7 @@ public class RoadmapServiceImpl implements RoadmapService {
                 // reachable it auto-completes as soon as enough child weight is done,
                 // otherwise it stays the current focus while its sub-skills are learned.
                 boolean gateLocked = isStageLocked(node, passedStages)
-                        || isSequentialGateLocked(node.getPreviousNode(), statusByNodeId);
+                        || isSequentialGateLocked(previousOf(node, order, nodes), statusByNodeId);
                 if (gateLocked) {
                     statusByNodeId.put(node.getNodeId(), FRONTEND_LOCKED_STATUS);
                 } else if (childCompletionRatio(node, childrenByParent, progressByNodeId, selectionView) >= parentCompletionThreshold) {
@@ -565,11 +1023,33 @@ public class RoadmapServiceImpl implements RoadmapService {
             // sequential previousNode ordering among siblings/spine leaves.
             boolean locked = isStageLocked(node, passedStages)
                     || isParentReachedGateLocked(node.getParentNode(), statusByNodeId)
-                    || isSequentialGateLocked(node.getPreviousNode(), statusByNodeId);
+                    || isSequentialGateLocked(previousOf(node, order, nodes), statusByNodeId);
             statusByNodeId.put(node.getNodeId(), locked ? FRONTEND_LOCKED_STATUS : FRONTEND_CURRENT_STATUS);
         }
 
         return statusByNodeId;
+    }
+
+    /** How far the node sits from a root; the cap keeps a cycle in the data from hanging the request. */
+    /**
+     * Depth from the stored column, walking the parent chain only as a fallback.
+     *
+     * <p>The column is authoritative because every consumer has to agree on it —
+     * the visibility filter, the layout and the client each derived their own
+     * answer before, and the client's disagreement is what put 134 of 169 nodes
+     * in a single column. The walk survives for rows written before the
+     * standardisation, and for tests that build nodes by hand.
+     */
+    private int depthOf(SkillNode node) {
+        if (node.getDepth() != null) {
+            return node.getDepth();
+        }
+        int depth = 0;
+        for (SkillNode cursor = node.getParentNode(); cursor != null && depth < 32;
+             cursor = cursor.getParentNode()) {
+            depth++;
+        }
+        return depth;
     }
 
     /** Node ids that are referenced as a {@code parentNode} by at least one other node (i.e. topics). */
@@ -707,8 +1187,57 @@ public class RoadmapServiceImpl implements RoadmapService {
         return passed;
     }
 
-    /** Kahn-style ordering over parent/previous references; tolerates cycles by appending leftovers. */
-    private List<SkillNode> orderDependenciesFirst(List<SkillNode> nodes) {
+    /**
+     * The node that must be completed before {@code node}, for this student.
+     *
+     * <p>Reads the resolver rather than the {@code previous_node} column so the
+     * unlock chain is the same chain the student is shown. Falls back to the
+     * column only when the resolver produced nothing for this roadmap, which
+     * keeps the older callers (career template, progress-only paths) working.
+     */
+    private SkillNode previousOf(SkillNode node, ResolvedOrder order, List<SkillNode> nodes) {
+        if (order == null) {
+            return node.getPreviousNode();
+        }
+        UUID previousId = order.previousByNodeId().get(node.getNodeId());
+        if (previousId == null) {
+            return null;
+        }
+        for (SkillNode candidate : nodes) {
+            if (previousId.equals(candidate.getNodeId())) {
+                return candidate;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Kahn-style ordering over parent references and the student's computed
+     * predecessors; tolerates cycles by appending leftovers.
+     *
+     * <p>{@code order.visitOrder()} is already dependencies-first, so it is used
+     * directly when available. The Kahn pass remains as the fallback for callers
+     * that have no resolved order — and as a safety net, since an incomplete
+     * visitOrder would silently lock every node it omitted.
+     */
+    private List<SkillNode> orderDependenciesFirst(List<SkillNode> nodes, ResolvedOrder order) {
+        if (order != null && order.visitOrder().size() == nodes.size()) {
+            Map<UUID, SkillNode> byId = new HashMap<>();
+            for (SkillNode node : nodes) {
+                byId.put(node.getNodeId(), node);
+            }
+            List<SkillNode> ordered = new ArrayList<>(nodes.size());
+            for (UUID nodeId : order.visitOrder()) {
+                SkillNode node = byId.get(nodeId);
+                if (node != null) {
+                    ordered.add(node);
+                }
+            }
+            if (ordered.size() == nodes.size()) {
+                return ordered;
+            }
+        }
+
         Set<UUID> emitted = new HashSet<>();
         List<SkillNode> ordered = new ArrayList<>(nodes.size());
         List<SkillNode> remaining = new ArrayList<>(nodes);
@@ -719,8 +1248,9 @@ public class RoadmapServiceImpl implements RoadmapService {
             Iterator<SkillNode> iterator = remaining.iterator();
             while (iterator.hasNext()) {
                 SkillNode node = iterator.next();
+                SkillNode previous = previousOf(node, order, nodes);
                 boolean parentReady = node.getParentNode() == null || emitted.contains(node.getParentNode().getNodeId());
-                boolean previousReady = node.getPreviousNode() == null || emitted.contains(node.getPreviousNode().getNodeId());
+                boolean previousReady = previous == null || emitted.contains(previous.getNodeId());
                 if (parentReady && previousReady) {
                     ordered.add(node);
                     emitted.add(node.getNodeId());
@@ -746,15 +1276,160 @@ public class RoadmapServiceImpl implements RoadmapService {
 
 
     /**
+     * Market demand keyed by skill id, or an empty map if it cannot be produced.
+     *
+     * <p>Demand is decoration on the roadmap, not part of it: a student must still
+     * be able to see their path when the scraper has never run, when the trend
+     * table is empty, or when that query fails outright. Swallowing the failure
+     * here keeps a reporting concern from taking down the page it annotates.
+     */
+    private Map<UUID, SkillDemandResponse> marketDemandSafe(UUID careerId) {
+        try {
+            return marketDemandService.demandBySkill(careerId);
+        } catch (Exception e) {
+            log.warn("RoadmapServiceImpl: market demand unavailable, rendering roadmap "
+                    + "without it: {}", e.getMessage());
+            return Map.of();
+        }
+    }
+
+    /**
      * @param fptAccount when false the FLM overlay is skipped entirely, so nodes carry no
      *                   fptCoverage/fptResources and the two overlay queries never run
      */
+    /**
+     * The student's proven skills, keyed by skill id.
+     *
+     * <p>Fed to the node view so a node can say where the student stands against
+     * the bar it sets. {@code requiredProficiency} on its own is unreadable:
+     * "needs APPLIED" means nothing until you know you are at PRACTICED.
+     */
+    private Map<UUID, StudentSkill> heldSkillsBySkillId(UUID studentId) {
+        Map<UUID, StudentSkill> held = new HashMap<>();
+        for (StudentSkill studentSkill : studentSkillRepository.findByStudent_UserId(studentId)) {
+            if (studentSkill.getSkill() != null) {
+                held.put(studentSkill.getSkill().getSkillId(), studentSkill);
+            }
+        }
+        return held;
+    }
+
+    /**
+     * How this node finishes, said plainly.
+     *
+     * <p>A topic auto-completes once enough of its sub-skills are done, and that
+     * used to happen with nothing on screen having warned it would, or shown what
+     * was still outstanding.
+     */
+    private String completionRuleFor(SkillNode node, boolean isTopic, int childTotal, int childCompleted) {
+        if (isTopic && childTotal > 0) {
+            return String.format("Completes at %d%% of its sub-skills (%d of %d done)",
+                    Math.round(parentCompletionThreshold * 100), childCompleted, childTotal);
+        }
+        if (node.getRequiredProficiency() != null && node.getRequiredProficiency() > 0) {
+            return "Completes when you reach " + proficiencyName(node.getRequiredProficiency());
+        }
+        return "Completes when you mark it done";
+    }
+
+    private String proficiencyName(Integer level) {
+        if (level == null) {
+            return "no set level";
+        }
+        return switch (level) {
+            case 1 -> "AWARE";
+            case 2 -> "PRACTICED";
+            case 3 -> "APPLIED";
+            case 4 -> "PROFESSIONAL";
+            default -> "level " + level;
+        };
+    }
+
+    /**
+     * Career readiness for this student, or nothing at all if it cannot be had.
+     *
+     * <p>Readiness is deliberately not {@code progress}: progress counts nodes
+     * ticked off on the view in front of the student, readiness counts the
+     * career's essential skills they actually hold. Finishing every node on a
+     * sub-roadmap moves the first to 100% and the second barely at all, and the
+     * student is entitled to see both numbers rather than the flattering one.
+     *
+     * <p>Never allowed to break the roadmap: a failure here costs the two
+     * percentages, not the page.
+     */
+    private SeniorityCalculator.SeniorityVerdict readinessSafe(Student student, CareerRole careerRole) {
+        if (student == null || student.getUserId() == null
+                || careerRole == null || careerRole.getCareerId() == null) {
+            return null;
+        }
+        try {
+            return seniorityCalculator.compute(student.getUserId(), careerRole.getCareerId());
+        } catch (Exception e) {
+            log.warn("RoadmapServiceImpl: could not compute readiness for user {}: {}",
+                    student.getUserId(), e.getMessage());
+            return null;
+        }
+    }
+
+    private StudentRoadmapResponse.StudentRoadmapResponseBuilder withReadiness(
+            StudentRoadmapResponse.StudentRoadmapResponseBuilder builder,
+            SeniorityCalculator.SeniorityVerdict verdict) {
+        if (verdict == null) {
+            return builder;
+        }
+        return builder
+                .readiness(verdict.ratioAll() == null ? null : verdict.ratioAll().doubleValue())
+                .readinessVerified(verdict.ratioVerified() == null ? null : verdict.ratioVerified().doubleValue())
+                .readinessRequiredCount(verdict.requiredCount())
+                .readinessHeldCount(verdict.heldCount())
+                .readinessVerifiedCount(verdict.verifiedCount());
+    }
+
+    /**
+     * The readiness denominator as rows, for the skill map.
+     *
+     * <p>Same failure policy as {@link #readinessSafe}: losing this costs the map,
+     * not the roadmap.
+     */
+    private List<CoreSkillResponse> coreSkillsSafe(Student student, CareerRole careerRole,
+                                                   Map<UUID, SkillDemandResponse> demandBySkill) {
+        if (student == null || student.getUserId() == null
+                || careerRole == null || careerRole.getCareerId() == null) {
+            return null;
+        }
+        try {
+            Map<UUID, SkillDemandResponse> demand = demandBySkill != null ? demandBySkill : Map.of();
+            return seniorityCalculator.coreSkills(student.getUserId(), careerRole.getCareerId()).stream()
+                    .map(core -> CoreSkillResponse.builder()
+                            .skillId(core.skillId())
+                            .skillName(core.skillName())
+                            .importance(core.importance())
+                            .proficiency(core.proficiency())
+                            .verifiedBy(core.verifiedBy())
+                            .marketDemand(demand.get(core.skillId()))
+                            .build())
+                    .toList();
+        } catch (Exception e) {
+            log.warn("RoadmapServiceImpl: could not build the core skill set for user {}: {}",
+                    student.getUserId(), e.getMessage());
+            return null;
+        }
+    }
+
     private List<RoadmapNodeResponse> buildRoadmapTree(
             List<SkillNode> nodes,
             Map<UUID, String> statusByNodeId,
             Map<UUID, StudentProgress> progressByNodeId,
             SelectionView selectionView,
-            boolean fptAccount
+            boolean fptAccount,
+            ResolvedOrder order,
+            Map<UUID, SkillDemandResponse> demandBySkill,
+            Map<UUID, Integer> hiddenChildren,
+            List<SkillNode> allNodes,
+            Map<UUID, StudentSkill> heldSkillsBySkillId,
+            Map<UUID, Integer> subtreeSizes,
+            Set<UUID> enterableIds,
+            StudentRoadmapContext context
     ) {
         // Presentation-only placement, joined in from the layout table.
         Map<UUID, RoadmapNodeLayout> layoutsByNodeId = new HashMap<>();
@@ -763,8 +1438,11 @@ public class RoadmapServiceImpl implements RoadmapService {
             layoutsByNodeId.put(layout.getNodeId(), layout);
         }
 
-        Set<UUID> topicIds = topicParentIds(nodes);
-        Map<UUID, List<SkillNode>> childrenByParent = childrenByParent(nodes);
+        // Counted over EVERY node of the career, not the slice being drawn: a topic
+        // that reads "2/12" must keep reading 2/12 when ten of those children are
+        // held back by the visibility filter.
+        Set<UUID> topicIds = topicParentIds(allNodes);
+        Map<UUID, List<SkillNode>> childrenByParent = childrenByParent(allNodes);
 
         // FLM overlay: skill name -> teaching FPT subjects, and subject -> lesson resources.
         // Left empty for non-FPT accounts, which also skips both overlay queries.
@@ -788,7 +1466,17 @@ public class RoadmapServiceImpl implements RoadmapService {
         final Map<String, List<FptSubject>> subjectsBySkillFinal = subjectsBySkill;
         final Map<String, List<FptSubjectResource>> resourcesByCodeFinal = resourcesByCode;
 
-        return nodes.stream()
+        // Market demand for the catalog skill behind each node, resolved once by the
+        // caller and shared with the ordering pass so the number the student reads on
+        // a node is the same one that decided where the node sits.
+        final Map<UUID, SkillDemandResponse> demand = demandBySkill != null ? demandBySkill : Map.of();
+
+        // Emit in the student's own order, not the database's. The client lays each
+        // topic's children out in the order this array gives them, so sending them
+        // in `node_level, node_name` order would render the static roadmap no
+        // matter what the resolver decided — the ordering would exist only on the
+        // wire and never on the screen.
+        return orderDependenciesFirst(nodes, order).stream()
                 .map(node -> {
                     RoadmapNodeLayout layout = layoutsByNodeId.get(node.getNodeId());
                     boolean isTopic = topicIds.contains(node.getNodeId());
@@ -836,23 +1524,48 @@ public class RoadmapServiceImpl implements RoadmapService {
                             ? buildNodeResources(coverSubjects, resourcesByCodeFinal)
                             : null;
 
+                    StudentSkill heldSkill = (node.getSkill() == null || heldSkillsBySkillId == null)
+                            ? null : heldSkillsBySkillId.get(node.getSkill().getSkillId());
+                    RoadmapEdgeResolver.NodePriority priority =
+                            roadmapEdgeResolver.priorityOf(node, context);
                     return RoadmapNodeResponse.builder()
                             .nodeId(node.getNodeId())
                             .nodeName(node.getNodeName())
                             .parentNode(node.getParentNode() != null ? node.getParentNode().getNodeId().toString() : null)
-                            .previousNode(node.getPreviousNode() != null ? node.getPreviousNode().getNodeId().toString() : null)
+                            // From the resolver, not the column: a client that still
+                            // derives its own edges from this field gets the
+                            // personalised order without shipping a new build.
+                            .previousNode(order != null && order.previousByNodeId().get(node.getNodeId()) != null
+                                    ? order.previousByNodeId().get(node.getNodeId()).toString()
+                                    : null)
                             .nodeLevel(node.getNodeLevel())
                             .stage(node.getType() != null && node.getType().getStage() != null
                                     ? node.getType().getStage().name() : null)
                             .completionPolicy(node.getCompletionPolicy())
                             .weight(node.getType() != null ? node.getType().getWeight() : null)
                             .requiredProficiency(node.getRequiredProficiency())
+                            .currentProficiency(heldSkill == null ? null : heldSkill.getProficiency())
+                            // Null is not a failure, it is a weaker claim: the
+                            // student said so themselves. The card is expected to
+                            // show the difference rather than flatten it.
+                            .proficiencyVerifiedBy(heldSkill == null ? null : heldSkill.getVerifiedBy())
+                            .completionRule(completionRuleFor(node, isTopic, countedChildren.size(), childCompleted))
+                            .subtreeSize(subtreeSizes == null ? null : subtreeSizes.get(node.getNodeId()))
+                            .entersRoadmap(enterableIds != null && enterableIds.contains(node.getNodeId()))
                             .parentTopic(isTopic)
+                            .depth(depthOf(node))
+                            .hiddenChildren(hiddenChildren == null
+                                    ? null : hiddenChildren.get(node.getNodeId()))
                             .childTotal(countedChildren.size())
                             .childCompleted(childCompleted)
                             .selection(node.getSelection())
                             .chooseCount(node.getChooseCount())
                             .nodeKind(node.getNodeKind())
+                            .tier(node.getTier())
+                            .tierLocked(roadmapTierResolver.isLocked(node,
+                                    roadmapTierResolver.ceilingFor(
+                                            context == null || context.level() == null
+                                                    ? null : context.level().name())))
                             .axis(node.getAxis())
                             .isOptional(node.getIsOptional())
                             .isCheckpoint(node.getIsCheckpoint())
@@ -862,10 +1575,25 @@ public class RoadmapServiceImpl implements RoadmapService {
                             .displayOrder(layout != null ? layout.getDisplayOrder() : null)
                             .description(node.getDescription())
                             .resource(node.getResource())
+                            .difficulty(node.getDifficulty())
+                            // Deprecated and empty on every row; copied through rather than
+                            // dropped so the response shape does not change under any client.
+                            .estimatedHours(node.getEstimatedHours())
+                            .objectives(node.getObjectives())
+                            .whyItMatters(node.getWhyItMatters())
                             .status(statusByNodeId.getOrDefault(node.getNodeId(), FRONTEND_LOCKED_STATUS))
                             .completedAt(completedAt)
                             .fptCoverage(fptCoverage)
                             .fptResources(fptResources)
+                            .skillName(node.getSkill() != null ? node.getSkill().getSkillName() : null)
+                            .skillCategory(node.getSkill() != null ? node.getSkill().getCategory() : null)
+                            .marketDemand(node.getSkill() != null
+                                    ? demand.get(node.getSkill().getSkillId())
+                                    : null)
+                            // The score this node was already ordered by, now readable.
+                            .priorityScore(priority == null ? null : priority.score())
+                            .priorityLabel(priority == null ? null : priority.label().name())
+                            .priorityReason(priority == null ? null : priority.reason())
                             .build();
                 })
                 .toList();

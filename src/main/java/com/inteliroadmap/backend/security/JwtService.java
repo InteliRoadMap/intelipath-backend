@@ -15,6 +15,7 @@ import org.springframework.stereotype.Component;
 import javax.crypto.SecretKey;
 import java.nio.charset.StandardCharsets;
 import java.util.Date;
+import java.util.UUID;
 
 @Component
 @Getter
@@ -67,6 +68,11 @@ public class JwtService {
         try {
             return Jwts.builder()
                     .subject(email)
+                    // A JWT's iat/exp are epoch SECONDS, so without this two logins
+                    // inside the same second produced a byte-identical token, hence
+                    // an identical SHA-256, hence a unique-constraint violation on
+                    // refresh_tokens.token and a 500 on a perfectly valid login.
+                    .id(UUID.randomUUID().toString())
                     .issuedAt(new Date())
                     .expiration(new Date(System.currentTimeMillis() + refreshExpiration))
                     .signWith(getSigningKey(), Jwts.SIG.HS256)

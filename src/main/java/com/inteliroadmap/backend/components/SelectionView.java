@@ -14,8 +14,24 @@ import java.util.UUID;
  *        undecided group)
  * @param greyedAlternatives node ids shown as {@code alternative} in the UI
  *        (unchosen alternatives of a decided group only)
+ * @param offPathDescendants what sits <em>below</em> an unchosen alternative of a
+ *        decided group — the alternative's own node is not included
  */
-public record SelectionView(Set<UUID> progressExcluded, Set<UUID> greyedAlternatives) {
+public record SelectionView(Set<UUID> progressExcluded, Set<UUID> greyedAlternatives,
+                            Set<UUID> offPathDescendants) {
+
+    /**
+     * A student who picked Java has no use for Laravel's 49 descendants.
+     *
+     * <p>Greying them was still sending them: the payload, and the page, carried
+     * every language's whole subtree. Dropping the descendants while keeping the
+     * alternative's own node means the roadmap holds only the chosen path, and
+     * the student can still see what they did not pick and change their mind —
+     * which is why this is not simply {@link #greyedAlternatives}.
+     */
+    public boolean isOffPathDescendant(UUID nodeId) {
+        return offPathDescendants.contains(nodeId);
+    }
 
     public boolean isExcludedFromProgress(UUID nodeId) {
         return progressExcluded.contains(nodeId);

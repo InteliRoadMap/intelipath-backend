@@ -1,9 +1,11 @@
 package com.inteliroadmap.backend.services.impl;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.inteliroadmap.backend.components.AbilityFloorPropagator;
 import com.inteliroadmap.backend.components.RoadmapProgressCalculator;
 import com.inteliroadmap.backend.components.RoadmapSelectionResolver;
 import com.inteliroadmap.backend.components.SelectionView;
+import com.inteliroadmap.backend.components.SkillProficiencyPromoter;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapRecommendationDecisionResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapRecommendationResponse;
 import com.inteliroadmap.backend.domain.entity.CareerRequiredSkill;
@@ -17,6 +19,7 @@ import com.inteliroadmap.backend.domain.entity.StudentProgress;
 import com.inteliroadmap.backend.domain.entity.StudentSkill;
 import com.inteliroadmap.backend.domain.entity.StudentSkillEvidence;
 import com.inteliroadmap.backend.domain.enums.EvidenceStatus;
+import com.inteliroadmap.backend.domain.enums.EvidenceType;
 import com.inteliroadmap.backend.domain.enums.ImportanceLevel;
 import com.inteliroadmap.backend.domain.enums.RecommendationAction;
 import com.inteliroadmap.backend.domain.enums.RecommendationStatus;
@@ -34,6 +37,7 @@ import com.inteliroadmap.backend.repositories.StudentSkillEvidenceRepository;
 import com.inteliroadmap.backend.repositories.StudentSkillRepository;
 import com.inteliroadmap.backend.services.AuthenticatedStudentService;
 import com.inteliroadmap.backend.services.RoadmapPersonalizationService;
+import com.inteliroadmap.backend.services.StudentLevelService;
 import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -49,6 +53,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -85,6 +90,40 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
     private static final BigDecimal PROFILE_SKILL_CONFIDENCE = new BigDecimal("0.60");
 
     /**
+     * Confidence for a profile skill, by how much of it the student claims.
+     *
+     * <p>The flat {@link #PROFILE_SKILL_CONFIDENCE} above treats "I have heard of
+     * Docker" and "I run Docker in production" as the same claim, and 0.60 is
+     * below the bar on every node that can accept evidence: all 29
+     * EVIDENCE_ALLOWED nodes on the Backend roadmap carry
+     * {@code required_proficiency = 65}. So the profile source could never
+     * produce a candidate — not rarely, never, for any student, on any node.
+     * Measured: zero rows in {@code roadmap_recommendation_items}.
+     *
+     * <p>The rungs are the behaviourally-anchored scale the assessment already
+     * writes. PRACTICED still sits under 0.65 on purpose: having practised
+     * something is not grounds to skip learning it. APPLIED is.
+     */
+    private static final BigDecimal[] PROFICIENCY_CONFIDENCE = {
+            new BigDecimal("0.00"),   // unset
+            new BigDecimal("0.40"),   // AWARE
+            new BigDecimal("0.55"),   // PRACTICED
+            new BigDecimal("0.70"),   // APPLIED
+            new BigDecimal("0.85")    // PROFESSIONAL
+    };
+
+    /**
+     * Added when the row carries {@code verified_by}.
+     *
+     * <p>Same rule {@code SkillEvidenceService} applies when a repository read
+     * and a self-report disagree: the read wins. This is that rule reaching the
+     * roadmap, and it is what makes connecting GitHub change what the student
+     * sees rather than only what their level says.
+     */
+    private static final BigDecimal VERIFIED_BONUS = new BigDecimal("0.10");
+    private static final BigDecimal MAX_PROFILE_CONFIDENCE = new BigDecimal("0.95");
+
+    /**
      * Confidence a skill's evidence must clear to fast-track a node, scaled by how
      * important that skill is to the career. HIGH-importance (foundational) skills
      * demand stronger proof before we let the student skip them; LOW-importance
@@ -119,6 +158,9 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
     private final RoadmapRecommendationMapper recommendationMapper;
     private final RoadmapProgressCalculator progressCalculator;
     private final RoadmapSelectionResolver roadmapSelectionResolver;
+    private final SkillProficiencyPromoter skillProficiencyPromoter;
+    private final AbilityFloorPropagator abilityFloorPropagator;
+    private final StudentLevelService studentLevelService;
 
     @Transactional
     @Override
@@ -128,7 +170,7 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
         Student student = authenticatedStudentService.getRequiredStudent();
         UUID careerId = requireSelectedCareer(student);
 
-        List<SkillNode> careerNodes = skillNodeRepository.findByCareerRole_CareerId(careerId);
+        List<SkillNode> careerNodes = skillNodeRepository.findPublishedForCareer(careerId);
         if (careerNodes.isEmpty()) {
             log.info("RoadmapPersonalizationServiceImpl: Career {} has no roadmap nodes, nothing to recommend", careerId);
             return List.of();
@@ -198,6 +240,11 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
         List<SkillNode> completedNodes = applyMarkCompleteItems(student, items);
         syncCompletedSkillsToProfile(student, completedNodes);
         linkAndAcceptEvidence(student, items, completedNodes);
+        // Runs last, once the rows above exist: stamps proficiency and the verifying
+        // source onto them. Without it every synced row stays proficiency-null, which
+        // SeniorityCalculator ignores, so no amount of GitHub or transcript evidence
+        // could ever move the student's level off the JUNIOR ceiling.
+        skillProficiencyPromoter.promote(student.getUserId(), completedNodes, collectEvidenceIds(items));
 
         recommendation.setStatus(RecommendationStatus.ACCEPTED);
         recommendation.setDecidedAt(LocalDateTime.now());
@@ -212,6 +259,8 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
                 .status(RecommendationStatus.ACCEPTED)
                 .decidedAt(recommendation.getDecidedAt())
                 .roadmapProgress(progress)
+                .completedNodeCount(completedNodes.size())
+                .completedNodeIds(completedNodes.stream().map(SkillNode::getNodeId).toList())
                 .build();
     }
 
@@ -274,14 +323,29 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
             }
         }
 
+        // Every node the two sources below matched by name, so the third pass can
+        // ask what those nodes already cover. Recorded as they are offered rather
+        // than re-derived, so a change to the matching rules cannot leave the
+        // propagation reasoning about a different set of nodes than the one that
+        // was actually proven.
+        Map<UUID, BigDecimal> provenConfidence = new LinkedHashMap<>();
+        Map<UUID, String> provenReason = new HashMap<>();
+        Map<UUID, UUID> provenEvidenceId = new HashMap<>();
+
         // Source 1: skills the student already holds in their profile.
         for (StudentSkill studentSkill : studentSkillRepository.findByStudent_UserId(student.getUserId())) {
             if (studentSkill.getSkill() == null) {
                 continue;
             }
-            String reason = "You already have '" + studentSkill.getSkill().getSkillName() + "' in your skill profile";
+            BigDecimal confidence = profileConfidence(studentSkill);
+            String reason = profileReason(studentSkill);
             for (SkillNode node : nodesBySkillId.getOrDefault(studentSkill.getSkill().getSkillId(), List.of())) {
-                offerCandidate(candidates, excludedNodeIds, node, PROFILE_SKILL_CONFIDENCE, reason, null, importanceBySkillId);
+                offerCandidate(candidates, excludedNodeIds, node, confidence, reason, null, importanceBySkillId,
+                        studentSkill.getVerifiedBy() != null && !studentSkill.getVerifiedBy().isBlank());
+                // A profile row propagates only when a source outside the student
+                // signed it: verified_by is set by GitHub, a transcript or a mentor.
+                recordProven(provenConfidence, provenReason, provenEvidenceId, node, confidence, reason, null,
+                        studentSkill.getVerifiedBy() != null && !studentSkill.getVerifiedBy().isBlank());
             }
         }
 
@@ -296,8 +360,12 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
             }
             String reason = buildEvidenceReason(evidence);
             if (evidence.getNodeId() != null && nodesById.containsKey(evidence.getNodeId())) {
+                SkillNode node = nodesById.get(evidence.getNodeId());
                 offerCandidate(candidates, excludedNodeIds,
-                        nodesById.get(evidence.getNodeId()), confidence, reason, evidence.getEvidenceId(), importanceBySkillId);
+                        node, confidence, reason, evidence.getEvidenceId(), importanceBySkillId,
+                        isExternallyAttested(evidence));
+                recordProven(provenConfidence, provenReason, provenEvidenceId,
+                        node, confidence, reason, evidence.getEvidenceId(), isExternallyAttested(evidence));
             } else if (evidence.getSkillName() != null) {
                 String skillName = evidence.getSkillName().toLowerCase();
                 List<SkillNode> matched = nodesBySkillName.get(skillName);
@@ -318,12 +386,129 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
                     matched = fuzzyMatchNodes(skillName, nodesBySkillName, nodesByKeyword);
                 }
                 for (SkillNode node : matched) {
-                    offerCandidate(candidates, excludedNodeIds, node, confidence, reason, evidence.getEvidenceId(), importanceBySkillId);
+                    offerCandidate(candidates, excludedNodeIds, node, confidence, reason, evidence.getEvidenceId(), importanceBySkillId, isExternallyAttested(evidence));
+                    recordProven(provenConfidence, provenReason, provenEvidenceId,
+                            node, confidence, reason, evidence.getEvidenceId(), isExternallyAttested(evidence));
                 }
             }
         }
 
+
+        // Source 3: the sub-skills a proven skill already covers.
+        //
+        // Sources 1 and 2 reach a node only by naming it, and a roadmap does not
+        // name a skill twice: an imported repository proves `Java`, and Java's own
+        // 71 sub-nodes carry their own catalog skills the student has evidence for
+        // none of. So the system graded someone a Java developer in the header and
+        // then asked them to tick `Exception Handling` by hand.
+        //
+        // Runs last, and only offers — every gate in offerCandidate still decides.
+        // See AbilityFloorPropagator for why the tier bound is strict and why the
+        // confidence is discounted rather than inherited whole.
+        String level = studentLevelService.levelOf(student.getUserId())
+                .map(current -> current.getLevel())
+                .orElse(null);
+        for (SkillNode covered : abilityFloorPropagator.coveredDescendants(
+                provenConfidence.keySet(), careerNodes, level)) {
+            UUID sourceNodeId = nearestProvenAncestor(covered, provenConfidence.keySet());
+            if (sourceNodeId == null) {
+                continue;
+            }
+            BigDecimal inherited = abilityFloorPropagator.inheritedConfidence(provenConfidence.get(sourceNodeId));
+            offerCandidate(candidates, excludedNodeIds, covered, inherited,
+                    inheritedReason(provenReason.get(sourceNodeId)),
+                    provenEvidenceId.get(sourceNodeId), importanceBySkillId,
+                    // Everything in provenConfidence already cleared the same gate
+                    // in recordProven, so this is true by construction. Passed
+                    // explicitly rather than hardcoded so the two cannot drift.
+                    true);
+        }
+
         return candidates;
+    }
+
+    /**
+     * Remembers a directly-matched node so source 3 can ask what it covers.
+     *
+     * <p><b>Only externally-attested proof propagates.</b> Marking one node from a
+     * self-report is a claim about that node; using it to mark everything beneath
+     * it is that claim being cited as proof of a hundred more. Measured on the live
+     * account: the graded paper wrote {@code source_type = MANUAL} at 0.80 for
+     * {@code Java}, source 3 inherited 0.68, and 24 nodes ticked themselves —
+     * {@code Enums}, {@code Record}, {@code Method Chaining}, {@code Initializer
+     * Block}. Answering a handful of Java questions on a mixed Backend paper is
+     * not evidence of any of those.
+     *
+     * <p>This is the same line {@code 2026-08-06_declared_skill_cleanup_2.sql}
+     * draws, and for the same reason: a student's own statement cannot corroborate
+     * itself. It is read off the evidence row rather than from a list of node ids,
+     * so the gate follows the data instead of a table someone has to maintain.
+     *
+     * @param externallyAttested false for MANUAL evidence and bare self-declaration
+     */
+    private void recordProven(Map<UUID, BigDecimal> confidenceByNode, Map<UUID, String> reasonByNode,
+                              Map<UUID, UUID> evidenceByNode, SkillNode node, BigDecimal confidence,
+                              String reason, UUID evidenceId, boolean externallyAttested) {
+        if (node == null || node.getNodeId() == null || confidence == null || !externallyAttested) {
+            return;
+        }
+        // Strongest wins, matching offerCandidate: two repositories proving Java
+        // should propagate the better of the two, not whichever was read last.
+        BigDecimal existing = confidenceByNode.get(node.getNodeId());
+        if (existing != null && existing.compareTo(confidence) >= 0) {
+            return;
+        }
+        confidenceByNode.put(node.getNodeId(), confidence);
+        reasonByNode.put(node.getNodeId(), reason);
+        if (evidenceId != null) {
+            evidenceByNode.put(node.getNodeId(), evidenceId);
+        }
+    }
+
+    /**
+     * The closest proven node above this one.
+     *
+     * <p>Nested proofs are possible — Java is proven, and so is Collections inside
+     * it — and the nearer one is the better claim about what sits under it.
+     */
+    private UUID nearestProvenAncestor(SkillNode node, Set<UUID> provenNodeIds) {
+        SkillNode current = node == null ? null : node.getParentNode();
+        int guard = 0;
+        while (current != null && current.getNodeId() != null && guard++ < MAX_ANCESTOR_WALK) {
+            if (provenNodeIds.contains(current.getNodeId())) {
+                return current.getNodeId();
+            }
+            current = current.getParentNode();
+        }
+        return null;
+    }
+
+    /**
+     * The reason, rewritten so it cannot be read as direct proof.
+     *
+     * <p>The recommendation row is what a student sees when they ask why a node
+     * ticked itself, and "verified by github" on a node no repository mentioned
+     * would be false. This says what actually happened.
+     */
+    private String inheritedReason(String directReason) {
+        String source = directReason == null || directReason.isBlank() ? "a skill you have proven" : directReason;
+        return "covered by " + source + ", and below your current level";
+    }
+
+    /** Depth bound on the parent walk, so a cyclic parent link cannot hang a request. */
+    private static final int MAX_ANCESTOR_WALK = 32;
+
+    /**
+     * True when something other than the student said this.
+     *
+     * <p>{@code MANUAL} covers both the skill picker's self-declaration and the
+     * assessment writing its own result back, so it is the one source that cannot
+     * corroborate a claim about anything except the node it names. GITHUB_PROJECT,
+     * TRANSCRIPT and CHAT_FILE all rest on an artefact somebody can go and read.
+     */
+    private boolean isExternallyAttested(StudentSkillEvidence evidence) {
+        return evidence != null && evidence.getSourceType() != null
+                && evidence.getSourceType() != EvidenceType.MANUAL;
     }
 
     /** Minimum length either side of a fuzzy match must have, to avoid short generic words matching everything. */
@@ -358,9 +543,65 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
     }
 
     /** Adds or merges a candidate, keeping the highest confidence and every supporting evidence id. */
+    /**
+     * How much a profile row is worth as grounds to skip a node.
+     *
+     * <p>Falls back to the old flat value when proficiency was never recorded, so
+     * a row written before the assessment existed behaves exactly as it did.
+     */
+    private BigDecimal profileConfidence(StudentSkill studentSkill) {
+        Short proficiency = studentSkill.getProficiency();
+        if (proficiency == null || proficiency < 1 || proficiency >= PROFICIENCY_CONFIDENCE.length) {
+            return PROFILE_SKILL_CONFIDENCE;
+        }
+        BigDecimal confidence = PROFICIENCY_CONFIDENCE[proficiency];
+        if (studentSkill.getVerifiedBy() != null && !studentSkill.getVerifiedBy().isBlank()) {
+            confidence = confidence.add(VERIFIED_BONUS).min(MAX_PROFILE_CONFIDENCE);
+        }
+        return confidence;
+    }
+
+    /** Names the grounds, including how strong they are — "you have it" is not a reason. */
+    private String profileReason(StudentSkill studentSkill) {
+        StringBuilder reason = new StringBuilder("You already have '")
+                .append(studentSkill.getSkill().getSkillName())
+                .append('\'');
+        Short proficiency = studentSkill.getProficiency();
+        if (proficiency != null && proficiency >= 1 && proficiency <= 4) {
+            reason.append(" at ").append(switch (proficiency.intValue()) {
+                case 1 -> "AWARE";
+                case 2 -> "PRACTICED";
+                case 3 -> "APPLIED";
+                default -> "PROFESSIONAL";
+            });
+        }
+        if (studentSkill.getVerifiedBy() != null && !studentSkill.getVerifiedBy().isBlank()) {
+            reason.append(", verified by ").append(studentSkill.getVerifiedBy().toLowerCase(Locale.ROOT));
+        } else {
+            reason.append(", self-declared");
+        }
+        return reason.toString();
+    }
+
     private void offerCandidate(Map<UUID, NodeCandidate> candidates, Set<UUID> excludedNodeIds,
                                 SkillNode node, BigDecimal confidence, String reason, UUID evidenceId,
-                                Map<UUID, ImportanceLevel> importanceBySkillId) {
+                                Map<UUID, ImportanceLevel> importanceBySkillId, boolean externallyAttested) {
+        // Only proof from outside the student may complete a node on their behalf.
+        //
+        // Measured on the live account: the graded paper wrote a MANUAL evidence
+        // row for `OOP` at 0.80, `OOP` is an evidence keyword on 17 Java nodes, and
+        // all 17 ticked themselves — `Attributes and Methods`, `Enums`, `Record`,
+        // `Method Chaining`. One answer on a mixed Backend paper is not proof of
+        // any of them, and the student is right that nothing about picking Java
+        // demonstrates knowing all of Java.
+        //
+        // A self-report still does everything it always did: it sets the student's
+        // level, feeds the Skill Map, and shapes what the assessment asks next. It
+        // just no longer completes work on their behalf. GITHUB_PROJECT and
+        // TRANSCRIPT rest on an artefact somebody can go and read, so they still do.
+        if (!externallyAttested) {
+            return;
+        }
         if (excludedNodeIds.contains(node.getNodeId())) {
             return;
         }
@@ -589,13 +830,19 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
      * Accepts the evidence rows referenced by the items and, where the skill
      * has just landed in student_skills, back-fills evidence.student_skill_id.
      */
-    private void linkAndAcceptEvidence(Student student, List<RoadmapRecommendationItem> items, List<SkillNode> completedNodes) {
+    /** Every evidence id referenced by the accepted items, de-duplicated. */
+    private Set<UUID> collectEvidenceIds(List<RoadmapRecommendationItem> items) {
         Set<UUID> evidenceIds = new HashSet<>();
         for (RoadmapRecommendationItem item : items) {
             if (item.getEvidenceIds() != null) {
                 evidenceIds.addAll(item.getEvidenceIds());
             }
         }
+        return evidenceIds;
+    }
+
+    private void linkAndAcceptEvidence(Student student, List<RoadmapRecommendationItem> items, List<SkillNode> completedNodes) {
+        Set<UUID> evidenceIds = collectEvidenceIds(items);
         if (evidenceIds.isEmpty()) {
             return;
         }
@@ -702,7 +949,7 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
 
     private int calculateCurrentProgress(Student student) {
         List<SkillNode> careerNodes = skillNodeRepository
-                .findByCareerRole_CareerId(student.getCareerRole().getCareerId());
+                .findPublishedForCareer(student.getCareerRole().getCareerId());
         List<StudentProgress> progresses = studentProgressRepository.findByStudent_UserId(student.getUserId());
         // Count only the student's active path so the reported % matches the roadmap view.
         SelectionView selectionView = roadmapSelectionResolver.resolve(student.getUserId(), careerNodes);

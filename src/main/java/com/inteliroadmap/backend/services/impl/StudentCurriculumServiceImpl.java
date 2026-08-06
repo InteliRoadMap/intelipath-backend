@@ -17,6 +17,7 @@ import com.inteliroadmap.backend.domain.entity.StudentFptSubject;
 import com.inteliroadmap.backend.domain.entity.StudentSkillEvidence;
 import com.inteliroadmap.backend.domain.enums.FptResourceKind;
 import com.inteliroadmap.backend.domain.enums.EvidenceStatus;
+import com.inteliroadmap.backend.components.RoadmapRefreshTrigger;
 import com.inteliroadmap.backend.domain.enums.EvidenceType;
 import com.inteliroadmap.backend.domain.enums.StudentSubjectSource;
 import com.inteliroadmap.backend.domain.enums.StudentSubjectStatus;
@@ -90,6 +91,7 @@ public class StudentCurriculumServiceImpl implements StudentCurriculumService {
     private static final int COHORT_BASE_YEAR = 2004;
 
     private final AuthenticatedStudentService authenticatedStudentService;
+    private final RoadmapRefreshTrigger roadmapRefreshTrigger;
     private final StudentRepository studentRepository;
     private final FptSubjectRepository fptSubjectRepository;
     private final FptSubjectSkillRepository fptSubjectSkillRepository;
@@ -359,6 +361,13 @@ public class StudentCurriculumServiceImpl implements StudentCurriculumService {
         evidenceRepository.saveAll(toCreate);
         log.info("StudentCurriculumService: user {} FLM evidence rebuilt — {} PASSED subjects, {} evidence rows",
                 userId, passed.size(), toCreate.size());
+
+        // A transcript that changes nothing the student can see is not analysis,
+        // it is filing. GitHub import already closed this loop; the transcript
+        // path did not, so passing a subject left the roadmap untouched until the
+        // student happened to press generate. The trigger swallows its own
+        // failures, so this cannot break transcript submission.
+        roadmapRefreshTrigger.refreshCurrentStudent("transcript");
     }
 
     /** See {@link #CONFIDENCE_BY_COVERAGE}: 1 subject 0.75, 2 subjects 0.85, 3 or more 0.90. */

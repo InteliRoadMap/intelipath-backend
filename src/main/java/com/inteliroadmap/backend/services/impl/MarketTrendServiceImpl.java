@@ -3,11 +3,14 @@ package com.inteliroadmap.backend.services.impl;
 import com.inteliroadmap.backend.mappers.MarketTrendMapper;
 import com.inteliroadmap.backend.domain.dto.response.market.MarketTrendResponse;
 import com.inteliroadmap.backend.domain.entity.Company;
+import com.inteliroadmap.backend.components.SeniorityClassifier;
+import com.inteliroadmap.backend.domain.entity.Recruitment;
 import com.inteliroadmap.backend.domain.entity.SkillTrend;
 import com.inteliroadmap.backend.repositories.CompanyRepository;
 import com.inteliroadmap.backend.repositories.RecruitmentRepository;
 import com.inteliroadmap.backend.repositories.SkillTrendRepository;
 import com.inteliroadmap.backend.repositories.SkillRepository;
+import com.inteliroadmap.backend.domain.dto.response.market.SkillPostingsResponse;
 import com.inteliroadmap.backend.domain.entity.Skill;
 import com.inteliroadmap.backend.services.MarketTrendService;
 import lombok.RequiredArgsConstructor;
@@ -16,10 +19,13 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalDouble;
+import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -39,6 +45,7 @@ public class MarketTrendServiceImpl implements MarketTrendService {
     private final SkillRepository skillRepository;
     private final RecruitmentRepository recruitmentRepository;
     private final MarketTrendMapper marketTrendMapper;
+    private final SeniorityClassifier seniorityClassifier;
 
     /**
      * Retrieves a list of the top hiring companies limited by the specified amount.
@@ -100,8 +107,18 @@ public class MarketTrendServiceImpl implements MarketTrendService {
     @Override
     public List<MarketTrendResponse.SalaryTrendResponse> getSalaryDistribution() {
         // Fetch all raw salary strings from the recruitment records
-        List<String> rawSalaries = recruitmentRepository.findAllSalaries();
+        return bucketSalaries(recruitmentRepository.findAllSalaries());
+    }
 
+    @Transactional(readOnly = true)
+    @Override
+    public List<MarketTrendResponse.SalaryTrendResponse> getSalaryDistribution(int windowDays) {
+        // Same buckets, but only over postings recent enough to be worth planning
+        // around, and counting a re-advertised job once.
+        return bucketSalaries(recruitmentRepository.findSalariesSince(since(windowDays)));
+    }
+
+    private List<MarketTrendResponse.SalaryTrendResponse> bucketSalaries(List<String> rawSalaries) {
         // Initialize counters for the predefined salary brackets
         int count0To10 = 0;
         int count10To20 = 0;
@@ -132,6 +149,89 @@ public class MarketTrendServiceImpl implements MarketTrendService {
                 MarketTrendResponse.SalaryTrendResponse.builder().category("30 - 50 triệu").jobCount(count30To50).build(),
                 MarketTrendResponse.SalaryTrendResponse.builder().category("Trên 50 triệu").jobCount(countOver50).build()
         );
+    }
+
+    @Transactional
+    @Override
+    public int classifyUnlabelledRecruitments() {
+        List<Recruitment> unlabelled = recruitmentRepository.findBySeniorityIsNull();
+        if (unlabelled.isEmpty()) {
+            return 0;
+        }
+        for (Recruitment r : unlabelled) {
+            Map<String, Object> infos = r.getRecruitmentInfos();
+            r.setSeniority(seniorityClassifier.classify(
+                    infos == null ? null : String.valueOf(infos.get("title")),
+                    infos == null ? null : String.valueOf(infos.get("experience"))).name());
+            r.setClassifiedAt(LocalDateTime.now());
+        }
+        recruitmentRepository.saveAll(unlabelled);
+        log.info("MarketTrendServiceImpl: classified {} previously unlabelled posting(s).", unlabelled.size());
+        return unlabelled.size();
+    }
+
+    /** Start of the window, from a day count. */
+    private LocalDate since(int windowDays) {
+        int days = windowDays > 0 ? windowDays : MarketTrendService.DEFAULT_WINDOW_DAYS;
+        return LocalDate.now().minusDays(days);
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public List<MarketTrendResponse.CompanyTrendResponse> getTopHiringCompanies(int limit, int windowDays) {
+        List<Object[]> rows = recruitmentRepository.findTopHiringCompanyIdsSince(since(windowDays), limit);
+
+        List<MarketTrendResponse.CompanyTrendResponse> out = new ArrayList<>();
+        for (Object[] row : rows) {
+            String companyId = (String) row[0];
+            long jobCount = ((Number) row[1]).longValue();
+            // A posting can outlive its company row; skip rather than emit a blank card.
+            companyRepository.findById(companyId).ifPresent(company ->
+                    out.add(marketTrendMapper.toCompanyTrendResponse(company, jobCount)));
+        }
+        return out;
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public List<MarketTrendResponse.SkillTrendResponse> getSkillTrends(int windowDays) {
+        LocalDate from = since(windowDays);
+
+        // "Trending" has to mean recent, not cumulative. The all-time form ranks a
+        // skill that was in demand months ago above one hiring right now, which is
+        // precisely backwards for someone deciding what to learn next.
+        List<SkillTrend> recent = skillTrendRepository.findAll().stream()
+                .filter(t -> t.getSkill() != null && t.getSkill().getSkillId() != null)
+                .filter(t -> t.getWeekStamp() != null && !t.getWeekStamp().isBefore(from))
+                .toList();
+
+        Map<String, List<SkillTrend>> trendsBySkill = recent.stream()
+                .collect(Collectors.groupingBy(t -> {
+                    Skill skill = skillRepository.findById(t.getSkill().getSkillId()).orElse(null);
+                    return skill != null ? skill.getSkillName() : "Unknown";
+                }));
+
+        return trendsBySkill.entrySet().stream()
+                .map(entry -> marketTrendMapper.toSkillTrendResponse(entry.getKey(), entry.getValue()))
+                .sorted((a, b) -> Integer.compare(
+                        b.getDataPoints().stream().mapToInt(MarketTrendResponse.TrendDataPoint::getJobsNeeded).sum(),
+                        a.getDataPoints().stream().mapToInt(MarketTrendResponse.TrendDataPoint::getJobsNeeded).sum()
+                ))
+                .limit(10)
+                .collect(Collectors.toList());
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public MarketTrendResponse.FreshnessResponse getFreshness(int windowDays) {
+        int days = windowDays > 0 ? windowDays : MarketTrendService.DEFAULT_WINDOW_DAYS;
+        LocalDate from = since(days);
+        return MarketTrendResponse.FreshnessResponse.builder()
+                .windowDays(days)
+                .jobsInWindow((int) recruitmentRepository.countDistinctJobsSince(from))
+                .newJobs((int) recruitmentRepository.countGenuinelyNewSince(from))
+                .latestPostedDate(recruitmentRepository.findLatestPostedDate())
+                .build();
     }
 
     /** Rough VND per USD, only ever used to bucket a posting, never to quote a figure. */
@@ -216,5 +316,53 @@ public class MarketTrendServiceImpl implements MarketTrendService {
             return OptionalDouble.of(average / 1_000_000d);
         }
         return OptionalDouble.of(average);
+    }
+
+    /** Hard cap, so a skill with 262 postings cannot be asked to ship 262 rows. */
+    private static final int MAX_POSTINGS = 50;
+
+    @Override
+    @Transactional(readOnly = true)
+    public SkillPostingsResponse getPostingsForSkill(UUID skillId, int limit) {
+        if (skillId == null) {
+            return SkillPostingsResponse.builder().totalCount(0).build();
+        }
+        int capped = Math.max(1, Math.min(limit, MAX_POSTINGS));
+        String skillName = skillRepository.findById(skillId)
+                .map(Skill::getSkillName)
+                .orElse(null);
+
+        List<SkillPostingsResponse.PostingResponse> postings =
+                recruitmentRepository.findPostingsForSkill(skillId, capped).stream()
+                        .map(this::toPosting)
+                        .toList();
+
+        return SkillPostingsResponse.builder()
+                .skillName(skillName)
+                // The true total, not postings.size(). A list of 50 under a headline
+                // of 158 has to say which one it is, or the cap reads as the count
+                // and quietly contradicts the number the student clicked on.
+                .totalCount(recruitmentRepository.countPostingsForSkill(skillId))
+                .postings(postings)
+                .build();
+    }
+
+    /** Positional read of the native projection, in the order the query selects. */
+    private SkillPostingsResponse.PostingResponse toPosting(Object[] row) {
+        return SkillPostingsResponse.PostingResponse.builder()
+                .id(text(row, 0))
+                .title(text(row, 1))
+                .location(text(row, 2))
+                .salary(text(row, 3))
+                .experience(text(row, 4))
+                .link(text(row, 5))
+                .postedDate(text(row, 6))
+                .seniority(text(row, 7))
+                .build();
+    }
+
+    private String text(Object[] row, int index) {
+        Object value = row == null || index >= row.length ? null : row[index];
+        return value == null ? null : String.valueOf(value);
     }
 }

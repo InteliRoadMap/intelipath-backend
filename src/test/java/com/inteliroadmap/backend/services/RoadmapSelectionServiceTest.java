@@ -11,6 +11,8 @@ import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.repositories.SkillNodeRepository;
 import com.inteliroadmap.backend.repositories.StudentNodeSelectionRepository;
 import com.inteliroadmap.backend.repositories.StudentSkillRepository;
+import com.inteliroadmap.backend.components.StackBranchScorer;
+import com.inteliroadmap.backend.services.MarketDemandService;
 import com.inteliroadmap.backend.services.impl.RoadmapSelectionServiceImpl;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -40,6 +42,8 @@ class RoadmapSelectionServiceTest {
     private SkillNodeRepository skillNodeRepository;
     @Mock
     private StudentSkillRepository studentSkillRepository;
+    @Mock
+    private MarketDemandService marketDemandService;
 
     private RoadmapSelectionService selectionService;
 
@@ -51,8 +55,11 @@ class RoadmapSelectionServiceTest {
 
     @BeforeEach
     void setUp() {
+        // The scorer is the real one: it is a pure function of the arguments, and
+        // mocking it here would test the wiring against a fiction.
         selectionService = new RoadmapSelectionServiceImpl(
-                authenticatedStudentService, selectionRepository, skillNodeRepository, studentSkillRepository);
+                authenticatedStudentService, selectionRepository, skillNodeRepository,
+                studentSkillRepository, new StackBranchScorer(), marketDemandService);
 
         career = CareerRole.builder().careerId(UUID.randomUUID()).careerName("Backend").build();
         student = Student.builder().userId(UUID.randomUUID()).careerRole(career).build();

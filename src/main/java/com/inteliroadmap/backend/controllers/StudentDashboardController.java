@@ -5,7 +5,11 @@ import com.inteliroadmap.backend.domain.dto.response.student.DashboardRoadmapPro
 import com.inteliroadmap.backend.domain.dto.response.student.MarketDemandResponse;
 import com.inteliroadmap.backend.domain.dto.response.student.MentorFeedbackItemResponse;
 import com.inteliroadmap.backend.domain.dto.response.student.RecommendationItemResponse;
+import com.inteliroadmap.backend.domain.dto.request.ReplyFeedbackRequest;
+import com.inteliroadmap.backend.domain.dto.response.counselor.CounselorFeedbackResponse;
 import com.inteliroadmap.backend.domain.dto.response.student.SkillGapItemResponse;
+import com.inteliroadmap.backend.services.FeedbackService;
+import jakarta.validation.Valid;
 import com.inteliroadmap.backend.services.StudentDashboardService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
@@ -22,6 +26,8 @@ import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -37,6 +43,7 @@ import java.util.List;
 public class StudentDashboardController {
 
     private final StudentDashboardService studentDashboardService;
+    private final FeedbackService feedbackService;
 
     /**
      * Get roadmap progress for the authenticated student.
@@ -142,6 +149,30 @@ public class StudentDashboardController {
         log.info("StudentDashboardController: Mark feedback {} read", feedbackId);
         studentDashboardService.markFeedbackRead(feedbackId);
         return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * Reply to a feedback message the authenticated student received.
+     *
+     * <p>The reply is stored as a feedback row in the opposite direction, so it
+     * lands in the mentor's or counselor's own inbox with the same unread state
+     * and notification as any other message.
+     */
+    @PostMapping("/mentor-feedback/{feedbackId}/reply")
+    @Operation(summary = "Reply to feedback",
+            description = "Sends the student's reply back to whoever wrote the feedback.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Reply sent"),
+            @ApiResponse(responseCode = "400", description = "Empty reply"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized or invalid access token"),
+            @ApiResponse(responseCode = "403", description = "The feedback was not addressed to this student"),
+            @ApiResponse(responseCode = "404", description = "Feedback not found")
+    })
+    public ResponseEntity<CounselorFeedbackResponse.FeedbackResponse> replyToFeedback(
+            @PathVariable java.util.UUID feedbackId,
+            @RequestBody @Valid ReplyFeedbackRequest request) {
+        log.info("StudentDashboardController: Reply to feedback {}", feedbackId);
+        return ResponseEntity.ok(feedbackService.replyToFeedback(feedbackId, request.getContent()));
     }
 
     /**

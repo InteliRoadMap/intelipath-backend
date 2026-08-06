@@ -11,7 +11,9 @@ import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.exceptions.ForbiddenException;
 import com.inteliroadmap.backend.repositories.ChatMessageRepository;
 import com.inteliroadmap.backend.repositories.ChatSessionRepository;
+import com.inteliroadmap.backend.domain.dto.response.student.StudentLevelResponse;
 import com.inteliroadmap.backend.repositories.StudentRepository;
+import com.inteliroadmap.backend.services.StudentLevelService;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.security.SecurityUtils;
 import com.inteliroadmap.backend.services.VirtualMentorService;
@@ -56,6 +58,8 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
     private final ChatClient chatClient;
     private final VectorStore vectorStore;
     private final AiServiceClient aiServiceClient;
+    /** Supplies the student's assessed level, or nothing when they skipped it. */
+    private final StudentLevelService studentLevelService;
     private final String systemPromptTemplate;
     private final String ragPromptTemplate;
 
@@ -75,6 +79,7 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
      * @param userRepository repository for user profiles
      * @param chatClientBuilder builder for creating the chat client
      * @param vectorStore the vector store for AI search and retrieval
+     * @param studentLevelService resolves the student's career level, if they have one
      */
     public VirtualMentorServiceImpl(ChatSessionRepository chatSessionRepository,
                                 ChatMessageRepository chatMessageRepository,
@@ -83,6 +88,7 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
                                 ChatClient chatClient,
                                 VectorStore vectorStore,
                                 AiServiceClient aiServiceClient,
+                                StudentLevelService studentLevelService,
                                 @Value("classpath:prompts/virtual-mentor-system.st") Resource systemPrompt,
                                 @Value("classpath:prompts/virtual-mentor-rag.st") Resource ragPrompt) {
         this.chatSessionRepository = chatSessionRepository;
@@ -92,6 +98,7 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
         this.vectorStore = vectorStore;
         this.chatClient = chatClient;
         this.aiServiceClient = aiServiceClient;
+        this.studentLevelService = studentLevelService;
         try {
             this.systemPromptTemplate = systemPrompt.getContentAsString(StandardCharsets.UTF_8);
             this.ragPromptTemplate = ragPrompt.getContentAsString(StandardCharsets.UTF_8);
@@ -349,8 +356,15 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
                 ? student.getCareerRole().getCareerName() : "not selected yet";
         String github = student != null && student.getGithubProfile() != null ? student.getGithubProfile() : "N/A";
         String transcript = student != null && student.getTranscriptUrl() != null ? student.getTranscriptUrl() : "N/A";
+        // "not assessed" rather than a default level: a student who skipped the
+        // self-assessment has made no claim, and telling the model they are a
+        // FRESHER would put words in their mouth.
+        String level = student == null ? "not assessed"
+                : studentLevelService.levelOf(student.getUserId())
+                        .map(StudentLevelResponse::getLevel)
+                        .orElse("not assessed");
         return String.format(systemPromptTemplate,
-                user.getFullName(), user.getUserId(), university, major, career, github, transcript);
+                user.getFullName(), user.getUserId(), university, major, career, github, transcript, level);
     }
 
     /**

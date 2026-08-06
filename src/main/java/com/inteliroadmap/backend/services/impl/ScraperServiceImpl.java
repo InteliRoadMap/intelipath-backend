@@ -41,11 +41,22 @@ public class ScraperServiceImpl implements ScraperService {
      */
     @Override
     public List<RecruitmentPostResponse> getRecruitmentPosts() {
-        log.info("ScraperServiceImpl: Retrieving Recruitment Posts...");
+        return getRecruitmentPosts(null);
+    }
+
+    @Override
+    public List<RecruitmentPostResponse> getRecruitmentPosts(String seniority) {
+        log.info("ScraperServiceImpl: Retrieving Recruitment Posts (level filter: {})",
+                seniority == null ? "none" : seniority);
         // Fetch all recruitment posts from the database. An empty result is a
         // valid state (nothing scraped yet) -> return an empty list, not a 404.
         List<RecruitmentPost> posts = recruitmentPostRepository.findAll();
 
+        // Sorted at the end rather than here: post.getRecruitment() is a lazy proxy
+        // and this method runs outside a transaction, so reading postedDate off it
+        // before the loop has fetched the real row would throw. The loop already
+        // loads each Recruitment, so the date is free once we are inside it.
+        List<PostWithDate> dated = new ArrayList<>();
         List<RecruitmentPostResponse> postDtos = new ArrayList<>();
         // Iterate through each post to build the response DTO
         for (RecruitmentPost post : posts) {
@@ -88,12 +99,32 @@ public class ScraperServiceImpl implements ScraperService {
                     .recruitment(recruitmentDto)
                     .build();
 
-            postDtos.add(dto);
+            // UNKNOWN survives the filter on purpose; see getRecruitmentPosts(String).
+            if (seniority != null
+                    && recruitment.getSeniority() != null
+                    && !"UNKNOWN".equalsIgnoreCase(recruitment.getSeniority())
+                    && !seniority.equalsIgnoreCase(recruitment.getSeniority())) {
+                continue;
+            }
+
+            dated.add(new PostWithDate(recruitment.getPostedDate(), dto));
         }
 
-        log.info("ScraperServiceImpl: Recruitment Posts Retrieved");
+        // Newest first. findAll() returns heap order — neither newest nor anything
+        // else a reader could name — so the top of the "open roles" list meant
+        // nothing. Undated rows sink to the bottom rather than being dropped.
+        dated.sort(java.util.Comparator.comparing(PostWithDate::postedDate,
+                java.util.Comparator.nullsLast(java.util.Comparator.reverseOrder())));
+        for (PostWithDate entry : dated) {
+            postDtos.add(entry.dto());
+        }
+
+        log.info("ScraperServiceImpl: Recruitment Posts Retrieved, newest first");
         return postDtos;
     }
+
+    /** A built response paired with the date it should be ordered by. */
+    private record PostWithDate(java.time.LocalDate postedDate, RecruitmentPostResponse dto) {}
 
     /**
      * Retrieves company information by its TopCV company ID.

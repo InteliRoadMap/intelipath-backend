@@ -20,6 +20,14 @@ public class ScrapedRecruitmentResponse {
     @JsonProperty("posted_date")
     private String postedDate;
 
+    /**
+     * Identity of the job rather than of this posting: company + title + location.
+     * A re-posted listing arrives with a new recruitment id but the same key, which
+     * is what lets a count collapse the two instead of reporting demand twice.
+     */
+    @JsonProperty("dedup_key")
+    private String dedupKey;
+
     @JsonProperty("application_deadline")
     private String applicationDeadline;
 }

@@ -17,4 +17,15 @@ public class MarketDemandResponse {
 
     @Builder.Default
     private List<Integer> chart = List.of();
+
+    /**
+     * One label per {@code chart} point, e.g. "27 Jul" for the week starting that
+     * Monday.
+     *
+     * Without these the client had nothing to name the points with and invented
+     * {@code ['mon'..'sun'][i % 7]}, so the axis read "sat sun tue" — day names
+     * bearing no relation to the dates underneath.
+     */
+    @Builder.Default
+    private List<String> chartLabels = List.of();
 }

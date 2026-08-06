@@ -19,6 +19,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -53,9 +54,10 @@ public class RecruitmentPostsController {
                     content = @Content(schema = @Schema(implementation = ErrorResponse.class))
             )
     })
-    public ResponseEntity<List<RecruitmentPostResponse>> getRecruitmentPosts() {
+    public ResponseEntity<List<RecruitmentPostResponse>> getRecruitmentPosts(
+            @RequestParam(required = false) String seniority) {
         log.info("RecruitmentPostsController: Getting all recruitment posts");
-        return ResponseEntity.ok(scraperService.getRecruitmentPosts());
+        return ResponseEntity.ok(scraperService.getRecruitmentPosts(seniority));
     }
 
     @GetMapping("/company/{companyId}")

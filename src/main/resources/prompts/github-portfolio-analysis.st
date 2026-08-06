@@ -1,6 +1,6 @@
 ## TASK
 You are a senior software engineer reviewing a GitHub repository for a student's portfolio.
-Analyze the metadata below and return a structured JSON result.
+Judge what THIS STUDENT can do, which is not the same question as what the repository is.
 
 ## INSTRUCTIONS
 1. **techStack**: Extract all technologies into a JSON object.
@@ -8,18 +8,30 @@ Analyze the metadata below and return a structured JSON result.
    - Values are arrays of specific technology names (e.g., ["React", "TypeScript"]).
    - Only include categories that are actually present. Skip empty ones.
    - Be specific: prefer "Spring Boot" over "Java", "PostgreSQL" over "SQL".
+   - LANGUAGE BYTES below is GitHub's measurement of the code itself and outranks the
+     config file. A dependency that is declared but barely written is not the stack.
 
 2. **summary**: Write exactly 2 sentences in English describing what this project does.
    - Sentence 1: What the project is and its main purpose.
    - Sentence 2: Key technologies used and what makes it notable.
    - Keep it professional and suitable for a portfolio. No filler like "This is a project...".
 
-3. **matchedSkills**: From the SKILL CATALOG below, decide which skills this repository
-   genuinely demonstrates and how strongly.
+3. **matchedSkills**: From the SKILL CATALOG below, decide which skills this student
+   genuinely demonstrates HERE, and how strongly.
    - Use ONLY skill names copied verbatim from the catalog. Do not invent names.
-   - "confidence" is 0.0-1.0 = how strongly the CODE (not just a mention) shows the skill.
-     A skill that is the project's primary stack -> high (0.85-0.95). A library used in
-     one config file or mentioned in passing -> low (0.4-0.6). Omit skills with no real signal.
+   - Weigh the evidence in this order, strongest first:
+       a. THIS STUDENT'S COMMIT SUBJECTS — what they actually built and changed.
+       b. LANGUAGE BYTES — how much code of each language exists.
+       c. README and config — what the project claims about itself.
+   - "confidence" is 0.0-1.0. Anchor it to evidence you were actually shown:
+       0.85-0.95  the student's own commits repeatedly work on this technology AND it is
+                  a major share of the language bytes
+       0.6-0.8    substantial in the code, but their commits do not specifically show it
+       0.4-0.6    present only as a dependency or a passing mention
+       omit       named nowhere except a badge, a heading, or a tutorial link
+   - CONTRIBUTION tells you how much of the repository is theirs. A student who wrote a
+     small share of a large project should not be credited as if they built all of it;
+     lower the confidence accordingly and prefer the skills their own commits touch.
    - If the catalog is empty, return an empty list.
 
 ## SKILL CATALOG
@@ -28,6 +40,12 @@ Analyze the metadata below and return a structured JSON result.
 ## INPUT
 - Repo Name: %s
 - Description: %s
+- CONTRIBUTION (this student's share of the repository):
+%s
+- LANGUAGE BYTES (GitHub's own measurement of the committed code):
+%s
+- THIS STUDENT'S COMMIT SUBJECTS (newest first):
+%s
 - README snippet:
 %s
 - Config file snippet (package.json / pom.xml / requirements.txt):

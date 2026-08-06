@@ -1,0 +1,231 @@
+{
+  "scope": "FRONTEND",
+  "careerNames": ["Frontend"],
+  "version": 1,
+  "items": [
+    {
+      "id": "fe-js-01",
+      "kind": "SINGLE_CHOICE",
+      "tier": 1,
+      "topic": "JavaScript",
+      "skills": ["JavaScript"],
+      "prompt": "What does this log, and why?\n\n```js\nconst list = [1, 2, 3];\nconst copy = list;\ncopy.push(4);\nconsole.log(list.length);\n```",
+      "choices": [
+        { "key": "a", "text": "3 — `copy` is a separate array" },
+        { "key": "b", "text": "4 — both names point at the same array" },
+        { "key": "c", "text": "3 — `const` prevents the array from being modified" },
+        { "key": "d", "text": "It throws, because `list` is declared `const`" }
+      ],
+      "answer": ["b"],
+      "explanation": "`const` binds the name, not the value. Assigning an array copies the reference, so both names see the same object. Copying the contents needs `[...list]` or `list.slice()`."
+    },
+    {
+      "id": "fe-js-02",
+      "kind": "SINGLE_CHOICE",
+      "tier": 2,
+      "topic": "Async JavaScript",
+      "skills": ["JavaScript"],
+      "prompt": "Three independent API calls each take about 300 ms. The code awaits them one after another and the page takes ~900 ms to fill.\n\nWhich change makes it ~300 ms?",
+      "choices": [
+        { "key": "a", "text": "Remove the `await` keywords so the calls do not block" },
+        { "key": "b", "text": "Start all three, then `await Promise.all([...])` on the resulting promises" },
+        { "key": "c", "text": "Move the calls into a `useEffect` so they run after render" },
+        { "key": "d", "text": "Wrap each call in `setTimeout(..., 0)`" }
+      ],
+      "answer": ["b"],
+      "explanation": "Sequential awaits mean each call starts only after the previous resolves. `Promise.all` needs the promises to already be in flight — which is why the calls are started first and awaited together. Dropping `await` starts them concurrently but leaves you with no values."
+    },
+    {
+      "id": "fe-react-01",
+      "kind": "SINGLE_CHOICE",
+      "tier": 1,
+      "topic": "React state",
+      "skills": ["React"],
+      "prompt": "A click handler calls `setCount(count + 1)` three times in a row. `count` starts at 0. What is it after one click?",
+      "choices": [
+        { "key": "a", "text": "3" },
+        { "key": "b", "text": "1, because all three reads see the same stale `count` from this render" },
+        { "key": "c", "text": "0, because state updates are discarded inside an event handler" },
+        { "key": "d", "text": "3, but only after a second render" }
+      ],
+      "answer": ["b"],
+      "explanation": "`count` is a value captured by this render, not a live cell. All three calls compute 0 + 1. The updater form — `setCount(c => c + 1)` — is passed the latest value each time and gives 3."
+    },
+    {
+      "id": "fe-react-02",
+      "kind": "SINGLE_CHOICE",
+      "tier": 2,
+      "topic": "React rendering",
+      "skills": ["React"],
+      "prompt": "A list of editable rows is rendered with the array index as the `key`. A row is deleted from the middle, and afterwards the text a user had typed in one input shows up in a different row.\n\nWhy?",
+      "choices": [
+        { "key": "a", "text": "The delete mutated the array instead of replacing it" },
+        { "key": "b", "text": "Index keys are reused after the delete, so React matches the old element to a different item and keeps its DOM state" },
+        { "key": "c", "text": "The inputs are uncontrolled and should be controlled" },
+        { "key": "d", "text": "The parent did not re-render, so the DOM is stale" }
+      ],
+      "answer": ["b"],
+      "explanation": "A key tells React which item an element belongs to across renders. With index keys, deleting the middle item shifts every later item onto a key that used to belong to its neighbour, so React reuses that DOM node — including whatever was typed into it. A stable id fixes it."
+    },
+    {
+      "id": "fe-react-03",
+      "kind": "SINGLE_CHOICE",
+      "tier": 3,
+      "topic": "React effects",
+      "skills": ["React"],
+      "prompt": "A component fetches a user by `id` in a `useEffect` and sets state with the result. Rapidly switching between two users sometimes leaves the wrong user's data on screen.\n\nWhat is the cause?",
+      "choices": [
+        { "key": "a", "text": "The dependency array is missing `id`, so the effect never re-runs" },
+        { "key": "b", "text": "Two requests are in flight and the slower one resolves last, overwriting the newer result" },
+        { "key": "c", "text": "React batches the two state updates and keeps the first" },
+        { "key": "d", "text": "The component is not memoised, so it renders twice" }
+      ],
+      "answer": ["b"],
+      "explanation": "This is a race, not a dependency bug — the effect ran correctly both times. The fix is to make the stale response harmless: a cleanup function that flips an `ignore` flag, or an `AbortController` that cancels the previous request."
+    },
+    {
+      "id": "fe-css-01",
+      "kind": "SINGLE_CHOICE",
+      "tier": 1,
+      "topic": "CSS layout",
+      "skills": ["CSS3"],
+      "prompt": "A flex child containing a long unbroken string overflows its container instead of shrinking, even though it has `flex: 1`.\n\nWhat is going on?",
+      "choices": [
+        { "key": "a", "text": "`flex: 1` only grows an item, it never shrinks it" },
+        { "key": "b", "text": "A flex item's `min-width` defaults to `auto`, so it will not shrink below its content; `min-width: 0` releases it" },
+        { "key": "c", "text": "The container needs `overflow: hidden`" },
+        { "key": "d", "text": "The string needs `white-space: nowrap` removed" }
+      ],
+      "answer": ["b"],
+      "explanation": "`min-width: auto` on flex items is the single most common cause of an unexplained overflow. `overflow: hidden` hides the symptom by clipping; `min-width: 0` lets the item shrink so the text can wrap or ellipsis properly."
+    },
+    {
+      "id": "fe-css-02",
+      "kind": "SINGLE_CHOICE",
+      "tier": 2,
+      "topic": "CSS",
+      "skills": ["CSS3"],
+      "prompt": "Two rules both target the same button. Which wins?\n\n```css\n.toolbar .btn { color: red; }\n.btn.primary { color: blue; }\n```",
+      "choices": [
+        { "key": "a", "text": "Red — it comes first" },
+        { "key": "b", "text": "Blue — it comes last and both have the same specificity (0,2,0)" },
+        { "key": "c", "text": "Red — descendant selectors are more specific" },
+        { "key": "d", "text": "Blue — class-on-class beats descendant" }
+      ],
+      "answer": ["b"],
+      "explanation": "Both selectors are two classes, so specificity is a tie at (0,2,0) and source order decides. Specificity counts the selectors, not how the elements nest."
+    },
+    {
+      "id": "fe-perf-01",
+      "kind": "SINGLE_CHOICE",
+      "tier": 3,
+      "topic": "Performance",
+      "skills": ["Performance", "JavaScript"],
+      "prompt": "A page renders a 5,000-row table and typing in the filter box feels frozen for about a second per keystroke.\n\nWhich change addresses the actual cost?",
+      "choices": [
+        { "key": "a", "text": "Wrap each row in `React.memo`" },
+        { "key": "b", "text": "Render only the rows in view — virtualise the list — so the DOM holds tens of nodes rather than thousands" },
+        { "key": "c", "text": "Move the filter into a `useMemo`" },
+        { "key": "d", "text": "Debounce the input by 300 ms" }
+      ],
+      "answer": ["b"],
+      "explanation": "Debouncing makes the freeze less frequent and just as long; memo and useMemo save re-computation while still asking the browser to lay out 5,000 rows. The cost is the DOM size, so the fix is to stop creating it."
+    },
+    {
+      "id": "fe-a11y-01",
+      "kind": "SINGLE_CHOICE",
+      "tier": 2,
+      "topic": "Accessibility",
+      "skills": ["Accessibility", "HTML5"],
+      "prompt": "A `<div>` with an `onClick` opens a dialog. It works with a mouse. What is missing for a keyboard user?",
+      "choices": [
+        { "key": "a", "text": "An `aria-label`" },
+        { "key": "b", "text": "It is not focusable and does not respond to Enter or Space — a `<button>` gives all of that for free" },
+        { "key": "c", "text": "A `cursor: pointer` style" },
+        { "key": "d", "text": "Nothing; click handlers fire on keyboard activation too" }
+      ],
+      "answer": ["b"],
+      "explanation": "A div is not in the tab order and has no activation behaviour. You can bolt on `tabindex`, `role=\"button\"` and key handlers, or use the element that already has them."
+    },
+    {
+      "id": "fe-net-01",
+      "kind": "SINGLE_CHOICE",
+      "tier": 1,
+      "topic": "Browser and HTTP",
+      "skills": ["HTTP", "JavaScript"],
+      "prompt": "A `fetch` to another origin fails in the browser with a CORS error, but the same URL works in Postman. What does that tell you?",
+      "choices": [
+        { "key": "a", "text": "The API is down for browsers only" },
+        { "key": "b", "text": "The server does not send the CORS headers the browser requires; the restriction is enforced by the browser, not by the server" },
+        { "key": "c", "text": "The request needs an API key that Postman is adding automatically" },
+        { "key": "d", "text": "It can be fixed from the frontend by setting `mode: 'no-cors'`" }
+      ],
+      "answer": ["b"],
+      "explanation": "Postman is not a browser and does not enforce the same-origin policy, so it never checks. The response has to carry the right `Access-Control-Allow-*` headers, which is a server change. `no-cors` does not fix it — it gives you an opaque response you cannot read."
+    },
+    {
+      "id": "fe-short-01",
+      "kind": "SHORT_ANSWER",
+      "tier": 2,
+      "topic": "Debugging",
+      "skills": ["JavaScript", "Performance"],
+      "prompt": "Users report that a page 'sometimes loads blank' but you cannot reproduce it on your machine.\n\nDescribe how you would investigate — what you would look at, and what you would add to the app so that next time you have evidence.",
+      "rubric": [
+        { "criterion": "Uses real evidence from the failing environment: console/network from the user, error-tracking service, or server logs — rather than only trying to reproduce", "points": 3 },
+        { "criterion": "Names plausible causes tied to environment differences: a failed request, a JS error in an older browser, a cached stale bundle, a slow network", "points": 3 },
+        { "criterion": "Proposes adding error reporting or an error boundary so a crash shows something instead of a blank page", "points": 2 },
+        { "criterion": "Mentions checking on a real device or throttled network rather than only a fast desktop", "points": 2 }
+      ],
+      "explanation": "A blank page almost always means an uncaught error during render. The answer worth full marks stops trying to reproduce and starts collecting: without reporting from the environment where it breaks, you are guessing."
+    },
+    {
+      "id": "fe-short-02",
+      "kind": "SHORT_ANSWER",
+      "tier": 3,
+      "topic": "State management",
+      "skills": ["React"],
+      "prompt": "A team is deciding whether to put the currently-signed-in user, the contents of a form, and a list of products fetched from an API into one global store.\n\nSay which of the three belong in global state and which do not, and explain the rule you are applying.",
+      "rubric": [
+        { "criterion": "Distinguishes server state (the product list) from client state, and notes it has different needs — caching, refetching, staleness", "points": 4 },
+        { "criterion": "Keeps form state local, on the grounds that nothing outside the form needs it while it is being edited", "points": 2 },
+        { "criterion": "Puts the signed-in user in global state, because many unrelated parts of the tree read it", "points": 2 },
+        { "criterion": "States a general rule — lift state only as far as the components that actually read it", "points": 2 }
+      ],
+      "explanation": "The useful rule is that state belongs at the lowest level where everything that reads it can see it. The sharper distinction is server state versus client state: a fetched product list is a cache of someone else's data, and treating it as ordinary state is what leads to hand-written refetch and invalidation logic."
+    },
+    {
+      "id": "fe-code-01",
+      "kind": "CODE",
+      "tier": 2,
+      "topic": "React effects",
+      "language": "typescript",
+      "skills": ["React", "TypeScript"],
+      "prompt": "This component adds a resize listener and never removes it, so a page that mounts it repeatedly accumulates listeners. Fix it, and add a one-line comment naming what the returned function does.",
+      "starterCode": "function useWindowWidth() {\n  const [width, setWidth] = useState(window.innerWidth);\n\n  useEffect(() => {\n    window.addEventListener('resize', () => setWidth(window.innerWidth));\n  });\n\n  return width;\n}",
+      "rubric": [
+        { "criterion": "Returns a cleanup function from useEffect that removes the listener", "points": 3 },
+        { "criterion": "The handler is a named/stable reference, so add and remove refer to the same function", "points": 3 },
+        { "criterion": "Adds a dependency array — `[]` — so the effect does not re-subscribe on every render", "points": 3 },
+        { "criterion": "The comment correctly describes the returned function as cleanup that runs on unmount (and before a re-run)", "points": 1 }
+      ],
+      "explanation": "Two bugs stack here: no cleanup, and no dependency array, so every render adds another listener. `removeEventListener` compares by identity, which is why an inline arrow cannot be removed — the handler has to be hoisted into a variable the cleanup can name."
+    },
+    {
+      "id": "fe-code-02",
+      "kind": "CODE",
+      "tier": 3,
+      "topic": "Async and hooks",
+      "language": "typescript",
+      "skills": ["React", "TypeScript"],
+      "prompt": "Write a `useDebouncedValue<T>(value: T, delayMs: number): T` hook. It returns the latest value, but only after `delayMs` has passed with no further changes.\n\nIt must not leak timers when the value changes rapidly or the component unmounts.",
+      "starterCode": "function useDebouncedValue<T>(value: T, delayMs: number): T {\n  // TODO\n  return value;\n}",
+      "rubric": [
+        { "criterion": "Holds the debounced value in state and updates it from a useEffect keyed on [value, delayMs]", "points": 3 },
+        { "criterion": "Clears the pending timer in the effect's cleanup, so a rapid change cancels the previous one", "points": 4 },
+        { "criterion": "Initialises the state with the incoming value, so the first render returns something sensible rather than undefined", "points": 2 },
+        { "criterion": "Generic in T and returns T — no `any`", "points": 1 }
+      ],
+      "explanation": "The whole hook is the cleanup. Without `return () => clearTimeout(t)` every keystroke schedules its own update and they all fire, which is throttling with extra steps rather than debouncing. The cleanup runs before each re-run and on unmount, which handles both leaks at once."
+    }
+  ]
+}

@@ -9,6 +9,8 @@ import com.inteliroadmap.backend.domain.entity.FeedbackAttachment;
 import com.inteliroadmap.backend.utils.FileValidationUtil;
 import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.domain.enums.FeedbackStatus;
+import com.inteliroadmap.backend.exceptions.BadRequestException;
+import com.inteliroadmap.backend.exceptions.ForbiddenException;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.exceptions.UnauthorizedException;
 import com.inteliroadmap.backend.repositories.FeedbackRepository;
@@ -115,6 +117,79 @@ public class FeedbackServiceImpl implements FeedbackService {
 
         log.info("FeedbackServiceImpl: New feedback created successfully");
         return toCrudFeedbackResponse(feedback);
+    }
+
+    /**
+     * Replies to a message the authenticated user received.
+     *
+     * <p>Stored as an ordinary feedback row in the opposite direction rather than
+     * a nested thread: the inbox, unread state, notification email and attachment
+     * handling then all apply to a reply for free, and nothing needed a new table.
+     */
+    @Transactional
+    @Override
+    public CounselorFeedbackResponse.FeedbackResponse replyToFeedback(UUID feedbackId, String content) {
+        log.info("FeedbackServiceImpl: Reply to feedback {} requested", feedbackId);
+
+        if (content == null || content.isBlank()) {
+            throw new BadRequestException("Reply content must not be empty.");
+        }
+
+        User sender = getAuthenticatedUser();
+
+        Feedback original = feedbackRepository.findByFeedbackId(feedbackId);
+        if (original == null) {
+            throw new ResourceNotFoundException("Feedback not found: " + feedbackId);
+        }
+
+        // Only the person the message was addressed to may answer it. Without this
+        // any authenticated user could post into someone else's conversation just
+        // by guessing a feedback id.
+        if (original.getReceiver() == null
+                || !original.getReceiver().getUserId().equals(sender.getUserId())) {
+            throw new ForbiddenException("You can only reply to feedback addressed to you.");
+        }
+
+        User receiver = userRepository.findByUserId(original.getSender().getUserId());
+        if (receiver == null) {
+            throw new ResourceNotFoundException("The original sender no longer exists.");
+        }
+
+        Feedback replyRow = feedbackRepository.save(Feedback.builder()
+                .sender(User.builder().userId(sender.getUserId()).build())
+                .receiver(User.builder().userId(receiver.getUserId()).build())
+                .senderName(sender.getFullName())
+                .content(content.trim())
+                // Same type as the message being answered, so a reply stays in the
+                // same filter as the conversation it belongs to.
+                .type(original.getType())
+                .status(FeedbackStatus.NEW)
+                .attachments(new ArrayList<>())
+                .build());
+
+        // Replying also settles the original: you have read what you answered.
+        if (original.getStatus() == FeedbackStatus.NEW) {
+            original.setStatus(FeedbackStatus.READ);
+            feedbackRepository.save(original);
+        }
+
+        try {
+            emailService.sendFeedbackNotificationEmail(
+                    receiver.getEmail(),
+                    receiver.getFullName(),
+                    sender.getFullName(),
+                    sender.getRole(),
+                    content,
+                    null
+            );
+        } catch (Exception e) {
+            // The reply is saved; a mail outage must not lose it or fail the request.
+            log.warn("FeedbackServiceImpl: reply {} saved but notification email failed: {}",
+                    replyRow.getFeedbackId(), e.getMessage());
+        }
+
+        log.info("FeedbackServiceImpl: Reply to feedback {} saved", feedbackId);
+        return toCrudFeedbackResponse(replyRow);
     }
 
     /**

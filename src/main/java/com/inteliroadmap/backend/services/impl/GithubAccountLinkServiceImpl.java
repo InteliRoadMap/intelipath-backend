@@ -39,7 +39,15 @@ public class GithubAccountLinkServiceImpl implements GithubAccountLinkService {
     private static final String USER_URL = "https://api.github.com/user";
     private static final String REVOKE_GRANT_URL = "https://api.github.com/applications/{clientId}/grant";
     // read:user for the profile, repo so the sync picker can see private repositories too.
-    private static final String SCOPES = "read:user repo";
+    //
+    // read:org is what makes a team project importable at all. GitHub conceals
+    // organisation membership by default, and a token without this scope is told the
+    // student belongs to no organisation — `/user/orgs` answered "none" for an account
+    // that plainly has one, since it holds a fork of that organisation's repository.
+    // Without it, `affiliation=organization_member` returns nothing either, so a
+    // student whose main work lives under their team's organisation could import none
+    // of it. Read-only: it grants sight of membership and teams, nothing more.
+    private static final String SCOPES = "read:user repo read:org";
 
     private final StudentRepository studentRepository;
     private final AuthenticatedStudentService authenticatedStudentService;

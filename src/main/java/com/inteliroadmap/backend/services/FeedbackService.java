@@ -17,4 +17,17 @@ public interface FeedbackService {
     CounselorFeedbackResponse.FeedbackResponse markReadFeedback(UUID feedbackId);
 
     void deleteFeedback(UUID feedbackId);
+
+    /**
+     * Replies to a feedback message the authenticated user received.
+     *
+     * <p>A reply is an ordinary feedback row sent the other way, so the existing
+     * inbox, read state and attachments all keep working without a thread table.
+     * Only the recipient of a message may reply to it — otherwise any student
+     * could post into another student's conversation by guessing an id.
+     *
+     * @param feedbackId the message being replied to
+     * @param content    the reply body
+     */
+    CounselorFeedbackResponse.FeedbackResponse replyToFeedback(UUID feedbackId, String content);
 }

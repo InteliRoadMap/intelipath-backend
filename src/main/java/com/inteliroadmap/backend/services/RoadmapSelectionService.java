@@ -1,6 +1,7 @@
 package com.inteliroadmap.backend.services;
 
 import com.inteliroadmap.backend.domain.dto.request.SelectAlternativeRequest;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.ChoiceOptionsResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.NodeSelectionResponse;
 
 import java.util.List;
@@ -22,6 +23,15 @@ public interface RoadmapSelectionService {
 
     /** Removes the selection for one group, returning the group to "not chosen yet". */
     void clearSelection(UUID groupNodeId);
+
+    /**
+     * The group's options ranked by fit, with the market figures beside them.
+     *
+     * <p>Read-only: opening the chooser must never store a choice. Ranked by the
+     * same scorer {@link #autoDefaultSelections()} uses, so the option presented
+     * as the best fit is the one the system would have taken.
+     */
+    ChoiceOptionsResponse getOptions(UUID groupNodeId);
 
     /**
      * Pre-selects alternatives from the student's skill profile: for every
