@@ -52,6 +52,11 @@ import com.inteliroadmap.backend.components.SkillNameCanonicalizer;
 @Slf4j
 public class DatabaseSeeder implements CommandLineRunner {
 
+    private static final String SEEDED_COUNSELOR_EMAIL = "counselornguyen12345@gmail.com";
+    private static final String SEEDED_MENTOR_EMAIL = "mentornguyen12345@gmail.com";
+    private static final String LEGACY_COUNSELOR_EMAIL = "mainclone1@gmail.com";
+    private static final String LEGACY_MENTOR_EMAIL = "heomapkh939732948@gmail.com";
+
     private final SkillRepository skillRepository;
     /**
      * The catalog's identity function. The seeder runs on every application start and
@@ -669,7 +674,7 @@ public class DatabaseSeeder implements CommandLineRunner {
             return;
         }
 
-        User mentor = userRepository.findByEmail("heomapkh939732948@gmail.com");
+        User mentor = userRepository.findByEmail(SEEDED_MENTOR_EMAIL);
         if (mentor == null) {
             log.warn("DatabaseSeeder: Cannot seed review requests: no seeded mentor found.");
             return;
@@ -717,11 +722,15 @@ public class DatabaseSeeder implements CommandLineRunner {
         userRepository.save(admin);
 
         // -------------------------- Import Counselor Account -------------------------- //
-        User userCou = userRepository.findByEmail("mainclone1@gmail.com");
+        User userCou = userRepository.findByEmail(SEEDED_COUNSELOR_EMAIL);
         if (userCou == null) {
-            userCou = User.builder().email("mainclone1@gmail.com").build();
+            userCou = userRepository.findByEmail(LEGACY_COUNSELOR_EMAIL);
         }
-        userCou.setFullName("Dang Phuoc Vinh");
+        if (userCou == null) {
+            userCou = User.builder().build();
+        }
+        userCou.setEmail(SEEDED_COUNSELOR_EMAIL);
+        userCou.setFullName("Nguyen Thao Vy");
         userCou.setRole(UserRole.COUNSELOR);
         // FPT so this counselor's student list resolves to the FPT students below.
         userCou.setAccountType(AccountType.FPT);
@@ -740,11 +749,15 @@ public class DatabaseSeeder implements CommandLineRunner {
         academicCounselorRepository.save(counselor);
 
         // --------------------------- Import Mentor Account ---------------------------- //
-        User userMen = userRepository.findByEmail("heomapkh939732948@gmail.com");
+        User userMen = userRepository.findByEmail(SEEDED_MENTOR_EMAIL);
         if (userMen == null) {
-            userMen = User.builder().email("heomapkh939732948@gmail.com").build();
+            userMen = userRepository.findByEmail(LEGACY_MENTOR_EMAIL);
         }
-        userMen.setFullName("Dang Phuoc Vinh");
+        if (userMen == null) {
+            userMen = User.builder().build();
+        }
+        userMen.setEmail(SEEDED_MENTOR_EMAIL);
+        userMen.setFullName("Nguyen Minh Quan");
         userMen.setRole(UserRole.MENTOR);
         // OTHER because an industry mentor works at a company, not FPT. The value is inert
         // for this role — the FPT gate only guards STUDENT endpoints — so it costs nothing
