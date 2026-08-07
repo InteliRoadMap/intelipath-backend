@@ -304,7 +304,15 @@ dist
 .ionide
 
 # Data inject into Database
-data
+data/*
+!data/v2/
+data/v2/*
+!data/v2/careers.csv
+!data/v2/skills.csv
+!data/v2/skills_v5.csv
+!data/v2/roadmap_nodes.csv
+!data/v2/roadmap_nodes_v6.csv
+!data/flm_overlay.json
 data/RoadmapDataTemplate.csv
 data/SkillDataTemplate.csv
 data/CareerDataTemplate.csv
