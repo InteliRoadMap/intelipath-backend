@@ -1,5 +1,7 @@
 package com.inteliroadmap.backend.services.impl;
 
+import com.inteliroadmap.backend.domain.dto.request.StudentAccounts;
+
 import com.inteliroadmap.backend.components.RoadmapProgressCalculator;
 import com.inteliroadmap.backend.domain.dto.request.ExportStudentListRequest;
 import com.inteliroadmap.backend.domain.dto.request.ImportStudentAccountsRequest;
@@ -271,9 +273,12 @@ public class CounselorServiceImpl implements CounselorService {
         // A student who has not selected a career yet has no roadmap/skill data to report.
         UUID careerId = student.getCareerRole() != null ? student.getCareerRole().getCareerId() : null;
 
-        // Weighted roadmap progress, shared formula with the student-facing views
+        // Weighted roadmap progress, shared formula AND shared denominator with the
+        // student-facing views. Counting the whole career here while the student is
+        // shown only published nodes puts two different percentages on one person,
+        // and the student is the one who has to explain the gap.
         int progress = careerId == null ? 0 : roadmapProgressCalculator.calculateProgress(
-                skillNodeRepository.findByCareerRole_CareerId(careerId),
+                skillNodeRepository.findPublishedForCareer(careerId),
                 studentProgressRepository.findByStudent_UserId(student.getUserId()));
 
         // Fetch the list of skills the student has yet to acquire for their current career
@@ -380,8 +385,9 @@ public class CounselorServiceImpl implements CounselorService {
 
                 if (user == null || student == null) continue;
 
+                // Same denominator as the student's own roadmap - see the note above.
                 int progress = roadmapProgressCalculator.calculateProgress(
-                        skillNodeRepository.findByCareerRole_CareerId(student.getCareerRole().getCareerId()),
+                        skillNodeRepository.findPublishedForCareer(student.getCareerRole().getCareerId()),
                         studentProgressRepository.findByStudent_UserId(student.getUserId()));
 
                 Row row = sheet.createRow(rowNum++);
@@ -443,8 +449,8 @@ public class CounselorServiceImpl implements CounselorService {
         User userC = userRepository.findByUserId(counselor.getUserId());
 
         List<String[]> createdAccounts = new ArrayList<>();
-        List<ImportStudentAccountsRequest.StudentAccounts> studentAccounts = request.getAccounts();
-        for (ImportStudentAccountsRequest.StudentAccounts account: studentAccounts) {
+        List<StudentAccounts> studentAccounts = request.getAccounts();
+        for (StudentAccounts account: studentAccounts) {
             User stUser = userRepository.findByEmail(account.getEmail());
 
             FptCurriculum curriculum = fptCurriculumRepository.findByCode(account.getCurriculum()).orElse(null);

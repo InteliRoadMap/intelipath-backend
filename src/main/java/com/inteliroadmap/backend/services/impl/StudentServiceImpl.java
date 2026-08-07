@@ -6,6 +6,9 @@ import com.inteliroadmap.backend.components.RoadmapProgressCalculator;
 import com.inteliroadmap.backend.domain.dto.request.SetupStudentProfileRequest;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.RequiredSkillResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.SkillResponse;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.CareerSkillGapResponse;
+import com.inteliroadmap.backend.domain.dto.response.market.MarketSkillGapResponse;
+import com.inteliroadmap.backend.domain.dto.response.market.SkillDemandResponse;
 import com.inteliroadmap.backend.domain.dto.response.student.StudentResponse;
 import com.inteliroadmap.backend.domain.entity.CareerRequiredSkill;
 import com.inteliroadmap.backend.domain.entity.CareerRole;
@@ -18,6 +21,7 @@ import com.inteliroadmap.backend.domain.entity.StudentSkill;
 import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.services.AuthenticatedStudentService;
+import com.inteliroadmap.backend.services.MarketDemandService;
 import com.inteliroadmap.backend.services.DocumentIngestionService;
 import com.inteliroadmap.backend.services.RagDocumentService;
 import com.inteliroadmap.backend.services.SupabaseStorageService;
@@ -47,6 +51,8 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import static com.inteliroadmap.backend.components.SeniorityCalculator.COUNTS_AS_HELD;
+import java.util.Map;
 
 /**
  * Implementation of the {@link StudentService}.
@@ -79,6 +85,7 @@ public class StudentServiceImpl implements StudentService {
     private final RagDocumentService ragDocumentService;
     private final DocumentIngestionService documentIngestionService;
     private final AuthenticatedStudentService authenticatedStudentService;
+    private final MarketDemandService marketDemandService;
 
     /**
      * Sets up or updates the student's profile information such as university, major, admission year, and target career.
@@ -205,13 +212,29 @@ public class StudentServiceImpl implements StudentService {
 
         // Fetch the required skills for the target career
         List<CareerRequiredSkill> requiredSkills = careerRequiredSkillRepository
-                .findByCareerRole_CareerId(student.getCareerRole().getCareerId());
+                .findByCareerRole_CareerIdAndImportanceLevelIn(
+                        student.getCareerRole().getCareerId(),
+                        List.of(com.inteliroadmap.backend.domain.enums.ImportanceLevel.HIGH,
+                                com.inteliroadmap.backend.domain.enums.ImportanceLevel.AVG));
                 
         // Filter out required skills that the student already possesses to find the missing ones
         List<CareerRequiredSkill> missingRequiredSkills = filterMissingRequiredSkills(requiredSkills, selectedSkills);
         List<Skill> missingSkills = missingRequiredSkills.stream()
                 .map(req -> skillRepository.findById(req.getSkill().getSkillId()).orElse(null))
                 .filter(Objects::nonNull)
+                .toList();
+        List<CareerSkillGapResponse> careerGaps = missingRequiredSkills.stream()
+                .map(required -> new CareerSkillGapResponse(
+                        required.getSkill().getSkillId(), required.getSkill().getSkillName(),
+                        required.getSkill().getCategory(), required.getImportanceLevel()))
+                .toList();
+        Map<UUID, SkillDemandResponse> demand = marketDemandService
+                .demandBySkill(student.getCareerRole().getCareerId());
+        List<MarketSkillGapResponse> marketGaps = missingRequiredSkills.stream()
+                .filter(required -> demand.containsKey(required.getSkill().getSkillId()))
+                .map(required -> new MarketSkillGapResponse(
+                        required.getSkill().getSkillId(), required.getSkill().getSkillName(),
+                        demand.get(required.getSkill().getSkillId())))
                 .toList();
 
         // Map required skills and calculate progress for each to populate the response
@@ -228,6 +251,8 @@ public class StudentServiceImpl implements StudentService {
                 .selectedSkills(skillMapper.toSelectedSkillResponses(selectedSkills))
                 .requiredSkills(requiredSkillResponses)
                 .missingSkills(skillMapper.toSkillItemResponses(missingSkills))
+                .careerSkillGaps(careerGaps)
+                .marketSkillGaps(marketGaps)
                 .build();
     }
 
@@ -252,7 +277,10 @@ public class StudentServiceImpl implements StudentService {
             return List.of();
         }
         List<CareerRequiredSkill> requiredSkills = careerRequiredSkillRepository
-                .findByCareerRole_CareerId(student.getCareerRole().getCareerId());
+                .findByCareerRole_CareerIdAndImportanceLevelIn(
+                        student.getCareerRole().getCareerId(),
+                        List.of(com.inteliroadmap.backend.domain.enums.ImportanceLevel.HIGH,
+                                com.inteliroadmap.backend.domain.enums.ImportanceLevel.AVG));
         List<StudentSkill> selectedSkills = studentSkillRepository.findByStudent_UserId(student.getUserId());
         return filterMissingRequiredSkills(requiredSkills, selectedSkills);
     }
@@ -281,8 +309,12 @@ public class StudentServiceImpl implements StudentService {
 
     /**
      * Calculates the progress percentage for a specific skill for a student.
-     * Returns 100 if the student has explicitly selected the skill.
-     * Otherwise, calculates based on completed skill nodes in the roadmap.
+     * Returns 100 only when the student holds the skill at the same proficiency
+     * threshold used by the seniority/readiness calculation. Merely having a
+     * {@code student_skills} row is not mastery: GitHub can record PostgreSQL at
+     * PRACTICED (2), which must not appear as 100% beside a readiness counter that
+     * correctly does not count it yet. Otherwise, progress comes from completed
+     * measurable roadmap nodes.
      *
      * @param student the student profile
      * @param skillId the UUID of the skill to calculate progress for
@@ -290,7 +322,11 @@ public class StudentServiceImpl implements StudentService {
      */
     @Override
     public Integer calculateSkillProgress(Student student, UUID skillId) {
-        if (studentSkillRepository.existsByStudent_UserIdAndSkill_SkillId(student.getUserId(), skillId)) {
+        StudentSkill heldSkill = studentSkillRepository
+                .findByStudent_UserIdAndSkill_SkillId(student.getUserId(), skillId)
+                .orElse(null);
+        if (heldSkill != null && heldSkill.getProficiency() != null
+                && heldSkill.getProficiency() >= COUNTS_AS_HELD) {
             return 100;
         }
         if (student.getCareerRole() == null || student.getCareerRole().getCareerId() == null) {

@@ -9,6 +9,7 @@ import com.inteliroadmap.backend.domain.dto.response.mentor.MentorPendingReviewR
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorProfileResponse;
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorProgressReportResponse;
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorStudentResponse;
+import com.inteliroadmap.backend.domain.dto.response.portfolio.GithubImportAuditResponse;
 import com.inteliroadmap.backend.domain.dto.request.UpdateMentorProfileRequest;
 import com.inteliroadmap.backend.services.MentorService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -34,6 +35,7 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/mentor")
@@ -88,6 +90,16 @@ public class MentorController {
             @RequestParam(defaultValue = "10") @Min(value = 1, message = "Page size must be at least 1") @Max(value = 100, message = "Page size must not exceed 100") int size) {
         Pageable pageable = PageRequest.of(page, size);
         return ResponseEntity.ok(mentorService.getStudentInfos(pageable));
+    }
+
+    @GetMapping("/portfolio/audit")
+    @Operation(summary = "Read a student's saved GitHub analysis",
+            description = "Returns the stored AI-analysis snapshot only for a student who requested a portfolio review from the authenticated mentor. It never exposes GitHub source code or credentials.")
+    public ResponseEntity<GithubImportAuditResponse> getStudentImportAudit(
+            @RequestParam UUID studentId,
+            @RequestParam String repoUrl) {
+        GithubImportAuditResponse audit = mentorService.getStudentImportAudit(studentId, repoUrl);
+        return audit == null ? ResponseEntity.notFound().build() : ResponseEntity.ok(audit);
     }
 
     @GetMapping("/feedback/history")

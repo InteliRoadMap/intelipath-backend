@@ -20,60 +20,7 @@ public class PortfolioResponse {
     private List<StudentSkillResponse> skills;
     private List<PortfolioProjectResponse> projects;
     private List<StudentEducationResponse> education;
+    private LearningJourneyResponse learningJourney;
+    private PortfolioStudentLevelResponse studentLevel;
 
-    @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    public static class UserInfoResponse {
-        // The slug addresses the portfolio, but feedback is addressed to a person:
-        // a viewer who arrived by slug still needs the id to write back.
-        private UUID userId;
-        private String fullName;
-        private String bio;
-        private String email;
-        private String portfolioSlug;
-        private String university;
-        private String avatarUrl;
-    }
-
-    @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    public static class PortfolioConfigResponse {
-        private String theme;
-        private Map<String, Object> themeColors;
-        private Map<String, Object> fonts;
-        private Map<String, Object> heroSection;
-        private Map<String, Object> skillsSection;
-    }
-
-    @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    public static class StudentSkillResponse {
-        private String skillName;
-        private String customDescription;
-        private String techStack;
-        // True only when a GitHub repository or a passed subject backs the skill.
-        // A skill the student merely declared about themselves stays false, so a
-        // viewer is never shown an unproven claim as if it were verified.
-        private boolean verified;
-        // Which source earned the badge: GITHUB_PROJECT, TRANSCRIPT or MANUAL.
-        private EvidenceType evidenceSource;
-    }
-
-    @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    public static class PortfolioProjectResponse {
-        private UUID projectId;
-        private String projectName;
-        private String repoUrl;
-        private String demoUrl;
-        private String description;
-        private Map<String, Object> techStack;
-        private String icon;
-        private Integer stars;
-    }
-
-    @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    public static class StudentEducationResponse {
-        private UUID educationId;
-        private String university;
-        private String degree;
-        private String period;
-        private String description;
-    }
 }

@@ -1,5 +1,9 @@
 package com.inteliroadmap.backend.services.impl;
 
+import com.inteliroadmap.backend.domain.dto.response.admin.DbPool;
+import com.inteliroadmap.backend.domain.dto.response.admin.Memory;
+import com.inteliroadmap.backend.domain.dto.response.admin.ServiceStatus;
+
 import com.inteliroadmap.backend.domain.dto.request.UpdateUserRoleRequest;
 import com.inteliroadmap.backend.domain.dto.request.UpdateUserStatusRequest;
 import com.inteliroadmap.backend.domain.enums.UserStatus;
@@ -105,10 +109,10 @@ public class AdminServiceImpl implements AdminService {
 
         log.info("AdminServiceImpl: Get system health");
 
-        List<AdminSystemHealthResponse.ServiceStatus> services = new ArrayList<>();
+        List<ServiceStatus> services = new ArrayList<>();
 
         // API: if this request is being served, the API layer is up.
-        services.add(new AdminSystemHealthResponse.ServiceStatus("API", true));
+        services.add(new ServiceStatus("API", true));
 
         // Database: a lightweight query proves connectivity.
         boolean dbUp;
@@ -119,13 +123,13 @@ public class AdminServiceImpl implements AdminService {
             log.warn("AdminServiceImpl: Database health check failed: {}", e.getMessage());
             dbUp = false;
         }
-        services.add(new AdminSystemHealthResponse.ServiceStatus("Database", dbUp));
+        services.add(new ServiceStatus("Database", dbUp));
 
         // AI Service: ping its root endpoint with a short timeout.
-        services.add(new AdminSystemHealthResponse.ServiceStatus("AI Service", aiServiceClient.isHealthy()));
+        services.add(new ServiceStatus("AI Service", aiServiceClient.isHealthy()));
 
         int up = (int) services.stream()
-                .filter(AdminSystemHealthResponse.ServiceStatus::isUp)
+                .filter(ServiceStatus::isUp)
                 .count();
 
         Runtime runtime = Runtime.getRuntime();
@@ -143,16 +147,16 @@ public class AdminServiceImpl implements AdminService {
                 .version(version != null ? version : "dev")
                 .javaVersion(System.getProperty("java.version"))
                 .db(readDbPool())
-                .memory(new AdminSystemHealthResponse.Memory(usedMb, maxMb))
+                .memory(new Memory(usedMb, maxMb))
                 .build();
     }
 
     /** Live HikariCP connection-pool stats; nulls out gracefully if unavailable. */
-    private AdminSystemHealthResponse.DbPool readDbPool() {
+    private DbPool readDbPool() {
         try {
             if (dataSource instanceof HikariDataSource hikari && hikari.getHikariPoolMXBean() != null) {
                 var pool = hikari.getHikariPoolMXBean();
-                return AdminSystemHealthResponse.DbPool.builder()
+                return DbPool.builder()
                         .active(pool.getActiveConnections())
                         .idle(pool.getIdleConnections())
                         .total(pool.getTotalConnections())

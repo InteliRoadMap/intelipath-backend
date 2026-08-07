@@ -1,5 +1,7 @@
 package com.inteliroadmap.backend.controllers;
 
+import com.inteliroadmap.backend.domain.dto.response.counselor.FeedbackResponse;
+
 import com.inteliroadmap.backend.domain.dto.request.*;
 import com.inteliroadmap.backend.domain.dto.response.counselor.CurriculumResponse;
 import org.springframework.web.bind.annotation.*;
@@ -190,10 +192,10 @@ public class CounselorController {
     @PostMapping("/feedback/create")
     @Operation(summary = "Create feedback", description = "Create a feedback to a student")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Feedback package", content = @Content(mediaType = "application/json", schema = @Schema(implementation = CounselorFeedbackResponse.FeedbackResponse.class))),
+            @ApiResponse(responseCode = "200", description = "Feedback package", content = @Content(mediaType = "application/json", schema = @Schema(implementation = FeedbackResponse.class))),
             @ApiResponse(responseCode = "401", description = "Unauthorized or invalid token")
     })
-    public ResponseEntity<CounselorFeedbackResponse.FeedbackResponse> createFeedback(
+    public ResponseEntity<FeedbackResponse> createFeedback(
             @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Create feedback payload", required = true,
                     content = @Content(
                             mediaType = "application/json",
@@ -216,11 +218,11 @@ public class CounselorController {
     @PatchMapping("/feedback/modify")
     @Operation(summary = "Modify feedback", description = "Modify a feedback to a student")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Feedback package", content = @Content(mediaType = "application/json", schema = @Schema(implementation = CounselorFeedbackResponse.FeedbackResponse.class))),
+            @ApiResponse(responseCode = "200", description = "Feedback package", content = @Content(mediaType = "application/json", schema = @Schema(implementation = FeedbackResponse.class))),
             @ApiResponse(responseCode = "401", description = "Unauthorized or invalid token"),
             @ApiResponse(responseCode = "404", description = "Feedback not found")
     })
-    public ResponseEntity<CounselorFeedbackResponse.FeedbackResponse> modifyFeedback(
+    public ResponseEntity<FeedbackResponse> modifyFeedback(
             @io.swagger.v3.oas.annotations.parameters.RequestBody(description = "Modify feedback payload", required = true,
                     content = @Content(
                             mediaType = "application/json",
@@ -243,11 +245,11 @@ public class CounselorController {
     @PatchMapping("/feedback/mark-read/{feedbackId}")
     @Operation(summary = "Mark feedback as read", description = "Marks a specific feedback sent to a student as READ")
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Feedback successfully marked as read", content = @Content(mediaType = "application/json", schema = @Schema(implementation = CounselorFeedbackResponse.FeedbackResponse.class))),
+            @ApiResponse(responseCode = "200", description = "Feedback successfully marked as read", content = @Content(mediaType = "application/json", schema = @Schema(implementation = FeedbackResponse.class))),
             @ApiResponse(responseCode = "401", description = "Unauthorized or invalid token"),
             @ApiResponse(responseCode = "404", description = "Feedback not found")
     })
-    public ResponseEntity<CounselorFeedbackResponse.FeedbackResponse> markReadFeedback(@PathVariable UUID feedbackId) {
+    public ResponseEntity<FeedbackResponse> markReadFeedback(@PathVariable UUID feedbackId) {
         log.info("CounselorController: Mark read feedback request received");
         return ResponseEntity.ok(feedbackService.markReadFeedback(feedbackId));
     }

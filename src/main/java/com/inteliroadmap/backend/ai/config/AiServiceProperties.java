@@ -24,8 +24,15 @@ public class AiServiceProperties {
     /**
      * How long to wait for a response. Kept generous because scraping and
      * batch AI summarisation are long-running operations.
+     *
+     * <p>Raised from 300s when skill extraction stopped skipping postings. It used to
+     * send only the descriptions a keyword pass came up thin on — a minority — and 300s
+     * covered that comfortably. Reading all 912 in a run at concurrency 12 lands around
+     * 150s, which 300s would also cover, but only until the corpus grows: a timeout here
+     * does not merely fail, it discards a completed run of paid model calls. The headroom
+     * is cheap and the failure is not.
      */
-    private Duration readTimeout = Duration.ofSeconds(300);
+    private Duration readTimeout = Duration.ofSeconds(900);
 
     /**
      * Read timeout for job-board scrapes. A scrape walks many detail pages with
@@ -41,8 +48,13 @@ public class AiServiceProperties {
      * as a job on the AI service: the HTTP calls that start and poll it return instantly.
      * A posting costs a detail fetch plus an LLM enrichment call — around six seconds all
      * in — so this budget is what decides the largest workable SCRAPER_LIMIT.
+     *
+     * <p>Two hours carries roughly a thousand postings at that rate. Raised from forty
+     * minutes because a two-hundred-posting sample is too small to weigh anything: with
+     * that many, one company posting eighteen roles is nine percent of the entire
+     * "market" and every trend is really a handful of rows.
      */
-    private Duration scrapeJobTimeout = Duration.ofMinutes(40);
+    private Duration scrapeJobTimeout = Duration.ofMinutes(120);
 
     /** Gap between polls of a running scrape. */
     private Duration scrapePollInterval = Duration.ofSeconds(10);

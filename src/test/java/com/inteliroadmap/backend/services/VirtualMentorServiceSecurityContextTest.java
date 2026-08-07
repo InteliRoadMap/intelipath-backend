@@ -1,6 +1,7 @@
 package com.inteliroadmap.backend.services;
 
 import com.inteliroadmap.backend.ai.client.AiServiceClient;
+import com.inteliroadmap.backend.ai.tool.JobMarketTool;
 import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.repositories.ChatMessageRepository;
@@ -56,6 +57,8 @@ class VirtualMentorServiceSecurityContextTest {
                 chatClient,
                 vectorStore,
                 aiServiceClient,
+                mock(StudentLevelService.class),
+                mock(JobMarketTool.class),
                 systemPrompt,
                 ragPrompt
         );

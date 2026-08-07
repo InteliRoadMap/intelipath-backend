@@ -19,12 +19,4 @@ public class UpdateFptSubjectsRequest {
     @Valid
     private List<SubjectEntry> subjects;
 
-    @Data
-    public static class SubjectEntry {
-
-        @NotBlank
-        private String subjectCode;
-
-        private boolean passed;
-    }
 }

@@ -65,7 +65,7 @@ public class CareerServiceImpl implements CareerService {
         CareerRole careerRole = careerRoleOptional.get();
 
         // Step 2: Load all roadmap nodes assigned to the career
-        List<SkillNode> nodes = skillNodeRepository.findByCareerRole_CareerId(careerId);
+        List<SkillNode> nodes = skillNodeRepository.findPublishedForCareer(careerId);
 
         // Step 3: Build the career requirement response
         return CareerResponse.builder()

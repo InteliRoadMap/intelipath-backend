@@ -34,4 +34,7 @@ public interface RoadmapPersonalizationService {
 
     /** Declines a recommendation without touching progress or skills. */
     RoadmapRecommendationDecisionResponse rejectRecommendation(UUID recommendationId);
+
+    /** Recomputes parent topics from already completed descendants. */
+    void reconcileCompletedTopicsForCurrentStudent();
 }

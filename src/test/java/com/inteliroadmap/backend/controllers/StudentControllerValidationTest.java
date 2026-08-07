@@ -1,6 +1,11 @@
 package com.inteliroadmap.backend.controllers;
 
+import com.inteliroadmap.backend.components.RoadmapRefreshTrigger;
+import com.inteliroadmap.backend.services.CareerAffinityService;
+import com.inteliroadmap.backend.services.GradedAssessmentService;
 import com.inteliroadmap.backend.services.SkillService;
+import com.inteliroadmap.backend.services.StudentAssessmentService;
+import com.inteliroadmap.backend.services.StudentLevelService;
 import com.inteliroadmap.backend.services.StudentService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -18,7 +23,14 @@ class StudentControllerValidationTest {
 
     @BeforeEach
     void setUp() {
-        StudentController controller = new StudentController(mock(StudentService.class), mock(SkillService.class));
+        StudentController controller = new StudentController(
+                mock(StudentService.class),
+                mock(SkillService.class),
+                mock(StudentAssessmentService.class),
+                mock(GradedAssessmentService.class),
+                mock(StudentLevelService.class),
+                mock(CareerAffinityService.class),
+                mock(RoadmapRefreshTrigger.class));
         mockMvc = MockMvcBuilders.standaloneSetup(controller).build();
     }
 

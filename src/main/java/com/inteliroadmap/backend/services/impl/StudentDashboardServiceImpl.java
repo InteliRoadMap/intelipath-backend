@@ -38,8 +38,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
+import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
@@ -58,6 +61,9 @@ import java.util.UUID;
 public class StudentDashboardServiceImpl implements StudentDashboardService {
 
     private static final int AI_TEXT_LIMIT = 80;
+
+    /** Axis label for a week, named by the Monday it starts on. */
+    private static final DateTimeFormatter WEEK_LABEL = DateTimeFormatter.ofPattern("d MMM", java.util.Locale.ENGLISH);
 
     private final UserRepository userRepository;
     private final SkillRepository skillRepository;
@@ -97,8 +103,10 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
 
         // Retrieve ordered skill nodes associated with the student's chosen career
         UUID careerId = student.getCareerRole().getCareerId();
-        List<SkillNode> nodes = skillNodeRepository
-                .findByCareerRole_CareerIdOrderByNodeLevelAscNodeNameAsc(careerId);
+        // Walk order, not alphabetical order: nodeLevel is 0 on most of the tree, so
+        // the old finder's nodeName tie-break floated MongoDB operators ($all, $eq)
+        // to the head of the student's action list.
+        List<SkillNode> nodes = skillNodeRepository.findPublishedOrderedForCareer(careerId);
 
         if (nodes.isEmpty()) {
             return DashboardRoadmapProgressResponse.builder().build();
@@ -282,6 +290,8 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
         }
 
         List<LocalDate> weeks = new ArrayList<>(jobsByWeek.keySet());
+        // TreeMap keeps these ascending, so the last two entries are the two most
+        // recent whole weeks — a week-on-week comparison, not Saturday against Sunday.
         LocalDate previousWeek = weeks.get(weeks.size() - 2);
         LocalDate currentWeek = weeks.get(weeks.size() - 1);
         int previousJobs = jobsByWeek.get(previousWeek);
@@ -295,7 +305,8 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
         return studentDashboardMapper.toMarketDemandResponse(
                 careerRole,
                 growth,
-                new ArrayList<>(jobsByWeek.values())
+                new ArrayList<>(jobsByWeek.values()),
+                weekLabels(jobsByWeek.keySet())
         );
     }
 
@@ -435,24 +446,56 @@ public class StudentDashboardServiceImpl implements StudentDashboardService {
     }
 
     /**
-     * Aggregates skill trend jobs by their respective week stack dates.
+     * Aggregates skill trend jobs into calendar weeks, keyed by each week's Monday.
+     *
+     * Despite its name {@code week_stamp} holds the <em>posting date</em> of the
+     * advert — {@code SkillExtractionServiceImpl} writes one row per skill per day.
+     * Grouping on it raw therefore produced a daily series, and the two things that
+     * read this map both went wrong on it: the chart drew the ordinary weekend
+     * trough as a sawtooth (Fri 205 jobs, Sat 21, Sun 12), and {@code growth}
+     * compared the last two <em>days</em>, so every Sunday reported a collapse of
+     * around -43% that was nothing but the weekend.
+     *
+     * The rows stay daily; only this rollup is weekly, so nothing else loses
+     * resolution.
      *
      * @param trends the list of {@link SkillTrend} data
-     * @return a map containing the aggregated job count per week date
+     * @return aggregated job count per week, ascending, Monday-keyed
      */
     private Map<LocalDate, Integer> sumJobsByWeek(List<SkillTrend> trends) {
-        Map<LocalDate, Integer> jobsByWeek = new TreeMap<>();
+        TreeMap<LocalDate, Integer> jobsByWeek = new TreeMap<>();
+        LocalDate earliestDay = null;
+        LocalDate latestDay = null;
         for (SkillTrend trend : trends) {
             if (trend.getWeekStamp() == null || trend.getJobsNeeded() == null) {
                 continue;
             }
 
-            Integer currentValue = jobsByWeek.get(trend.getWeekStamp());
-            if (currentValue == null) {
-                currentValue = 0;
+            LocalDate day = trend.getWeekStamp();
+            if (earliestDay == null || day.isBefore(earliestDay)) {
+                earliestDay = day;
             }
-            jobsByWeek.put(trend.getWeekStamp(), currentValue + trend.getJobsNeeded());
+            if (latestDay == null || day.isAfter(latestDay)) {
+                latestDay = day;
+            }
+            jobsByWeek.merge(day.with(DayOfWeek.MONDAY), trend.getJobsNeeded(), Integer::sum);
+        }
+
+        // Both ends of the crawl window land mid-week, and a part-week is not a small
+        // week: the leading one held 75 jobs against ~800 for its whole neighbours,
+        // which draws as a collapse that never happened. Trim whichever boundary the
+        // data does not actually cover, but never trim away the last point standing.
+        if (jobsByWeek.size() > 1 && earliestDay != null && earliestDay.isAfter(jobsByWeek.firstKey())) {
+            jobsByWeek.remove(jobsByWeek.firstKey());
+        }
+        if (jobsByWeek.size() > 1 && latestDay != null && latestDay.isBefore(jobsByWeek.lastKey().plusDays(6))) {
+            jobsByWeek.remove(jobsByWeek.lastKey());
         }
         return jobsByWeek;
+    }
+
+    /** Week labels matching {@link #sumJobsByWeek}'s values, e.g. "27 Jul". */
+    private List<String> weekLabels(Collection<LocalDate> weekStarts) {
+        return weekStarts.stream().map(WEEK_LABEL::format).toList();
     }
 }

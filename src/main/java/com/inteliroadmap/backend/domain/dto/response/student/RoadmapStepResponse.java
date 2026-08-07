@@ -16,4 +16,15 @@ public class RoadmapStepResponse {
     private UUID id;
     private String title;
     private RoadmapStepStatus status;
+
+    /**
+     * The node this step sits under, or null for a root.
+     *
+     * A title alone is not always a task: "$eq" means nothing until you know it is
+     * a MongoDB comparison operator, and the dashboard was showing exactly that.
+     */
+    private String parentTitle;
+
+    /** How deep in the tree, so a caller can tell a track apart from a leaf detail. */
+    private Short depth;
 }

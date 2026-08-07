@@ -61,6 +61,28 @@ public class StudentNodeSelection {
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
+    /**
+     * True when the system chose this branch rather than the student.
+     *
+     * <p>The distinction has to survive in the data, not just in the moment: an
+     * auto-pick the student never noticed is otherwise indistinguishable from a
+     * decision they made and forgot, and re-running the auto-selection must
+     * never overwrite a real choice.
+     */
+    @Column(name = "auto_selected", nullable = false)
+    @Builder.Default
+    private Boolean autoSelected = Boolean.FALSE;
+
+    /**
+     * Why it was chosen, in the student's own numbers — "you have Java at APPLIED
+     * (verified by GitHub), and it leads the alternatives on market relevance".
+     *
+     * <p>Null for a choice the student made themselves; there is nothing to
+     * justify.
+     */
+    @Column(name = "auto_reason")
+    private String autoReason;
+
     @PrePersist
     public void prePersist() {
         if (createdAt == null) {

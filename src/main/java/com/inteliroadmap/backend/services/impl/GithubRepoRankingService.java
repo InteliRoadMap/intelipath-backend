@@ -2,6 +2,7 @@ package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.clients.GithubApiClient.GithubRepoSummary;
 import com.inteliroadmap.backend.domain.dto.response.portfolio.GithubRepoRankResponse;
+import com.inteliroadmap.backend.domain.dto.response.portfolio.ScoreLine;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -59,11 +60,16 @@ public class GithubRepoRankingService {
 
     private GithubRepoRankResponse score(GithubRepoSummary repo, List<String> catalog) {
         List<String> highlights = new ArrayList<>();
+        // Recorded alongside the running total so the two can never disagree: every line
+        // added here is the same number added to `total` on the line above it.
+        List<ScoreLine> breakdown = new ArrayList<>();
         int total = 0;
 
         // Stars — log-scaled so a handful of stars still counts but a viral repo doesn't dominate.
         int starScore = (int) Math.min(SCORE_STARS_MAX, Math.round(log2(repo.stars() + 1) * 8.0));
         total += starScore;
+        breakdown.add(new ScoreLine("Stars", starScore, SCORE_STARS_MAX,
+                repo.stars() + " star(s), log-scaled so one popular repo cannot dominate"));
         if (repo.stars() > 0) {
             highlights.add(repo.stars() + "★");
         }
@@ -71,34 +77,62 @@ public class GithubRepoRankingService {
         // Recency of the last push.
         int recencyScore = recencyScore(repo.pushedAt());
         total += recencyScore;
+        breakdown.add(new ScoreLine("Recent activity", recencyScore, SCORE_RECENCY_MAX,
+                describeRecency(repo.pushedAt())));
         if (recencyScore >= 20) {
             highlights.add("recently active");
         }
 
         // A real description signals a presentable, documented project.
-        if (repo.description() != null && !repo.description().isBlank()) {
+        boolean described = repo.description() != null && !repo.description().isBlank();
+        if (described) {
             total += SCORE_DESCRIPTION;
         } else {
             highlights.add("no description");
         }
+        breakdown.add(new ScoreLine("Description",
+                described ? SCORE_DESCRIPTION : 0, SCORE_DESCRIPTION,
+                described ? "has a description on GitHub" : "no description on GitHub — add one to gain these points"));
 
-        // Original work (not a fork) is what a portfolio should showcase.
+        // Work the student did themselves is what a portfolio should showcase — which
+        // is not the same question as whether GitHub calls the repository a fork.
+        //
+        // Scoring on the flag alone ranked two bookmark forks of other people's
+        // repositories (30 points each) above the student's own main project (25),
+        // which was a fork of their team's organisation repository and pushed to
+        // daily. Forking the team repo and working in the fork is the ordinary shape
+        // of a university project, and the ranking read it as copied code.
         if (!repo.fork()) {
             total += SCORE_ORIGINAL;
             highlights.add("original");
+            breakdown.add(new ScoreLine("Your own work", SCORE_ORIGINAL, SCORE_ORIGINAL,
+                    "not a fork"));
+        } else if (repo.isWorkedInFork()) {
+            total += SCORE_ORIGINAL;
+            highlights.add("your work in a fork");
+            breakdown.add(new ScoreLine("Your own work", SCORE_ORIGINAL, SCORE_ORIGINAL,
+                    "a fork, but pushed to after you forked it — that is your work"));
         } else {
             highlights.add("fork");
+            breakdown.add(new ScoreLine("Your own work", 0, SCORE_ORIGINAL,
+                    "a fork with no pushes since you forked it, so it reads as a bookmark"));
         }
 
         // Language relevant to the student's target career.
-        if (matchesCareer(repo.language(), catalog)) {
+        boolean languageMatches = matchesCareer(repo.language(), catalog);
+        if (languageMatches) {
             total += SCORE_LANGUAGE_MATCH;
             highlights.add("matches " + repo.language());
         }
+        breakdown.add(new ScoreLine("Career language",
+                languageMatches ? SCORE_LANGUAGE_MATCH : 0, SCORE_LANGUAGE_MATCH,
+                describeLanguageMatch(repo.language(), catalog, languageMatches)));
 
         // A few forks by others is a mild quality signal.
         int forkScore = Math.min(SCORE_FORKS_MAX, repo.forks() * 2);
         total += forkScore;
+        breakdown.add(new ScoreLine("Forked by others", forkScore, SCORE_FORKS_MAX,
+                repo.forks() + " fork(s) of this repository"));
 
         total = Math.max(0, Math.min(100, total));
 
@@ -117,7 +151,38 @@ public class GithubRepoRankingService {
                 .qualityScore(total)
                 .qualityTier(tier(total))
                 .highlights(highlights)
+                .scoreBreakdown(breakdown)
                 .build();
+    }
+
+    private String describeRecency(OffsetDateTime pushedAt) {
+        if (pushedAt == null) {
+            return "GitHub reports no last-push date";
+        }
+        long days = ChronoUnit.DAYS.between(pushedAt, OffsetDateTime.now());
+        return "last push " + days + " day(s) ago";
+    }
+
+    /**
+     * Says which career skill the language matched, not merely that one did.
+     *
+     * <p>The match is a loose substring test, so it can fire for reasons that look wrong
+     * from outside — naming the skill it hit is what makes the result arguable instead of
+     * mysterious.
+     */
+    private String describeLanguageMatch(String language, List<String> catalog, boolean matched) {
+        if (language == null || language.isBlank()) {
+            return "GitHub reports no primary language for this repository";
+        }
+        if (!matched) {
+            return language + " is not in your career's skill list";
+        }
+        String lang = language.toLowerCase(Locale.ROOT);
+        String hit = catalog.stream()
+                .filter(skill -> skill.contains(lang) || lang.contains(skill))
+                .findFirst()
+                .orElse(lang);
+        return language + " matches the career skill \"" + hit + "\"";
     }
 
     private int recencyScore(OffsetDateTime pushedAt) {

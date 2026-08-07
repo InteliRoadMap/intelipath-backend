@@ -113,4 +113,30 @@ class RoadmapSelectionResolverTest {
         assertFalse(view.isExcludedFromProgress(http.getNodeId()));
         assertFalse(view.isGreyedAlternative(http.getNodeId()));
     }
+
+    /**
+     * The point of picking a language: what hangs below the ones you did not pick
+     * stops being sent at all. Greying them still shipped every language's whole
+     * subtree to a page that then had to draw it.
+     */
+    @Test
+    void decidedGroup_dropsDescendantsOfUnchosenAlternatives() {
+        SelectionView view = resolver.resolve(
+                allNodes(), Map.of(group.getNodeId(), java.getNodeId()));
+
+        assertTrue(view.isOffPathDescendant(csharpChild.getNodeId()));
+        // The alternative itself survives, so the student can see what they turned
+        // down and change their mind. Cutting it would make the choice invisible.
+        assertFalse(view.isOffPathDescendant(csharp.getNodeId()));
+        assertFalse(view.isOffPathDescendant(java.getNodeId()));
+        assertFalse(view.isOffPathDescendant(http.getNodeId()));
+    }
+
+    /** Nothing may be cut while the student is still choosing. */
+    @Test
+    void undecidedGroup_keepsEveryAlternativeWhole() {
+        SelectionView view = resolver.resolve(allNodes(), Map.of());
+
+        assertTrue(view.offPathDescendants().isEmpty());
+    }
 }

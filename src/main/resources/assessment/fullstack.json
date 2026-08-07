@@ -1,0 +1,231 @@
+{
+  "scope": "FULLSTACK",
+  "careerNames": ["Full Stack", "Fullstack", "Full-Stack"],
+  "version": 1,
+  "items": [
+    {
+      "id": "fs-js-01",
+      "kind": "SINGLE_CHOICE",
+      "tier": 1,
+      "topic": "JavaScript",
+      "skills": ["JavaScript"],
+      "prompt": "What does this log, and why?\n\n```js\nconst list = [1, 2, 3];\nconst copy = list;\ncopy.push(4);\nconsole.log(list.length);\n```",
+      "choices": [
+        { "key": "a", "text": "3 — `copy` is a separate array" },
+        { "key": "b", "text": "4 — both names point at the same array" },
+        { "key": "c", "text": "3 — `const` prevents the array from being modified" },
+        { "key": "d", "text": "It throws, because `list` is declared `const`" }
+      ],
+      "answer": ["b"],
+      "explanation": "`const` binds the name, not the value. Assigning an array copies the reference, so both names see the same object."
+    },
+    {
+      "id": "fs-react-01",
+      "kind": "SINGLE_CHOICE",
+      "tier": 1,
+      "topic": "React state",
+      "skills": ["React"],
+      "prompt": "A click handler calls `setCount(count + 1)` three times in a row. `count` starts at 0. What is it after one click?",
+      "choices": [
+        { "key": "a", "text": "3" },
+        { "key": "b", "text": "1, because all three reads see the same stale `count` from this render" },
+        { "key": "c", "text": "0, because state updates are discarded inside an event handler" },
+        { "key": "d", "text": "3, but only after a second render" }
+      ],
+      "answer": ["b"],
+      "explanation": "`count` is a value captured by this render, not a live cell. The updater form `setCount(c => c + 1)` is passed the latest value each time and gives 3."
+    },
+    {
+      "id": "fs-oop-01",
+      "kind": "SINGLE_CHOICE",
+      "tier": 2,
+      "topic": "OOP",
+      "skills": ["OOP", "Dependency Injection"],
+      "prompt": "An `OrderService` constructs `new EmailSender()` inside its own constructor. What is the concrete cost, as opposed to taking a sender as a constructor argument?",
+      "choices": [
+        { "key": "a", "text": "It allocates more memory, because a new sender exists per service" },
+        { "key": "b", "text": "It cannot be unit-tested without actually sending mail, and the sender cannot be swapped without editing OrderService" },
+        { "key": "c", "text": "It breaks encapsulation, because the sender is now internal state" },
+        { "key": "d", "text": "Nothing — this is what constructors are for" }
+      ],
+      "answer": ["b"],
+      "explanation": "The cost is coupling, and it shows up first in the tests. A dependency you cannot replace is a dependency you cannot fake."
+    },
+    {
+      "id": "fs-db-01",
+      "kind": "SINGLE_CHOICE",
+      "tier": 2,
+      "topic": "Databases",
+      "skills": ["SQL", "PostgreSQL"],
+      "prompt": "An endpoint loads 50 orders, then loads each order's customer inside the loop. The logs show 51 queries. Which of these actually fixes it?",
+      "choices": [
+        { "key": "a", "text": "Add an index on `orders.customer_id`" },
+        { "key": "b", "text": "Fetch the customers in one query — a join, or one `WHERE id IN (...)` — and match them in memory" },
+        { "key": "c", "text": "Increase the connection pool size so the 51 queries run concurrently" },
+        { "key": "d", "text": "Cache each customer after loading it" }
+      ],
+      "answer": ["b"],
+      "explanation": "This is the N+1 problem. The index makes each of 51 queries faster and leaves 51 round-trips; only collapsing the queries removes the cause."
+    },
+    {
+      "id": "fs-cache-01",
+      "kind": "SINGLE_CHOICE",
+      "tier": 2,
+      "topic": "Caching",
+      "skills": ["Caching", "Redis"],
+      "prompt": "A read-heavy endpoint uses cache-aside. On a write, the code updates the database and deletes the cache key. A colleague suggests writing the new value into the cache instead of deleting it. What is the main risk?",
+      "choices": [
+        { "key": "a", "text": "It is slower, because a write to the cache costs more than a delete" },
+        { "key": "b", "text": "Two concurrent writes can land in the cache in the opposite order from the database, leaving a stale value cached indefinitely" },
+        { "key": "c", "text": "The value cannot be stored without a serializer" },
+        { "key": "d", "text": "The TTL is lost, so the key never expires" }
+      ],
+      "answer": ["b"],
+      "explanation": "Delete-on-write is self-healing: the next read repopulates from the source of truth. Writing through from application code introduces an ordering race between two writers."
+    },
+    {
+      "id": "fs-err-01",
+      "kind": "SINGLE_CHOICE",
+      "tier": 1,
+      "topic": "Error handling",
+      "skills": ["Error Handling"],
+      "prompt": "Which of these is the clearest sign of a `catch` block that makes a bug harder to find?",
+      "choices": [
+        { "key": "a", "text": "It logs the exception and rethrows it wrapped in a domain exception" },
+        { "key": "b", "text": "It catches the exception, logs the message only, and returns null" },
+        { "key": "c", "text": "It catches a narrow exception type and applies a documented fallback" },
+        { "key": "d", "text": "It catches, logs the full stack trace, and lets the request fail" }
+      ],
+      "answer": ["b"],
+      "explanation": "Returning null on failure moves the crash somewhere else and drops the stack trace on the way, so the eventual error points at code that did nothing wrong."
+    },
+    {
+      "id": "fs-algo-01",
+      "kind": "SINGLE_CHOICE",
+      "tier": 1,
+      "topic": "Algorithms",
+      "skills": ["Data Structures", "Algorithms"],
+      "prompt": "For each of 100,000 events you check whether a user id is in a list of 100,000 ids. The list is an array checked with a linear `includes`/`contains`. What changes if it becomes a hash set?",
+      "choices": [
+        { "key": "a", "text": "Nothing measurable — both are O(n) lookups" },
+        { "key": "b", "text": "Each lookup goes from O(n) to O(1), so the total goes from about 10^10 comparisons to about 10^5" },
+        { "key": "c", "text": "Each lookup goes from O(n) to O(log n), the same as a sorted array" },
+        { "key": "d", "text": "It gets slower, because hashing each id costs more than comparing it" }
+      ],
+      "answer": ["b"],
+      "explanation": "10^10 comparisons is minutes of CPU; 100,000 hashes is imperceptible. This is the most common performance bug in application code, on both sides of the stack."
+    },
+    {
+      "id": "fs-api-01",
+      "kind": "SINGLE_CHOICE",
+      "tier": 2,
+      "topic": "HTTP and APIs",
+      "skills": ["REST", "HTTP"],
+      "prompt": "A `fetch` from your React app to your own API fails with a CORS error, but the same URL works from Postman. Where does the fix belong?",
+      "choices": [
+        { "key": "a", "text": "In the frontend, by setting `mode: 'no-cors'`" },
+        { "key": "b", "text": "In the API, which must send the `Access-Control-Allow-*` headers — the rule is enforced by the browser, and Postman is not one" },
+        { "key": "c", "text": "In the frontend, by moving the call into a `useEffect`" },
+        { "key": "d", "text": "Nowhere — the API is down for browsers only" }
+      ],
+      "answer": ["b"],
+      "explanation": "Being able to fix both ends is the point of the role: knowing that this one can only be fixed on the server saves an afternoon of editing the client."
+    },
+    {
+      "id": "fs-auth-01",
+      "kind": "SINGLE_CHOICE",
+      "tier": 3,
+      "topic": "Security",
+      "skills": ["Authentication", "JWT"],
+      "prompt": "A JWT access token is stored in `localStorage` so the SPA can attach it to requests. What is the specific risk, compared with an httpOnly cookie?",
+      "choices": [
+        { "key": "a", "text": "None — localStorage is origin-scoped, so it is equivalent" },
+        { "key": "b", "text": "Any JavaScript running on the page, including a compromised dependency, can read the token and exfiltrate it; an httpOnly cookie is unreadable from JS" },
+        { "key": "c", "text": "localStorage is sent with every request, so it leaks to third parties" },
+        { "key": "d", "text": "Tokens in localStorage cannot be given an expiry" }
+      ],
+      "answer": ["b"],
+      "explanation": "The trade is real in both directions: httpOnly cookies resist XSS but need CSRF protection, while localStorage resists CSRF and hands the token to any XSS. The wrong answer is believing there is no trade."
+    },
+    {
+      "id": "fs-concur-01",
+      "kind": "SINGLE_CHOICE",
+      "tier": 3,
+      "topic": "Concurrency",
+      "skills": ["Concurrency", "SQL"],
+      "prompt": "Two requests both read `stock = 1`, both decide the item is available, and both write `stock = 0`. One unit was sold twice. Which approach removes the race rather than narrowing it?",
+      "choices": [
+        { "key": "a", "text": "Wrapping the read and the write in one transaction at READ COMMITTED" },
+        { "key": "b", "text": "Re-reading the stock immediately before writing" },
+        { "key": "c", "text": "`UPDATE items SET stock = stock - 1 WHERE id = ? AND stock > 0` and treating zero updated rows as sold out" },
+        { "key": "d", "text": "Retrying the request when the write fails" }
+      ],
+      "answer": ["c"],
+      "explanation": "a, b and d all shrink the window between check and write without closing it. Making the database evaluate the condition inside the update puts it under the row lock."
+    },
+    {
+      "id": "fs-short-01",
+      "kind": "SHORT_ANSWER",
+      "tier": 2,
+      "topic": "Debugging across the stack",
+      "skills": ["Performance", "SQL"],
+      "prompt": "A page that used to load instantly now takes four seconds. You do not yet know whether the delay is in the browser, the network, or the server.\n\nDescribe how you would narrow it down to one of the three, in order, and what you would look at once you had.",
+      "rubric": [
+        { "criterion": "Starts at the network tab or an equivalent trace to split the time into request time versus rendering time — a measurement that eliminates two of the three", "points": 4 },
+        { "criterion": "If server-side: names the slow query log, EXPLAIN, or an APM trace, and a plausible cause such as a missing index or N+1", "points": 3 },
+        { "criterion": "If client-side: names a profiler or the size of the rendered DOM / bundle rather than guessing", "points": 2 },
+        { "criterion": "Measures again after the fix to confirm the cause was the one found", "points": 1 }
+      ],
+      "explanation": "The full-stack skill being tested is not knowing every cause, it is refusing to guess which layer. One look at the waterfall eliminates two-thirds of the search space before any code is read."
+    },
+    {
+      "id": "fs-short-02",
+      "kind": "SHORT_ANSWER",
+      "tier": 3,
+      "topic": "API design",
+      "skills": ["REST", "React"],
+      "prompt": "A dashboard needs a user's profile, their last five orders, and an unread-notification count. The backend has one endpoint per resource, so the page makes three requests and shows three separate spinners.\n\nDiscuss the options and say what you would do.",
+      "rubric": [
+        { "criterion": "Considers more than one option — parallel requests, an aggregate endpoint, or a single query language such as GraphQL — rather than asserting one", "points": 3 },
+        { "criterion": "Notes that the three requests can already run in parallel, so the problem may be waterfalling rather than the number of endpoints", "points": 3 },
+        { "criterion": "Names a real cost of the aggregate endpoint: coupling to one screen's needs, harder caching, or one slow part delaying the whole response", "points": 3 },
+        { "criterion": "Reaches a decision and gives the condition that would change it", "points": 1 }
+      ],
+      "explanation": "The trap is treating three requests as obviously wrong. If they run in parallel the cost is three spinners, which is a UI problem; if they are sequential the cost is latency, which is an architecture problem. An answer that does not distinguish those is guessing."
+    },
+    {
+      "id": "fs-code-01",
+      "kind": "CODE",
+      "tier": 2,
+      "topic": "React effects",
+      "language": "typescript",
+      "skills": ["React", "TypeScript"],
+      "prompt": "This component adds a resize listener and never removes it, so a page that mounts it repeatedly accumulates listeners. Fix it, and add a one-line comment naming what the returned function does.",
+      "starterCode": "function useWindowWidth() {\n  const [width, setWidth] = useState(window.innerWidth);\n\n  useEffect(() => {\n    window.addEventListener('resize', () => setWidth(window.innerWidth));\n  });\n\n  return width;\n}",
+      "rubric": [
+        { "criterion": "Returns a cleanup function from useEffect that removes the listener", "points": 3 },
+        { "criterion": "The handler is a named/stable reference, so add and remove refer to the same function", "points": 3 },
+        { "criterion": "Adds a dependency array — `[]` — so the effect does not re-subscribe on every render", "points": 3 },
+        { "criterion": "The comment correctly describes the returned function as cleanup on unmount", "points": 1 }
+      ],
+      "explanation": "Two bugs stack: no cleanup, and no dependency array. `removeEventListener` compares by identity, which is why an inline arrow can never be removed."
+    },
+    {
+      "id": "fs-code-02",
+      "kind": "CODE",
+      "tier": 3,
+      "topic": "API and error handling",
+      "language": "typescript",
+      "skills": ["TypeScript", "REST", "Error Handling"],
+      "prompt": "Write `fetchWithRetry(url, { retries, timeoutMs })`. It should:\n\n- give up on a single attempt after `timeoutMs` and try again\n- retry on a network error or a 5xx response\n- NOT retry on a 4xx response\n- wait longer between successive attempts\n- throw the last error when the retries run out\n\nState in a comment why 4xx is excluded.",
+      "starterCode": "async function fetchWithRetry(\n  url: string,\n  opts: { retries: number; timeoutMs: number }\n): Promise<Response> {\n  // TODO\n  return fetch(url);\n}",
+      "rubric": [
+        { "criterion": "Times each attempt out — AbortController with a timer, or an equivalent race — and clears the timer afterwards", "points": 3 },
+        { "criterion": "Retries on network errors and 5xx but returns 4xx to the caller without retrying", "points": 3 },
+        { "criterion": "Backs off between attempts rather than retrying in a tight loop", "points": 2 },
+        { "criterion": "Throws the last error after the final attempt instead of returning undefined, and the comment explains that a 4xx is the client's own fault so repeating it cannot succeed", "points": 2 }
+      ],
+      "explanation": "The reasoning being tested is which failures are worth repeating. A 500 may be transient; a 400 is your request being wrong, and sending it again three times only adds load to a server that already told you the answer."
+    }
+  ]
+}

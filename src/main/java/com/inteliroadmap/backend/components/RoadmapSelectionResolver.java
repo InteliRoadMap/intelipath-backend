@@ -68,6 +68,7 @@ public class RoadmapSelectionResolver {
 
         Set<UUID> progressExcluded = new HashSet<>();
         Set<UUID> greyedAlternatives = new HashSet<>();
+        Set<UUID> offPathDescendants = new HashSet<>();
         for (SkillNode node : nodes) {
             if (node.getParentNode() == null) {
                 continue;
@@ -86,9 +87,15 @@ public class RoadmapSelectionResolver {
             collectSubtree(node, childrenByParent, progressExcluded);
             if (decided) {
                 collectSubtree(node, childrenByParent, greyedAlternatives);
+                // Only once the student has actually decided. While the group is
+                // undecided every alternative must stay whole, because the student
+                // is still choosing between them and cannot choose what was cut.
+                for (SkillNode child : childrenByParent.getOrDefault(node.getNodeId(), List.of())) {
+                    collectSubtree(child, childrenByParent, offPathDescendants);
+                }
             }
         }
-        return new SelectionView(progressExcluded, greyedAlternatives);
+        return new SelectionView(progressExcluded, greyedAlternatives, offPathDescendants);
     }
 
     private void collectSubtree(SkillNode root, Map<UUID, List<SkillNode>> childrenByParent, Set<UUID> out) {
