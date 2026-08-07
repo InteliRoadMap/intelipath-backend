@@ -4,6 +4,7 @@ import com.inteliroadmap.backend.domain.dto.request.UpdateNodeProgressRequest;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.StudentRoadmapResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapNodeResponse;
 import com.inteliroadmap.backend.domain.dto.response.plan.LearningPlanResponse;
+import com.inteliroadmap.backend.domain.entity.Student;
 
 import java.util.Set;
 import java.util.UUID;
@@ -35,6 +36,9 @@ public interface RoadmapService {
      *        the no-argument call
      */
     StudentRoadmapResponse getStudentRoadmap(Set<UUID> expandedNodeIds);
+
+    /** Read-only roadmap snapshot for a portfolio owner or viewer. */
+    StudentRoadmapResponse getStudentRoadmapForPortfolio(Student student);
 
     /**
      * One standalone roadmap under the career.

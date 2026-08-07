@@ -57,6 +57,11 @@ public class SkillNode {
     @Column(name = "node_name", nullable = false)
     private String nodeName;
 
+    /** TOPIC | SKILL | CAPABILITY | CHECKPOINT. Never inferred by a client. */
+    @Column(name = "semantic_type", nullable = false, length = 20)
+    @Builder.Default
+    private String semanticType = "CAPABILITY";
+
     /**
      * @deprecated the ordering index <em>inside</em> the source roadmap, not a
      * position on the career path and not a depth. It reads 0 on 2.610 nodes and

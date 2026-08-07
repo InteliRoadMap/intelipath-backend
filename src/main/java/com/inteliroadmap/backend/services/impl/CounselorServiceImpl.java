@@ -1,5 +1,7 @@
 package com.inteliroadmap.backend.services.impl;
 
+import com.inteliroadmap.backend.domain.dto.request.StudentAccounts;
+
 import com.inteliroadmap.backend.components.RoadmapProgressCalculator;
 import com.inteliroadmap.backend.domain.dto.request.ExportStudentListRequest;
 import com.inteliroadmap.backend.domain.dto.request.ImportStudentAccountsRequest;
@@ -447,8 +449,8 @@ public class CounselorServiceImpl implements CounselorService {
         User userC = userRepository.findByUserId(counselor.getUserId());
 
         List<String[]> createdAccounts = new ArrayList<>();
-        List<ImportStudentAccountsRequest.StudentAccounts> studentAccounts = request.getAccounts();
-        for (ImportStudentAccountsRequest.StudentAccounts account: studentAccounts) {
+        List<StudentAccounts> studentAccounts = request.getAccounts();
+        for (StudentAccounts account: studentAccounts) {
             User stUser = userRepository.findByEmail(account.getEmail());
 
             FptCurriculum curriculum = fptCurriculumRepository.findByCode(account.getCurriculum()).orElse(null);

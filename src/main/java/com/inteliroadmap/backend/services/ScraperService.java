@@ -21,6 +21,8 @@ public interface ScraperService {
      */
     List<RecruitmentPostResponse> getRecruitmentPosts(String seniority);
 
+    List<RecruitmentPostResponse> getRecruitmentPosts(String seniority, java.util.UUID careerId);
+
     CompanyResponse getCompanyInfos(String companyId);
 
     RecruitmentResponse getRecruitmentInfos(String recruitmentId);

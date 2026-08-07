@@ -1,6 +1,10 @@
 package com.inteliroadmap.backend.services;
 
-import com.inteliroadmap.backend.domain.dto.response.market.MarketTrendResponse;
+import com.inteliroadmap.backend.domain.dto.response.market.CompanyTrendResponse;
+import com.inteliroadmap.backend.domain.dto.response.market.FreshnessResponse;
+import com.inteliroadmap.backend.domain.dto.response.market.SalaryTrendResponse;
+import com.inteliroadmap.backend.domain.dto.response.market.SkillTrendResponse;
+
 import com.inteliroadmap.backend.domain.dto.response.market.SkillPostingsResponse;
 
 import java.util.List;
@@ -20,25 +24,30 @@ public interface MarketTrendService {
     /** Default window. A month is long enough to smooth a quiet week, short enough to still be news. */
     int DEFAULT_WINDOW_DAYS = 30;
 
-    List<MarketTrendResponse.CompanyTrendResponse> getTopHiringCompanies(int limit) ;
+    List<CompanyTrendResponse> getTopHiringCompanies(int limit) ;
 
-    List<MarketTrendResponse.SkillTrendResponse> getSkillTrends() ;
+    List<SkillTrendResponse> getSkillTrends() ;
 
-    List<MarketTrendResponse.SalaryTrendResponse> getSalaryDistribution() ;
+    List<SalaryTrendResponse> getSalaryDistribution() ;
 
     /** As above, restricted to postings from the last {@code windowDays} days. */
-    List<MarketTrendResponse.CompanyTrendResponse> getTopHiringCompanies(int limit, int windowDays) ;
+    List<CompanyTrendResponse> getTopHiringCompanies(int limit, int windowDays) ;
 
-    List<MarketTrendResponse.SkillTrendResponse> getSkillTrends(int windowDays) ;
+    List<SkillTrendResponse> getSkillTrends(int windowDays) ;
 
-    List<MarketTrendResponse.SalaryTrendResponse> getSalaryDistribution(int windowDays) ;
+    List<SalaryTrendResponse> getSalaryDistribution(int windowDays) ;
 
     /**
      * How many jobs appeared in the window that had never been advertised before,
      * alongside the total in that window. Lets the UI say "12 new of 48" instead of
      * calling every re-post new.
      */
-    MarketTrendResponse.FreshnessResponse getFreshness(int windowDays) ;
+    FreshnessResponse getFreshness(int windowDays) ;
+
+    List<CompanyTrendResponse> getTopHiringCompanies(int limit, int windowDays, UUID careerId, String seniority);
+    List<SkillTrendResponse> getSkillTrends(int windowDays, UUID careerId, String seniority);
+    List<SalaryTrendResponse> getSalaryDistribution(int windowDays, UUID careerId, String seniority);
+    FreshnessResponse getFreshness(int windowDays, UUID careerId, String seniority);
 
     /**
      * Labels postings that carry no seniority yet and returns how many were

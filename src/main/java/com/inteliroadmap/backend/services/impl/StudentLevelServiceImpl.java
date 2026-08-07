@@ -4,6 +4,7 @@ import com.inteliroadmap.backend.components.SeniorityCalculator;
 import com.inteliroadmap.backend.domain.dto.response.student.StudentLevelResponse;
 import com.inteliroadmap.backend.domain.entity.Student;
 import com.inteliroadmap.backend.domain.entity.StudentAssessment;
+import com.inteliroadmap.backend.domain.enums.SeniorityLevel;
 import com.inteliroadmap.backend.mappers.StudentAssessmentMapper;
 import com.inteliroadmap.backend.repositories.StudentAssessmentRepository;
 import com.inteliroadmap.backend.repositories.StudentRepository;
@@ -16,6 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 import java.util.UUID;
+import java.util.Comparator;
+import java.util.List;
 
 /**
  * Implementation of {@link StudentLevelService}.
@@ -68,18 +71,50 @@ public class StudentLevelServiceImpl implements StudentLevelService {
 
         // No completed run means the student skipped the assessment. That is a
         // deliberate absence, not a missing default — do not invent FRESHER.
-        Optional<StudentAssessment> latest = studentAssessmentRepository
-                .findFirstByUserIdAndStatusOrderByCreatedAtDesc(student.getUserId(), COMPLETED_STATUS);
-        if (latest.isEmpty()) return Optional.empty();
-
         UUID careerId = student.getCareerRole() == null ? null : student.getCareerRole().getCareerId();
         // The level is only meaningful against a target. A student who changed
         // career to one with no data on file has no comparable level any more.
         if (careerId == null) return Optional.empty();
 
-        SeniorityCalculator.SeniorityVerdict verdict = seniorityCalculator.compute(student.getUserId(), careerId);
-        if (verdict.requiredCount() == 0) return Optional.empty();
+        List<StudentAssessment> completed = studentAssessmentRepository
+                .findByUserIdAndCareerIdAndStatusOrderByCreatedAtDesc(
+                        student.getUserId(), careerId, COMPLETED_STATUS);
+        if (completed.isEmpty()) return Optional.empty();
 
-        return Optional.of(studentAssessmentMapper.toLevelResponse(verdict, latest.get()));
+        StudentAssessment bestAssessment = completed.stream()
+                .filter(row -> row.getAiLevel() != null)
+                .max(Comparator.comparingInt(row -> levelRank(row.getAiLevel())))
+                .orElse(completed.getFirst());
+
+        SeniorityCalculator.SeniorityVerdict coverageVerdict =
+                seniorityCalculator.compute(student.getUserId(), careerId);
+        if (coverageVerdict.requiredCount() == 0) return Optional.empty();
+
+        // The paper and the live coverage calculator measure complementary
+        // evidence. The old path discarded the paper's result entirely: a MID
+        // paper could become FRESHER because the career's HIGH catalog contained
+        // languages and tools the paper never asked about. Keep the completed
+        // assessment as the floor; repositories, transcripts and mentor evidence
+        // can still raise the live level afterwards.
+        SeniorityLevel effectiveLevel = SeniorityLevel.max(
+                bestAssessment.getAiLevel(), coverageVerdict.level());
+        SeniorityCalculator.SeniorityVerdict verdict = new SeniorityCalculator.SeniorityVerdict(
+                effectiveLevel,
+                SeniorityLevel.max(bestAssessment.getAiRawLevel(), coverageVerdict.rawLevel()),
+                coverageVerdict.ratioAll(),
+                coverageVerdict.ratioVerified(),
+                coverageVerdict.requiredCount(),
+                coverageVerdict.heldCount(),
+                coverageVerdict.verifiedCount());
+
+        return Optional.of(studentAssessmentMapper.toLevelResponse(verdict, bestAssessment));
+    }
+
+    private int levelRank(SeniorityLevel level) {
+        if (level == null || level == SeniorityLevel.UNKNOWN) return -1;
+        for (int i = 0; i < SeniorityLevel.LADDER.length; i++) {
+            if (SeniorityLevel.LADDER[i] == level) return i;
+        }
+        return -1;
     }
 }

@@ -14,6 +14,12 @@ import java.util.UUID;
 public class RoadmapNodeResponse {
     private UUID nodeId;
     private String nodeName;
+    /** TOPIC | SKILL | CAPABILITY | CHECKPOINT. */
+    private String semanticType;
+    /** Depth relative to the currently opened roadmap root. */
+    private Integer relativeDepth;
+    private RoadmapTopicResponse topic;
+    private RoadmapSkillResponse skill;
     private String parentNode;
     private String previousNode;
     private Integer nodeLevel;
@@ -89,6 +95,13 @@ public class RoadmapNodeResponse {
      * on screen had said it would, or what was still missing.
      */
     private String completionRule;
+
+    /** Evidence rows whose skill/node identity can directly support this node. */
+    private java.util.List<RoadmapNodeEvidenceResponse> evidence;
+    /** Effective confidence bar after node proficiency and career importance are combined. */
+    private Double evidenceRequiredConfidence;
+    /** Plain-language explanation of why evidence did or did not complete the node. */
+    private String evidenceDecision;
 
     /** Descendants inside this node. Large ones are roadmaps, not steps. */
     private Integer subtreeSize;

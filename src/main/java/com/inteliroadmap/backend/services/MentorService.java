@@ -11,10 +11,12 @@ import com.inteliroadmap.backend.domain.dto.response.mentor.MentorPendingReviewR
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorProfileResponse;
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorProgressReportResponse;
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorStudentResponse;
+import com.inteliroadmap.backend.domain.dto.response.portfolio.GithubImportAuditResponse;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import java.util.List;
+import java.util.UUID;
 
 public interface MentorService {
 
@@ -46,4 +48,11 @@ public interface MentorService {
     MentorProgressReportResponse getProgressReports();
 
     MentorResponse submitFeedback(CreateFeedbackRequest request);
+
+    /**
+     * Read-only view of an existing AI repository analysis for a student who asked this
+     * mentor to review their portfolio.  It never re-fetches the repository or exposes
+     * the student's GitHub credentials.
+     */
+    GithubImportAuditResponse getStudentImportAudit(UUID studentId, String repoUrl);
 }

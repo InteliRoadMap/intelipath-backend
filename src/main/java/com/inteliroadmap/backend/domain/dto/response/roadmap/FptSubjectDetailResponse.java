@@ -35,30 +35,4 @@ public class FptSubjectDetailResponse {
     /** Class sessions; the ones with a file are the downloadable material. */
     private List<MaterialResponse> sessions;
 
-    @Data
-    @Builder
-    public static class CloResponse {
-        /** The syllabus's own label, e.g. CLO1. */
-        private String code;
-        private String outcome;
-    }
-
-    @Data
-    @Builder
-    public static class MaterialResponse {
-        private UUID id;
-        private String title;
-        private String topic;
-        /** Which CLO(s) the session maps to, as the syllabus wrote it. */
-        private String cloRef;
-        /** A reference link the syllabus published. Never a link to the file itself. */
-        private String url;
-        private Long sizeBytes;
-        /**
-         * Whether we hold a copy to serve. False is the common case — FLM's own download
-         * handler errors for ~145 of 207 files — so the UI must say "no file" rather than
-         * offer a button that 404s.
-         */
-        private boolean downloadable;
-    }
 }

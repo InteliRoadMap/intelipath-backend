@@ -68,6 +68,7 @@ public class RoadmapRefreshTrigger {
             List<RoadmapRecommendationResponse> generated =
                     roadmapPersonalizationService.generateRecommendationsForCurrentStudent();
             if (generated.isEmpty()) {
+                roadmapPersonalizationService.reconcileCompletedTopicsForCurrentStudent();
                 log.debug("RoadmapRefreshTrigger: nothing new to apply after {}.", reason);
                 return markedNodeIds;
             }
@@ -92,6 +93,7 @@ public class RoadmapRefreshTrigger {
             }
             log.info("RoadmapRefreshTrigger: applied {} of {} recommendation(s) after {}, marking {} node(s).",
                     applied, generated.size(), reason, markedNodeIds.size());
+            roadmapPersonalizationService.reconcileCompletedTopicsForCurrentStudent();
             return markedNodeIds;
         } catch (Exception e) {
             log.warn("RoadmapRefreshTrigger: roadmap refresh after {} failed, evidence kept for the "

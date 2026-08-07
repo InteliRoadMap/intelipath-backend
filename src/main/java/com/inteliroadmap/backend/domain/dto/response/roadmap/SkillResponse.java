@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 
 import java.util.List;
 import java.util.UUID;
+import com.inteliroadmap.backend.domain.dto.response.market.MarketSkillGapResponse;
 
 @Data
 @AllArgsConstructor
@@ -24,6 +25,12 @@ public class SkillResponse {
 
     @Builder.Default
     private List<SkillItemResponse> missingSkills = List.of();
+
+    @Builder.Default
+    private List<CareerSkillGapResponse> careerSkillGaps = List.of();
+
+    @Builder.Default
+    private List<MarketSkillGapResponse> marketSkillGaps = List.of();
 
     /**
      * Roadmap nodes the declaration just marked as already covered.

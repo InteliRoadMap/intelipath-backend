@@ -1,5 +1,7 @@
 package com.inteliroadmap.backend.services.impl;
 
+import com.inteliroadmap.backend.domain.dto.response.roadmap.MatchedSkillResponse;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.inteliroadmap.backend.components.StackBranchScorer;
 import com.inteliroadmap.backend.domain.dto.request.SelectAlternativeRequest;
@@ -14,6 +16,7 @@ import com.inteliroadmap.backend.domain.entity.StudentSkill;
 import com.inteliroadmap.backend.exceptions.BadRequestException;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.repositories.SkillNodeRepository;
+import com.inteliroadmap.backend.repositories.SkillRepository;
 import com.inteliroadmap.backend.repositories.StudentNodeSelectionRepository;
 import com.inteliroadmap.backend.repositories.StudentSkillRepository;
 import com.inteliroadmap.backend.services.AuthenticatedStudentService;
@@ -55,6 +58,7 @@ public class RoadmapSelectionServiceImpl implements RoadmapSelectionService {
     private final AuthenticatedStudentService authenticatedStudentService;
     private final StudentNodeSelectionRepository selectionRepository;
     private final SkillNodeRepository skillNodeRepository;
+    private final SkillRepository skillRepository;
     private final StudentSkillRepository studentSkillRepository;
     private final StackBranchScorer stackBranchScorer;
     private final MarketDemandService marketDemandService;
@@ -195,8 +199,8 @@ public class RoadmapSelectionServiceImpl implements RoadmapSelectionService {
         List<ChoiceOptionResponse> options = new ArrayList<>(ranking.ranked().size());
         for (StackBranchScorer.Scored scored : ranking.ranked()) {
             SkillNode node = scored.node();
-            SkillDemandResponse demand = node.getSkill() == null ? null
-                    : displayDemand.get(node.getSkill().getSkillId());
+            DemandMatch demandMatch = resolveDisplayDemand(node, displayDemand);
+            SkillDemandResponse demand = demandMatch.demand();
             boolean isChosen = node.getNodeId().equals(chosenNodeId);
             options.add(ChoiceOptionResponse.builder()
                     .nodeId(node.getNodeId())
@@ -205,7 +209,7 @@ public class RoadmapSelectionServiceImpl implements RoadmapSelectionService {
                     .fitReason(fitReasonFor(scored, ranking))
                     .matchedSkills(scored.contributions().stream()
                             .limit(MATCHED_SKILLS_SHOWN)
-                            .map(c -> ChoiceOptionResponse.MatchedSkillResponse.builder()
+                            .map(c -> MatchedSkillResponse.builder()
                                     .skillName(c.skillName())
                                     .proficiency(c.proficiency())
                                     .verified(c.verified())
@@ -213,7 +217,7 @@ public class RoadmapSelectionServiceImpl implements RoadmapSelectionService {
                             .toList())
                     .marketFrequency(demand == null ? null : demand.getFrequency())
                     .marketJobCount(demand == null ? null : demand.getJobCount())
-                    .skillId(node.getSkill() == null ? null : node.getSkill().getSkillId())
+                    .skillId(demandMatch.skillId())
                     .nodeCount(node.getSubtreeSize())
                     .chosen(isChosen)
                     .autoSelected(isChosen && autoSelected)
@@ -226,6 +230,44 @@ public class RoadmapSelectionServiceImpl implements RoadmapSelectionService {
                 .verdict(ranking.verdict().name())
                 .options(options)
                 .build();
+    }
+
+    /**
+     * Choice options are TOPIC nodes, so they intentionally carry no skill_id.
+     * Market demand still belongs to a measurable catalog skill. Resolve that
+     * boundary here instead of restoring the old topic -> skill coupling.
+     */
+    private DemandMatch resolveDisplayDemand(SkillNode node,
+                                             Map<UUID, SkillDemandResponse> displayDemand) {
+        if (node.getSkill() != null && node.getSkill().getSkillId() != null) {
+            UUID skillId = node.getSkill().getSkillId();
+            return new DemandMatch(skillId, displayDemand.get(skillId));
+        }
+
+        for (String candidate : marketSkillNames(node.getNodeName())) {
+            var skill = skillRepository.findOneBySkillNameIgnoreCase(candidate);
+            if (skill != null && displayDemand.containsKey(skill.getSkillId())) {
+                return new DemandMatch(skill.getSkillId(), displayDemand.get(skill.getSkillId()));
+            }
+        }
+        return DemandMatch.EMPTY;
+    }
+
+    private static List<String> marketSkillNames(String optionName) {
+        if (optionName == null || optionName.isBlank()) {
+            return List.of();
+        }
+        return switch (optionName.trim().toLowerCase(Locale.ROOT)) {
+            case "golang" -> List.of("Go", "Golang");
+            case "javascript (node.js)" -> List.of("Node.js", "JavaScript");
+            case "nodejs" -> List.of("Node.js", "NodeJS");
+            case ".net framework based" -> List.of("C#", ".NET");
+            default -> List.of(optionName.trim());
+        };
+    }
+
+    private record DemandMatch(UUID skillId, SkillDemandResponse demand) {
+        private static final DemandMatch EMPTY = new DemandMatch(null, null);
     }
 
     /**
@@ -266,9 +308,15 @@ public class RoadmapSelectionServiceImpl implements RoadmapSelectionService {
             return 0;
         }
 
-        Set<UUID> alreadyChosenGroups = new HashSet<>();
+        Map<UUID, StudentNodeSelection> autoSelectionsByGroup = new HashMap<>();
+        Set<UUID> manuallyChosenGroups = new HashSet<>();
         for (StudentNodeSelection selection : selectionRepository.findByStudent_UserId(student.getUserId())) {
-            alreadyChosenGroups.add(selection.getGroupNode().getNodeId());
+            UUID groupId = selection.getGroupNode().getNodeId();
+            if (Boolean.TRUE.equals(selection.getAutoSelected())) {
+                autoSelectionsByGroup.put(groupId, selection);
+            } else {
+                manuallyChosenGroups.add(groupId);
+            }
         }
 
         Set<String> skillNames = new HashSet<>();
@@ -302,7 +350,7 @@ public class RoadmapSelectionServiceImpl implements RoadmapSelectionService {
         Map<UUID, List<SkillNode>> alternativesByGroup = new HashMap<>();
         for (SkillNode node : careerNodes) {
             if (CHOOSE_ONE.equalsIgnoreCase(node.getSelection())
-                    && !alreadyChosenGroups.contains(node.getNodeId())) {
+                    && !manuallyChosenGroups.contains(node.getNodeId())) {
                 groupsById.put(node.getNodeId(), node);
             }
         }
@@ -347,14 +395,21 @@ public class RoadmapSelectionServiceImpl implements RoadmapSelectionService {
                 reason = "Chose " + chosen.getNodeName() + " because it is a skill you declared.";
             }
 
-            selectionRepository.save(StudentNodeSelection.builder()
-                    .student(Student.builder().userId(student.getUserId()).build())
-                    .groupNode(group)
-                    .chosenNode(chosen)
-                    .autoSelected(Boolean.TRUE)
-                    .autoReason(reason)
-                    .build());
-            created++;
+            StudentNodeSelection selection = autoSelectionsByGroup.get(group.getNodeId());
+            boolean isNew = selection == null;
+            if (isNew) {
+                selection = StudentNodeSelection.builder()
+                        .student(Student.builder().userId(student.getUserId()).build())
+                        .groupNode(group)
+                        .build();
+            }
+            selection.setChosenNode(chosen);
+            selection.setAutoSelected(Boolean.TRUE);
+            selection.setAutoReason(reason);
+            selectionRepository.save(selection);
+            if (isNew) {
+                created++;
+            }
             log.info("RoadmapSelectionServiceImpl: Auto-selected '{}' in group '{}' for student {} — {}",
                     chosen.getNodeName(), group.getNodeName(), student.getUserId(), reason);
         }

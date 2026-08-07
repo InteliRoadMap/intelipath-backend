@@ -57,4 +57,15 @@ public enum SeniorityLevel {
         if (b == null || b == UNKNOWN) return a;
         return a.ordinal() <= b.ordinal() ? a : b;
     }
+
+    /**
+     * The higher of two measured levels. UNKNOWN is no opinion, not a rung.
+     * Used when fresh objective evidence may raise an assessment result but must
+     * never erase what that completed assessment already demonstrated.
+     */
+    public static SeniorityLevel max(SeniorityLevel a, SeniorityLevel b) {
+        if (a == null || a == UNKNOWN) return b;
+        if (b == null || b == UNKNOWN) return a;
+        return a.ordinal() >= b.ordinal() ? a : b;
+    }
 }

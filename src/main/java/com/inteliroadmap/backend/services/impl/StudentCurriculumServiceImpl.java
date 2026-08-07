@@ -1,5 +1,9 @@
 package com.inteliroadmap.backend.services.impl;
 
+import com.inteliroadmap.backend.domain.dto.request.SubjectEntry;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.CloResponse;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.MaterialResponse;
+
 import com.inteliroadmap.backend.domain.dto.request.DeclareCurriculumTermRequest;
 import com.inteliroadmap.backend.domain.dto.request.SetStudentCurriculumRequest;
 import com.inteliroadmap.backend.domain.dto.request.UpdateFptSubjectsRequest;
@@ -121,9 +125,9 @@ public class StudentCurriculumServiceImpl implements StudentCurriculumService {
                 .map(FptSubjectSkill::getSkillName)
                 .toList();
 
-        List<FptSubjectDetailResponse.CloResponse> clos =
+        List<CloResponse> clos =
                 fptSubjectCloRepository.findBySubjectCodeOrderByOrderIndexAsc(code).stream()
-                        .map(c -> FptSubjectDetailResponse.CloResponse.builder()
+                        .map(c -> CloResponse.builder()
                                 .code(c.getCode())
                                 .outcome(c.getOutcome())
                                 .build())
@@ -131,7 +135,7 @@ public class StudentCurriculumServiceImpl implements StudentCurriculumService {
 
         // Split by kind rather than making the page do it: MATERIAL rows are references
         // with nothing to download, SESSION rows are where files live.
-        Map<FptResourceKind, List<FptSubjectDetailResponse.MaterialResponse>> byKind =
+        Map<FptResourceKind, List<MaterialResponse>> byKind =
                 fptSubjectResourceRepository
                         .findBySubjectCodeInOrderBySubjectCodeAscOrderIndexAsc(List.of(code)).stream()
                         .collect(Collectors.groupingBy(
@@ -152,8 +156,8 @@ public class StudentCurriculumServiceImpl implements StudentCurriculumService {
     }
 
     /** Never exposes sourceUrl or storagePath: downloads go through the signed-URL endpoint. */
-    private static FptSubjectDetailResponse.MaterialResponse toMaterial(FptSubjectResource r) {
-        return FptSubjectDetailResponse.MaterialResponse.builder()
+    private static MaterialResponse toMaterial(FptSubjectResource r) {
+        return MaterialResponse.builder()
                 .id(r.getId())
                 .title(r.getTitle())
                 .topic(r.getTopic())
@@ -201,7 +205,7 @@ public class StudentCurriculumServiceImpl implements StudentCurriculumService {
         FptCurriculum curriculum = resolveCurriculum(student);
         UUID curriculumId = curriculum != null ? curriculum.getId() : null;
 
-        for (UpdateFptSubjectsRequest.SubjectEntry entry : request.getSubjects()) {
+        for (SubjectEntry entry : request.getSubjects()) {
             String code = entry.getSubjectCode().trim();
             if (code.isEmpty() || !fptSubjectRepository.existsById(code)) {
                 continue;

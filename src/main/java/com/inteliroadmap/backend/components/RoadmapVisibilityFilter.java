@@ -133,11 +133,14 @@ public class RoadmapVisibilityFilter {
                 visible.add(nodeId);
                 continue;
             }
-            // An explicit expand overrides BOTH rules. The student asked to see
-            // inside this topic; answering with a filtered subset would make the
-            // "+13" badge a lie and leave them clicking a button that does nothing.
+            // Expand overrides depth, never the capability stage. Otherwise a
+            // Fresher can click "+N" once and receive the same advanced payload
+            // as a Senior, defeating personalization in both career and
+            // sub-roadmap views.
             if (hasExpandedAncestor(node, expanded)) {
-                visible.add(nodeId);
+                if (!isAboveAllowedStage(node, allowedStage)) {
+                    visible.add(nodeId);
+                }
                 continue;
             }
             if (depth >= maxDepth) {

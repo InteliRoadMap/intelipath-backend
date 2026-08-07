@@ -1,11 +1,14 @@
 package com.inteliroadmap.backend.controllers;
 
+import com.inteliroadmap.backend.domain.dto.response.portfolio.PortfolioProjectResponse;
+
 import com.inteliroadmap.backend.domain.dto.request.GithubImportBatchRequest;
 import com.inteliroadmap.backend.domain.dto.request.GithubImportRequest;
 import com.inteliroadmap.backend.domain.dto.response.portfolio.GithubImportAuditResponse;
 import com.inteliroadmap.backend.domain.dto.response.portfolio.GithubRepoRankResponse;
 import com.inteliroadmap.backend.domain.dto.response.portfolio.PortfolioResponse;
 import com.inteliroadmap.backend.domain.dto.response.portfolio.RepoEvidenceResponse;
+import com.inteliroadmap.backend.domain.dto.response.portfolio.RepoSourcePlanResponse;
 import com.inteliroadmap.backend.services.GithubPortfolioService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
@@ -38,7 +41,7 @@ public class GithubPortfolioController {
 
     @PostMapping("/github-import")
     @Operation(summary = "Import Project from GitHub", description = "Extracts repo info and README, uses AI to summarize, and returns project info without saving.")
-    public ResponseEntity<PortfolioResponse.PortfolioProjectResponse> importFromGithub(@RequestBody @Valid GithubImportRequest request) {
+    public ResponseEntity<PortfolioProjectResponse> importFromGithub(@RequestBody @Valid GithubImportRequest request) {
         log.info("GithubPortfolioController: Request received: Import Portfolio Project from GitHub: {}", request.getRepoUrl());
         return ResponseEntity.ok(githubPortfolioService.importFromGithub(request));
     }
@@ -54,9 +57,17 @@ public class GithubPortfolioController {
     @PostMapping("/github-import-batch")
     @Operation(summary = "Import several selected GitHub repositories",
             description = "Runs AI analysis over each selected repository and returns the resulting (unsaved) project entries for the student to add to their portfolio.")
-    public ResponseEntity<List<PortfolioResponse.PortfolioProjectResponse>> importBatch(@RequestBody @Valid GithubImportBatchRequest request) {
+    public ResponseEntity<List<PortfolioProjectResponse>> importBatch(@RequestBody @Valid GithubImportBatchRequest request) {
         log.info("GithubPortfolioController: Request received: Batch import {} GitHub repositories", request.getRepoUrls().size());
         return ResponseEntity.ok(githubPortfolioService.importBatch(request.getRepoUrls()));
+    }
+
+    @PostMapping("/github-analysis-plan")
+    @Operation(summary = "Preview the real source context selected for GitHub analysis",
+            description = "Returns the production source paths the importer will read. It does not call AI or save evidence.")
+    public ResponseEntity<List<RepoSourcePlanResponse>> planBatchAnalysis(
+            @RequestBody @Valid GithubImportBatchRequest request) {
+        return ResponseEntity.ok(githubPortfolioService.planBatchAnalysis(request.getRepoUrls()));
     }
 
     @GetMapping("/github-audit")

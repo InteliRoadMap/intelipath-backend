@@ -1,5 +1,6 @@
 package com.inteliroadmap.backend.services.impl;
 
+
 import static com.inteliroadmap.backend.mappers.ScraperMapper.str;
 import com.inteliroadmap.backend.domain.dto.response.scraper.CompanyResponse;
 import com.inteliroadmap.backend.domain.dto.response.scraper.RecruitmentPostResponse;
@@ -46,6 +47,11 @@ public class ScraperServiceImpl implements ScraperService {
 
     @Override
     public List<RecruitmentPostResponse> getRecruitmentPosts(String seniority) {
+        return getRecruitmentPosts(seniority, null);
+    }
+
+    @Override
+    public List<RecruitmentPostResponse> getRecruitmentPosts(String seniority, java.util.UUID careerId) {
         log.info("ScraperServiceImpl: Retrieving Recruitment Posts (level filter: {})",
                 seniority == null ? "none" : seniority);
         // Fetch all recruitment posts from the database. An empty result is a
@@ -63,9 +69,11 @@ public class ScraperServiceImpl implements ScraperService {
             // Retrieve associated company and recruitment details using their TopCV IDs
             Company company = companyRepository.findByTopCvCompanyId(post.getCompany().getTopCvCompanyId());
             Recruitment recruitment = recruitmentRepository.findByTopCvRecruitmentId(post.getRecruitment().getTopCvRecruitmentId());
+            if (careerId != null && !careerId.equals(recruitment.getCareerId())) continue;
 
             // Build company DTO
-            RecruitmentPostResponse.Company companyDto = RecruitmentPostResponse.Company.builder()
+            com.inteliroadmap.backend.domain.dto.response.scraper.Company companyDto =
+                    com.inteliroadmap.backend.domain.dto.response.scraper.Company.builder()
                     .name(str(company.getSignatures(), "name"))
                     .logo(str(company.getSignatures(), "logo"))
                     .companyLink(str(company.getSignatures(), "link"))
@@ -83,11 +91,13 @@ public class ScraperServiceImpl implements ScraperService {
             }
 
             // Build recruitment DTO
-            RecruitmentPostResponse.Recruitment recruitmentDto = RecruitmentPostResponse.Recruitment.builder()
+            com.inteliroadmap.backend.domain.dto.response.scraper.Recruitment recruitmentDto =
+                    com.inteliroadmap.backend.domain.dto.response.scraper.Recruitment.builder()
                     .title(str(recruitment.getRecruitmentInfos(), "title"))
                     .salary(str(recruitment.getRecruitmentInfos(), "salary"))
                     .location(str(recruitment.getRecruitmentInfos(), "location"))
                     .experience(str(recruitment.getRecruitmentInfos(), "experience"))
+                    .seniority(recruitment.getSeniority())
                     .applicationDeadline(recruitment.getApplicationDeadline())
                     .tags(flattenedTags)
                     .build();

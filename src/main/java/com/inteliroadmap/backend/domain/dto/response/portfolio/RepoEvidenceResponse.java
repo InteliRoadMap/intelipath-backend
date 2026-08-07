@@ -36,13 +36,4 @@ public class RepoEvidenceResponse {
 
     private List<EvidenceSkillResponse> skills;
 
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class EvidenceSkillResponse {
-        private String skill;
-        /** ACCEPTED | PENDING | REJECTED, as the evidence row stands right now. */
-        private String status;
-    }
 }

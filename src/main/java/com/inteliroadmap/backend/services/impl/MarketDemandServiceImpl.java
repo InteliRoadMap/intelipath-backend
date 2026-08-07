@@ -8,6 +8,7 @@ import com.inteliroadmap.backend.mappers.MarketDemandMapper;
 import com.inteliroadmap.backend.repositories.CareerRequiredSkillRepository;
 import com.inteliroadmap.backend.repositories.CareerRoleRepository;
 import com.inteliroadmap.backend.repositories.RecruitmentRepository;
+import com.inteliroadmap.backend.repositories.RecruitmentSkillRepository;
 import com.inteliroadmap.backend.repositories.SkillTrendRepository;
 import com.inteliroadmap.backend.services.MarketDemandService;
 import lombok.RequiredArgsConstructor;
@@ -36,6 +37,7 @@ public class MarketDemandServiceImpl implements MarketDemandService {
 
     private final SkillTrendRepository skillTrendRepository;
     private final RecruitmentRepository recruitmentRepository;
+    private final RecruitmentSkillRepository recruitmentSkillRepository;
     private final CareerRequiredSkillRepository careerRequiredSkillRepository;
     private final CareerRoleRepository careerRoleRepository;
     private final MarketDemandMapper marketDemandMapper;
@@ -49,7 +51,7 @@ public class MarketDemandServiceImpl implements MarketDemandService {
 
         LocalDate from = LocalDate.now().minusDays(WINDOW_DAYS);
 
-        long sampleSize = recruitmentRepository.countByPostedDateGreaterThanEqual(from);
+        long sampleSize = recruitmentRepository.countCareerPostingsSince(careerId, from);
         if (sampleSize <= 0) {
             log.debug("MarketDemandServiceImpl: no postings in the last {} days; "
                     + "returning no demand figures.", WINDOW_DAYS);
@@ -77,17 +79,13 @@ public class MarketDemandServiceImpl implements MarketDemandService {
 
         Map<UUID, Integer> careersNamingBySkillId = careersNamingBySkillId();
 
-        // Sum each skill's daily job counts inside the window. A skill trending
-        // across several days accumulates; one that spiked once stays below the
-        // mapper's reporting floor and is dropped.
+        // Numerator and denominator now describe the exact same population:
+        // distinct postings for this career inside this window.
         Map<UUID, Integer> jobCounts = new HashMap<>();
-        List<SkillTrend> trends = skillTrendRepository.findByWeekStampGreaterThanEqual(from);
-        for (SkillTrend t : trends) {
-            if (t.getSkill() == null || t.getSkill().getSkillId() == null) continue;
-            if (!importanceBySkillId.containsKey(t.getSkill().getSkillId())) continue;
-            jobCounts.merge(t.getSkill().getSkillId(),
-                    t.getJobsNeeded() == null ? 0 : t.getJobsNeeded(),
-                    Integer::sum);
+        for (Object[] row : recruitmentSkillRepository.demandForCareerSince(careerId, from)) {
+            UUID skillId = (UUID) row[0];
+            if (!importanceBySkillId.containsKey(skillId)) continue;
+            jobCounts.put(skillId, ((Number) row[1]).intValue());
         }
 
         Map<UUID, SkillDemandResponse> out = new HashMap<>();

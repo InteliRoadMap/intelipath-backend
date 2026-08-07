@@ -18,11 +18,4 @@ public class FptNodeCoverageResponse {
     private boolean selfStudy;
     private List<FptSubjectRefResponse> subjects;
 
-    @Data
-    @Builder
-    public static class FptSubjectRefResponse {
-        private String code;
-        private String name;
-        private Integer semester;
-    }
 }

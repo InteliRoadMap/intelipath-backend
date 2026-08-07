@@ -22,28 +22,4 @@ public class RecruitmentPostResponse {
     private Company company;
     private Recruitment recruitment;
 
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class Company {
-        private String name;
-        private String logo;
-        @JsonProperty("company_link")
-        private String companyLink;
-    }
-
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class Recruitment {
-        private String title;
-        private String salary;
-        private String location;
-        private String experience;
-        @JsonProperty("application_deadline")
-        private LocalDate applicationDeadline;
-        private List<String> tags;
-    }
 }

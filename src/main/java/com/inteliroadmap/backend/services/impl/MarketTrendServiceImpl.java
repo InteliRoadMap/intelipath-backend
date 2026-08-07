@@ -1,7 +1,13 @@
 package com.inteliroadmap.backend.services.impl;
 
+import com.inteliroadmap.backend.domain.dto.response.market.CompanyTrendResponse;
+import com.inteliroadmap.backend.domain.dto.response.market.FreshnessResponse;
+import com.inteliroadmap.backend.domain.dto.response.market.PostingResponse;
+import com.inteliroadmap.backend.domain.dto.response.market.SalaryTrendResponse;
+import com.inteliroadmap.backend.domain.dto.response.market.SkillTrendResponse;
+import com.inteliroadmap.backend.domain.dto.response.market.TrendDataPoint;
+
 import com.inteliroadmap.backend.mappers.MarketTrendMapper;
-import com.inteliroadmap.backend.domain.dto.response.market.MarketTrendResponse;
 import com.inteliroadmap.backend.domain.entity.Company;
 import com.inteliroadmap.backend.components.SeniorityClassifier;
 import com.inteliroadmap.backend.domain.entity.Recruitment;
@@ -51,11 +57,11 @@ public class MarketTrendServiceImpl implements MarketTrendService {
      * Retrieves a list of the top hiring companies limited by the specified amount.
      * 
      * @param limit The maximum number of top hiring companies to return
-     * @return A list of {@link MarketTrendResponse.CompanyTrendResponse} representing the top companies
+     * @return A list of {@link CompanyTrendResponse} representing the top companies
      */
     @Transactional(readOnly = true)
     @Override
-    public List<MarketTrendResponse.CompanyTrendResponse> getTopHiringCompanies(int limit) {
+    public List<CompanyTrendResponse> getTopHiringCompanies(int limit) {
         // Query the database for the top companies WITH their post count.
         List<Object[]> rows = companyRepository.findTopHiringCompaniesWithCount(PageRequest.of(0, limit));
 
@@ -68,11 +74,11 @@ public class MarketTrendServiceImpl implements MarketTrendService {
     /**
      * Aggregates and retrieves the top 10 skill trends based on job demand.
      * 
-     * @return A list of {@link MarketTrendResponse.SkillTrendResponse} detailing skill demands
+     * @return A list of {@link SkillTrendResponse} detailing skill demands
      */
     @Transactional(readOnly = true)
     @Override
-    public List<MarketTrendResponse.SkillTrendResponse> getSkillTrends() {
+    public List<SkillTrendResponse> getSkillTrends() {
         // Fetch all skill trends from the database
         List<SkillTrend> allTrends = skillTrendRepository.findAll();
 
@@ -90,8 +96,8 @@ public class MarketTrendServiceImpl implements MarketTrendService {
                 .map(entry -> marketTrendMapper.toSkillTrendResponse(entry.getKey(), entry.getValue()))
                 // Sort the responses by total jobs needed in descending order (highest demand first)
                 .sorted((a, b) -> Integer.compare(
-                        b.getDataPoints().stream().mapToInt(MarketTrendResponse.TrendDataPoint::getJobsNeeded).sum(),
-                        a.getDataPoints().stream().mapToInt(MarketTrendResponse.TrendDataPoint::getJobsNeeded).sum()
+                        b.getDataPoints().stream().mapToInt(TrendDataPoint::getJobsNeeded).sum(),
+                        a.getDataPoints().stream().mapToInt(TrendDataPoint::getJobsNeeded).sum()
                 ))
                 .limit(10) // Only top 10 skills
                 .collect(Collectors.toList());
@@ -101,24 +107,24 @@ public class MarketTrendServiceImpl implements MarketTrendService {
      * Calculates and returns the salary distribution across predefined salary ranges
      * based on available recruitment data.
      * 
-     * @return A list of {@link MarketTrendResponse.SalaryTrendResponse} representing job counts per salary bracket
+     * @return A list of {@link SalaryTrendResponse} representing job counts per salary bracket
      */
     @Transactional(readOnly = true)
     @Override
-    public List<MarketTrendResponse.SalaryTrendResponse> getSalaryDistribution() {
+    public List<SalaryTrendResponse> getSalaryDistribution() {
         // Fetch all raw salary strings from the recruitment records
         return bucketSalaries(recruitmentRepository.findAllSalaries());
     }
 
     @Transactional(readOnly = true)
     @Override
-    public List<MarketTrendResponse.SalaryTrendResponse> getSalaryDistribution(int windowDays) {
+    public List<SalaryTrendResponse> getSalaryDistribution(int windowDays) {
         // Same buckets, but only over postings recent enough to be worth planning
         // around, and counting a re-advertised job once.
         return bucketSalaries(recruitmentRepository.findSalariesSince(since(windowDays)));
     }
 
-    private List<MarketTrendResponse.SalaryTrendResponse> bucketSalaries(List<String> rawSalaries) {
+    private List<SalaryTrendResponse> bucketSalaries(List<String> rawSalaries) {
         // Initialize counters for the predefined salary brackets
         int count0To10 = 0;
         int count10To20 = 0;
@@ -143,11 +149,11 @@ public class MarketTrendServiceImpl implements MarketTrendService {
 
         // Build and return the final distribution list representing each salary category
         return List.of(
-                MarketTrendResponse.SalaryTrendResponse.builder().category("Dưới 10 triệu").jobCount(count0To10).build(),
-                MarketTrendResponse.SalaryTrendResponse.builder().category("10 - 20 triệu").jobCount(count10To20).build(),
-                MarketTrendResponse.SalaryTrendResponse.builder().category("20 - 30 triệu").jobCount(count20To30).build(),
-                MarketTrendResponse.SalaryTrendResponse.builder().category("30 - 50 triệu").jobCount(count30To50).build(),
-                MarketTrendResponse.SalaryTrendResponse.builder().category("Trên 50 triệu").jobCount(countOver50).build()
+                SalaryTrendResponse.builder().category("Dưới 10 triệu").jobCount(count0To10).build(),
+                SalaryTrendResponse.builder().category("10 - 20 triệu").jobCount(count10To20).build(),
+                SalaryTrendResponse.builder().category("20 - 30 triệu").jobCount(count20To30).build(),
+                SalaryTrendResponse.builder().category("30 - 50 triệu").jobCount(count30To50).build(),
+                SalaryTrendResponse.builder().category("Trên 50 triệu").jobCount(countOver50).build()
         );
     }
 
@@ -178,10 +184,10 @@ public class MarketTrendServiceImpl implements MarketTrendService {
 
     @Transactional(readOnly = true)
     @Override
-    public List<MarketTrendResponse.CompanyTrendResponse> getTopHiringCompanies(int limit, int windowDays) {
+    public List<CompanyTrendResponse> getTopHiringCompanies(int limit, int windowDays) {
         List<Object[]> rows = recruitmentRepository.findTopHiringCompanyIdsSince(since(windowDays), limit);
 
-        List<MarketTrendResponse.CompanyTrendResponse> out = new ArrayList<>();
+        List<CompanyTrendResponse> out = new ArrayList<>();
         for (Object[] row : rows) {
             String companyId = (String) row[0];
             long jobCount = ((Number) row[1]).longValue();
@@ -194,7 +200,7 @@ public class MarketTrendServiceImpl implements MarketTrendService {
 
     @Transactional(readOnly = true)
     @Override
-    public List<MarketTrendResponse.SkillTrendResponse> getSkillTrends(int windowDays) {
+    public List<SkillTrendResponse> getSkillTrends(int windowDays) {
         LocalDate from = since(windowDays);
 
         // "Trending" has to mean recent, not cumulative. The all-time form ranks a
@@ -214,8 +220,8 @@ public class MarketTrendServiceImpl implements MarketTrendService {
         return trendsBySkill.entrySet().stream()
                 .map(entry -> marketTrendMapper.toSkillTrendResponse(entry.getKey(), entry.getValue()))
                 .sorted((a, b) -> Integer.compare(
-                        b.getDataPoints().stream().mapToInt(MarketTrendResponse.TrendDataPoint::getJobsNeeded).sum(),
-                        a.getDataPoints().stream().mapToInt(MarketTrendResponse.TrendDataPoint::getJobsNeeded).sum()
+                        b.getDataPoints().stream().mapToInt(TrendDataPoint::getJobsNeeded).sum(),
+                        a.getDataPoints().stream().mapToInt(TrendDataPoint::getJobsNeeded).sum()
                 ))
                 .limit(10)
                 .collect(Collectors.toList());
@@ -223,15 +229,71 @@ public class MarketTrendServiceImpl implements MarketTrendService {
 
     @Transactional(readOnly = true)
     @Override
-    public MarketTrendResponse.FreshnessResponse getFreshness(int windowDays) {
+    public FreshnessResponse getFreshness(int windowDays) {
         int days = windowDays > 0 ? windowDays : MarketTrendService.DEFAULT_WINDOW_DAYS;
         LocalDate from = since(days);
-        return MarketTrendResponse.FreshnessResponse.builder()
+        return FreshnessResponse.builder()
                 .windowDays(days)
                 .jobsInWindow((int) recruitmentRepository.countDistinctJobsSince(from))
                 .newJobs((int) recruitmentRepository.countGenuinelyNewSince(from))
                 .latestPostedDate(recruitmentRepository.findLatestPostedDate())
                 .build();
+    }
+
+    private String level(String seniority) {
+        return seniority == null ? "" : seniority.trim().toUpperCase(java.util.Locale.ROOT);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CompanyTrendResponse> getTopHiringCompanies(int limit, int windowDays, UUID careerId, String seniority) {
+        if (careerId == null) return getTopHiringCompanies(limit, windowDays);
+        List<CompanyTrendResponse> out = new ArrayList<>();
+        for (Object[] row : recruitmentRepository.findTopHiringCompanyIdsScoped(
+                since(windowDays), careerId, level(seniority), limit)) {
+            companyRepository.findById((String) row[0]).ifPresent(company -> out.add(
+                    marketTrendMapper.toCompanyTrendResponse(company, ((Number) row[1]).longValue())));
+        }
+        return out;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<SalaryTrendResponse> getSalaryDistribution(int windowDays, UUID careerId, String seniority) {
+        if (careerId == null) return getSalaryDistribution(windowDays);
+        return bucketSalaries(recruitmentRepository.findSalariesScoped(
+                since(windowDays), careerId, level(seniority)));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<SkillTrendResponse> getSkillTrends(int windowDays, UUID careerId, String seniority) {
+        if (careerId == null) return getSkillTrends(windowDays);
+        Map<String, List<TrendDataPoint>> points = new java.util.LinkedHashMap<>();
+        for (Object[] row : recruitmentRepository.findSkillTrendsScoped(
+                since(windowDays), careerId, level(seniority))) {
+            LocalDate week = row[1] instanceof java.sql.Date d ? d.toLocalDate() : LocalDate.parse(String.valueOf(row[1]));
+            points.computeIfAbsent(String.valueOf(row[0]), ignored -> new ArrayList<>())
+                    .add(TrendDataPoint.builder().date(week).jobsNeeded(((Number) row[2]).intValue()).build());
+        }
+        return points.entrySet().stream()
+                .map(e -> SkillTrendResponse.builder().skillName(e.getKey()).dataPoints(e.getValue()).build())
+                .sorted((a, b) -> Integer.compare(
+                        b.getDataPoints().stream().mapToInt(TrendDataPoint::getJobsNeeded).sum(),
+                        a.getDataPoints().stream().mapToInt(TrendDataPoint::getJobsNeeded).sum()))
+                .limit(10).toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public FreshnessResponse getFreshness(int windowDays, UUID careerId, String seniority) {
+        if (careerId == null) return getFreshness(windowDays);
+        int days = windowDays > 0 ? windowDays : DEFAULT_WINDOW_DAYS;
+        String scopedLevel = level(seniority);
+        return FreshnessResponse.builder().windowDays(days)
+                .jobsInWindow((int) recruitmentRepository.countDistinctJobsScoped(since(days), careerId, scopedLevel))
+                .newJobs((int) recruitmentRepository.countGenuinelyNewScoped(since(days), careerId, scopedLevel))
+                .latestPostedDate(recruitmentRepository.findLatestPostedDateScoped(careerId, scopedLevel)).build();
     }
 
     /** Rough VND per USD, only ever used to bucket a posting, never to quote a figure. */
@@ -332,7 +394,7 @@ public class MarketTrendServiceImpl implements MarketTrendService {
                 .map(Skill::getSkillName)
                 .orElse(null);
 
-        List<SkillPostingsResponse.PostingResponse> postings =
+        List<PostingResponse> postings =
                 recruitmentRepository.findPostingsForSkill(skillId, capped).stream()
                         .map(this::toPosting)
                         .toList();
@@ -348,8 +410,8 @@ public class MarketTrendServiceImpl implements MarketTrendService {
     }
 
     /** Positional read of the native projection, in the order the query selects. */
-    private SkillPostingsResponse.PostingResponse toPosting(Object[] row) {
-        return SkillPostingsResponse.PostingResponse.builder()
+    private PostingResponse toPosting(Object[] row) {
+        return PostingResponse.builder()
                 .id(text(row, 0))
                 .title(text(row, 1))
                 .location(text(row, 2))

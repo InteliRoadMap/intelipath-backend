@@ -50,13 +50,4 @@ public class GithubRepoRankResponse {
      */
     private java.util.List<ScoreLine> scoreBreakdown;
 
-    /**
-     * One signal's contribution.
-     *
-     * @param label  what was measured, e.g. {@code Recent activity}
-     * @param points what it added, {@code 0} included
-     * @param max    the most this signal could have added, so a student can see the gap
-     * @param detail the underlying fact, e.g. {@code last push 5 day(s) ago}
-     */
-    public record ScoreLine(String label, int points, int max, String detail) {}
 }

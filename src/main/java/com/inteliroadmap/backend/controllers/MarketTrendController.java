@@ -1,6 +1,10 @@
 package com.inteliroadmap.backend.controllers;
 
-import com.inteliroadmap.backend.domain.dto.response.market.MarketTrendResponse;
+import com.inteliroadmap.backend.domain.dto.response.market.CompanyTrendResponse;
+import com.inteliroadmap.backend.domain.dto.response.market.FreshnessResponse;
+import com.inteliroadmap.backend.domain.dto.response.market.SalaryTrendResponse;
+import com.inteliroadmap.backend.domain.dto.response.market.SkillTrendResponse;
+
 import com.inteliroadmap.backend.domain.dto.response.market.SkillPostingsResponse;
 import com.inteliroadmap.backend.services.MarketTrendService;
 import io.swagger.v3.oas.annotations.Operation;
@@ -32,11 +36,15 @@ public class MarketTrendController {
 
     @GetMapping("/companies/top-hiring")
     @Operation(summary = "Get top hiring companies", description = "Returns companies with the most recruitment posts.")
-    public ResponseEntity<List<MarketTrendResponse.CompanyTrendResponse>> getTopHiringCompanies(
+    public ResponseEntity<List<CompanyTrendResponse>> getTopHiringCompanies(
             @RequestParam(defaultValue = "10") @Min(value = 1, message = "Limit must be at least 1") @Max(value = 100, message = "Limit must not exceed 100") int limit,
-            @RequestParam(required = false) @Min(value = 1, message = "days must be at least 1") @Max(value = 365, message = "days must not exceed 365") Integer days) {
+            @RequestParam(required = false) @Min(value = 1, message = "days must be at least 1") @Max(value = 365, message = "days must not exceed 365") Integer days,
+            @RequestParam(required = false) UUID careerId,
+            @RequestParam(required = false) String seniority) {
         // days omitted keeps the original all-time behaviour, so an existing client
         // that never learns about the parameter sees exactly what it saw before.
+        if (careerId != null) return ResponseEntity.ok(marketTrendService.getTopHiringCompanies(
+                limit, days == null ? MarketTrendService.DEFAULT_WINDOW_DAYS : days, careerId, seniority));
         return ResponseEntity.ok(days == null
                 ? marketTrendService.getTopHiringCompanies(limit)
                 : marketTrendService.getTopHiringCompanies(limit, days));
@@ -62,8 +70,11 @@ public class MarketTrendController {
 
     @GetMapping("/skills/trending")
     @Operation(summary = "Get skill trends over time", description = "Returns historical jobs needed data for top skills.")
-    public ResponseEntity<List<MarketTrendResponse.SkillTrendResponse>> getSkillTrends(
-            @RequestParam(required = false) @Min(value = 1, message = "days must be at least 1") @Max(value = 365, message = "days must not exceed 365") Integer days) {
+    public ResponseEntity<List<SkillTrendResponse>> getSkillTrends(
+            @RequestParam(required = false) @Min(value = 1, message = "days must be at least 1") @Max(value = 365, message = "days must not exceed 365") Integer days,
+            @RequestParam(required = false) UUID careerId, @RequestParam(required = false) String seniority) {
+        if (careerId != null) return ResponseEntity.ok(marketTrendService.getSkillTrends(
+                days == null ? MarketTrendService.DEFAULT_WINDOW_DAYS : days, careerId, seniority));
         return ResponseEntity.ok(days == null
                 ? marketTrendService.getSkillTrends()
                 : marketTrendService.getSkillTrends(days));
@@ -71,8 +82,11 @@ public class MarketTrendController {
 
     @GetMapping("/salary-overview")
     @Operation(summary = "Get salary distribution", description = "Returns job counts grouped by salary ranges based on actual recruitment data.")
-    public ResponseEntity<List<MarketTrendResponse.SalaryTrendResponse>> getSalaryDistribution(
-            @RequestParam(required = false) @Min(value = 1, message = "days must be at least 1") @Max(value = 365, message = "days must not exceed 365") Integer days) {
+    public ResponseEntity<List<SalaryTrendResponse>> getSalaryDistribution(
+            @RequestParam(required = false) @Min(value = 1, message = "days must be at least 1") @Max(value = 365, message = "days must not exceed 365") Integer days,
+            @RequestParam(required = false) UUID careerId, @RequestParam(required = false) String seniority) {
+        if (careerId != null) return ResponseEntity.ok(marketTrendService.getSalaryDistribution(
+                days == null ? MarketTrendService.DEFAULT_WINDOW_DAYS : days, careerId, seniority));
         return ResponseEntity.ok(days == null
                 ? marketTrendService.getSalaryDistribution()
                 : marketTrendService.getSalaryDistribution(days));
@@ -83,8 +97,10 @@ public class MarketTrendController {
             description = "Distinct jobs in the window, how many had never been advertised before, "
                     + "and the most recent posting date on file. Lets the UI state the period "
                     + "instead of implying the figures are from today.")
-    public ResponseEntity<MarketTrendResponse.FreshnessResponse> getFreshness(
-            @RequestParam(defaultValue = "30") @Min(value = 1, message = "days must be at least 1") @Max(value = 365, message = "days must not exceed 365") int days) {
+    public ResponseEntity<FreshnessResponse> getFreshness(
+            @RequestParam(defaultValue = "30") @Min(value = 1, message = "days must be at least 1") @Max(value = 365, message = "days must not exceed 365") int days,
+            @RequestParam(required = false) UUID careerId, @RequestParam(required = false) String seniority) {
+        if (careerId != null) return ResponseEntity.ok(marketTrendService.getFreshness(days, careerId, seniority));
         return ResponseEntity.ok(marketTrendService.getFreshness(days));
     }
 

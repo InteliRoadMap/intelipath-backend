@@ -48,4 +48,15 @@ public interface RecruitmentSkillRepository extends JpaRepository<RecruitmentSki
             ORDER BY r.career_id, postings DESC
             """, nativeQuery = true)
     List<Object[]> demandByCareer();
+
+    /** [skillId, distinct posting count] within one career and one time window. */
+    @Query(value = """
+            SELECT rs.skill_id, count(DISTINCT rs.recruitment_id) AS postings
+            FROM recruitment_skills rs
+            JOIN recruitments r ON r.recruitment_id = rs.recruitment_id
+            WHERE r.career_id = :careerId AND r.posted_date >= :from
+            GROUP BY rs.skill_id
+            """, nativeQuery = true)
+    List<Object[]> demandForCareerSince(@Param("careerId") UUID careerId,
+                                        @Param("from") LocalDate from);
 }

@@ -9,6 +9,7 @@ import com.inteliroadmap.backend.domain.dto.response.plan.LearningPlanResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.StudentRoadmapResponse;
 import com.inteliroadmap.backend.services.RoadmapSelectionService;
 import com.inteliroadmap.backend.services.RoadmapService;
+import com.inteliroadmap.backend.services.RoadmapPersonalizationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -49,6 +50,7 @@ public class RoadmapController {
 
     private final RoadmapService roadmapService;
     private final RoadmapSelectionService roadmapSelectionService;
+    private final RoadmapPersonalizationService roadmapPersonalizationService;
 
     @GetMapping("/student")
     @Operation(summary = "Get student's roadmap", description = "Fetch the entire roadmap (Flat Array) of the logged-in student, combined with progress status to render the Map.")
@@ -60,6 +62,9 @@ public class RoadmapController {
     })
     public ResponseEntity<StudentRoadmapResponse> getStudentRoadmap(
             @RequestParam(name = "expand", required = false) List<UUID> expand) {
+        // Repairs parent-topic state left by older evidence imports before serving
+        // the graph. The reconciliation is idempotent and runs in its own transaction.
+        roadmapPersonalizationService.reconcileCompletedTopicsForCurrentStudent();
         // ?expand=<nodeId>&expand=<nodeId> opens those topics all the way down.
         // Absent means the default slice, so every existing caller is unaffected.
         return ResponseEntity.ok(roadmapService.getStudentRoadmap(
@@ -81,6 +86,7 @@ public class RoadmapController {
     public ResponseEntity<StudentRoadmapResponse> getStudentSubRoadmap(
             @PathVariable UUID nodeId,
             @RequestParam(name = "expand", required = false) List<UUID> expand) {
+        roadmapPersonalizationService.reconcileCompletedTopicsForCurrentStudent();
         return ResponseEntity.ok(roadmapService.getStudentSubRoadmap(
                 nodeId, expand == null ? Set.of() : new HashSet<>(expand)));
     }

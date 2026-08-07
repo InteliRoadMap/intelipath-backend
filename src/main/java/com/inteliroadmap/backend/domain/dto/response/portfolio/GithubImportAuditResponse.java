@@ -70,24 +70,4 @@ public class GithubImportAuditResponse {
     /** The model's matches, each carrying what the profile has since done with it. */
     private List<MatchedSkillResponse> skills;
 
-    @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    public static class SourceReadResponse {
-        private String path;
-        /** Characters that reached the prompt, after truncation. Zero is a real answer. */
-        private int chars;
-        private boolean found;
-    }
-
-    @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    public static class MatchedSkillResponse {
-        private String skill;
-        /** What the model claimed, 0..1, before the evidence layer clamped it. */
-        private double confidence;
-        /**
-         * Live evidence status: ACCEPTED, REJECTED, PENDING — or NOT_RECORDED when the
-         * model named a skill that is not in the catalog, which the evidence layer drops
-         * rather than minting a new skill from a model's guess.
-         */
-        private String status;
-    }
 }

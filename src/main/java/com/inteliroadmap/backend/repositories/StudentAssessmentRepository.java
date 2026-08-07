@@ -18,4 +18,7 @@ public interface StudentAssessmentRepository extends JpaRepository<StudentAssess
     Optional<StudentAssessment> findFirstByUserIdAndStatusOrderByCreatedAtDesc(UUID userId, String status);
 
     List<StudentAssessment> findByUserIdOrderByCreatedAtDesc(UUID userId);
+
+    List<StudentAssessment> findByUserIdAndCareerIdAndStatusOrderByCreatedAtDesc(
+            UUID userId, UUID careerId, String status);
 }

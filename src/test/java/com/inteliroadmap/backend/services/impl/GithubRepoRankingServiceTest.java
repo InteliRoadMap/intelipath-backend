@@ -2,6 +2,7 @@ package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.clients.GithubApiClient.GithubRepoSummary;
 import com.inteliroadmap.backend.domain.dto.response.portfolio.GithubRepoRankResponse;
+import com.inteliroadmap.backend.domain.dto.response.portfolio.ScoreLine;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
@@ -29,7 +30,7 @@ class GithubRepoRankingServiceTest {
                 "Java", 4, 2, false, OffsetDateTime.now().minusDays(3)));
 
         int summed = ranked.getScoreBreakdown().stream()
-                .mapToInt(GithubRepoRankResponse.ScoreLine::points)
+                .mapToInt(ScoreLine::points)
                 .sum();
         assertThat(summed).isEqualTo(ranked.getQualityScore());
     }
@@ -40,7 +41,7 @@ class GithubRepoRankingServiceTest {
         GithubRepoRankResponse ranked = rankOne(repo("scratch", null,
                 "Haskell", 0, 0, false, OffsetDateTime.now().minusDays(2)));
 
-        assertThat(ranked.getScoreBreakdown()).extracting(GithubRepoRankResponse.ScoreLine::label)
+        assertThat(ranked.getScoreBreakdown()).extracting(ScoreLine::label)
                 .contains("Description", "Career language");
         assertThat(lineFor(ranked, "Description").points()).isZero();
         assertThat(lineFor(ranked, "Description").detail()).contains("no description");
@@ -79,7 +80,7 @@ class GithubRepoRankingServiceTest {
                 .allSatisfy(line -> assertThat(line.points()).isBetween(0, line.max()));
     }
 
-    private GithubRepoRankResponse.ScoreLine lineFor(GithubRepoRankResponse ranked, String label) {
+    private ScoreLine lineFor(GithubRepoRankResponse ranked, String label) {
         return ranked.getScoreBreakdown().stream()
                 .filter(line -> line.label().equals(label))
                 .findFirst()

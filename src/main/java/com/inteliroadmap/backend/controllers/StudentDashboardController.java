@@ -1,5 +1,7 @@
 package com.inteliroadmap.backend.controllers;
 
+import com.inteliroadmap.backend.domain.dto.response.counselor.FeedbackResponse;
+
 import com.inteliroadmap.backend.domain.dto.response.student.AiHistoryItemResponse;
 import com.inteliroadmap.backend.domain.dto.response.student.DashboardRoadmapProgressResponse;
 import com.inteliroadmap.backend.domain.dto.response.student.MarketDemandResponse;
@@ -168,7 +170,7 @@ public class StudentDashboardController {
             @ApiResponse(responseCode = "403", description = "The feedback was not addressed to this student"),
             @ApiResponse(responseCode = "404", description = "Feedback not found")
     })
-    public ResponseEntity<CounselorFeedbackResponse.FeedbackResponse> replyToFeedback(
+    public ResponseEntity<FeedbackResponse> replyToFeedback(
             @PathVariable java.util.UUID feedbackId,
             @RequestBody @Valid ReplyFeedbackRequest request) {
         log.info("StudentDashboardController: Reply to feedback {}", feedbackId);

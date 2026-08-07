@@ -456,6 +456,38 @@ public class GithubApiClient {
     }
 
     /**
+     * Lists source paths without downloading their contents. The caller selects a
+     * very small representative sample, keeping repository analysis evidence-based
+     * without sending the whole codebase to the model.
+     */
+    public List<String> listRepositoryFiles(String owner, String repo, String branch, String accessToken) {
+        String url = "https://api.github.com/repos/" + owner + "/" + repo
+                + "/git/trees/" + branch + "?recursive=1";
+        try {
+            ResponseEntity<String> response = restTemplate.exchange(
+                    url, HttpMethod.GET, new HttpEntity<>(authHeaders(accessToken)), String.class);
+            if (response.getBody() == null) {
+                return List.of();
+            }
+            JsonNode tree = objectMapper.readTree(response.getBody()).path("tree");
+            if (!tree.isArray()) {
+                return List.of();
+            }
+            List<String> paths = new ArrayList<>();
+            for (JsonNode entry : tree) {
+                if ("blob".equals(entry.path("type").asText()) && entry.hasNonNull("path")) {
+                    paths.add(entry.path("path").asText());
+                }
+            }
+            return paths;
+        } catch (Exception e) {
+            log.warn("GithubApiClient: could not list repository tree for {}/{}: {}",
+                    owner, repo, e.getMessage());
+            return List.of();
+        }
+    }
+
+    /**
      * The student's own commit messages, newest first.
      *
      * <p>What a repository <em>is</em> and what one person <em>did in it</em> are different

@@ -1,7 +1,23 @@
 package com.inteliroadmap.backend.mappers;
 
+import com.inteliroadmap.backend.domain.dto.request.PortfolioProjectRequest;
+import com.inteliroadmap.backend.domain.dto.request.StudentEducationRequest;
+import com.inteliroadmap.backend.domain.dto.response.portfolio.PortfolioConfigResponse;
+import com.inteliroadmap.backend.domain.dto.response.portfolio.PortfolioProjectResponse;
+import com.inteliroadmap.backend.domain.dto.response.portfolio.StudentEducationResponse;
+import com.inteliroadmap.backend.domain.dto.response.portfolio.StudentSkillResponse;
+import com.inteliroadmap.backend.domain.dto.response.portfolio.UserInfoResponse;
+
 import com.inteliroadmap.backend.domain.dto.request.PortfolioUpsertRequest;
 import com.inteliroadmap.backend.domain.dto.response.portfolio.PortfolioResponse;
+import com.inteliroadmap.backend.domain.dto.response.portfolio.CoreSkillSummaryResponse;
+import com.inteliroadmap.backend.domain.dto.response.portfolio.LearningJourneyResponse;
+import com.inteliroadmap.backend.domain.dto.response.portfolio.RoadmapStageResponse;
+import com.inteliroadmap.backend.domain.dto.response.portfolio.PortfolioStudentLevelResponse;
+import com.inteliroadmap.backend.domain.dto.response.student.StudentLevelResponse;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.CoreSkillResponse;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapNodeResponse;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.StudentRoadmapResponse;
 import com.inteliroadmap.backend.domain.entity.PortfolioConfig;
 import com.inteliroadmap.backend.domain.entity.PortfolioProject;
 import com.inteliroadmap.backend.domain.entity.Skill;
@@ -19,8 +35,10 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.LinkedHashMap;
 import java.util.stream.Collectors;
 import java.util.Optional;
+import java.util.UUID;
 
 @Component
 @RequiredArgsConstructor
@@ -35,11 +53,12 @@ public class PortfolioMapper {
     public PortfolioResponse toPortfolioResponse(
             User user, Student student, PortfolioConfig config,
             List<StudentSkill> skills, List<PortfolioProject> projects,
-            List<StudentEducation> education, List<StudentSkillEvidence> evidence) {
+            List<StudentEducation> education, List<StudentSkillEvidence> evidence,
+            StudentRoadmapResponse roadmap, StudentLevelResponse studentLevel) {
 
-        Map<String, EvidenceType> sourceBySkillName = strongestSourceBySkillName(evidence);
+        Map<UUID, EvidenceType> sourceByStudentSkillId = strongestSourceByStudentSkillId(evidence);
 
-        PortfolioResponse.UserInfoResponse userInfo = PortfolioResponse.UserInfoResponse.builder()
+        UserInfoResponse userInfo = UserInfoResponse.builder()
                 .userId(user.getUserId())
                 .fullName(user.getFullName())
                 .bio(user.getBio())
@@ -49,9 +68,9 @@ public class PortfolioMapper {
                 .avatarUrl(user.getAvatarUrl())
                 .build();
 
-        PortfolioResponse.PortfolioConfigResponse configResponse = null;
+        PortfolioConfigResponse configResponse = null;
         if (config != null) {
-            configResponse = PortfolioResponse.PortfolioConfigResponse.builder()
+            configResponse = PortfolioConfigResponse.builder()
                     .theme(config.getTheme())
                     .themeColors(config.getThemeColors())
                     .fonts(config.getFonts())
@@ -60,7 +79,7 @@ public class PortfolioMapper {
                     .build();
         }
 
-        List<PortfolioResponse.StudentSkillResponse> skillResponses = skills.stream()
+        List<StudentSkillResponse> skillResponses = skills.stream()
                 .map(s -> {
                     String skillName = "Unknown Skill";
                     if (s.getSkill().getSkillId() != null) {
@@ -69,19 +88,22 @@ public class PortfolioMapper {
                             skillName = opt.get().getSkillName();
                         }
                     }
-                    EvidenceType source = sourceBySkillName.get(skillName.toLowerCase());
-                    return PortfolioResponse.StudentSkillResponse.builder()
+                    EvidenceType source = sourceByStudentSkillId.get(s.getStudentSkillId());
+                    return StudentSkillResponse.builder()
                             .skillName(skillName)
                             .customDescription(s.getCustomDescription())
                             .techStack(s.getTechStack())
-                            .verified(source != null && source != EvidenceType.MANUAL)
+                            // StudentSkill.verifiedBy is the canonical verification state used
+                            // by readiness, level and the roadmap. Evidence supplies the label,
+                            // but must not independently redefine whether the skill is verified.
+                            .verified(s.getVerifiedBy() != null && !s.getVerifiedBy().isBlank())
                             .evidenceSource(source)
                             .build();
                 })
                 .collect(Collectors.toList());
 
-        List<PortfolioResponse.PortfolioProjectResponse> projectResponses = projects.stream()
-                .map(p -> PortfolioResponse.PortfolioProjectResponse.builder()
+        List<PortfolioProjectResponse> projectResponses = projects.stream()
+                .map(p -> PortfolioProjectResponse.builder()
                         .projectId(p.getProjectId())
                         .projectName(p.getProjectName())
                         .repoUrl(p.getRepoUrl())
@@ -93,8 +115,8 @@ public class PortfolioMapper {
                         .build())
                 .collect(Collectors.toList());
 
-        List<PortfolioResponse.StudentEducationResponse> educationResponses = education.stream()
-                .map(e -> PortfolioResponse.StudentEducationResponse.builder()
+        List<StudentEducationResponse> educationResponses = education.stream()
+                .map(e -> StudentEducationResponse.builder()
                         .educationId(e.getEducationId())
                         .university(e.getUniversity())
                         .degree(e.getDegree())
@@ -109,7 +131,56 @@ public class PortfolioMapper {
                 .skills(skillResponses)
                 .projects(projectResponses)
                 .education(educationResponses)
+                .learningJourney(toLearningJourney(roadmap))
+                .studentLevel(toPortfolioStudentLevel(studentLevel))
                 .build();
+    }
+
+    private PortfolioStudentLevelResponse toPortfolioStudentLevel(StudentLevelResponse level) {
+        if (level == null || level.getLevel() == null) return null;
+        return PortfolioStudentLevelResponse.builder()
+                .level(level.getLevel())
+                .source(level.getSource())
+                .assessedAt(level.getAssessedAt())
+                .build();
+    }
+
+    private LearningJourneyResponse toLearningJourney(StudentRoadmapResponse roadmap) {
+        if (roadmap == null || roadmap.getTargetCareerRole() == null) return null;
+
+        List<CoreSkillSummaryResponse> coreSkills = roadmap.getCoreSkills() == null
+                ? List.of()
+                : roadmap.getCoreSkills().stream().map(this::toCoreSkillSummary).toList();
+
+        Map<String, int[]> stageCounts = new LinkedHashMap<>();
+        for (RoadmapNodeResponse node : roadmap.getNodes() == null ? List.<RoadmapNodeResponse>of() : roadmap.getNodes()) {
+            String stage = node.getStage() == null || node.getStage().isBlank() ? "Roadmap" : node.getStage();
+            int[] counts = stageCounts.computeIfAbsent(stage, ignored -> new int[3]);
+            counts[0]++;
+            if ("completed".equalsIgnoreCase(node.getStatus())) counts[1]++;
+            if ("current".equalsIgnoreCase(node.getStatus())) counts[2]++;
+        }
+        List<RoadmapStageResponse> stages = stageCounts.entrySet().stream()
+                .map(entry -> RoadmapStageResponse.builder()
+                        .name(entry.getKey()).totalNodes(entry.getValue()[0])
+                        .completedNodes(entry.getValue()[1]).currentNodes(entry.getValue()[2]).build())
+                .toList();
+
+        return LearningJourneyResponse.builder()
+                .targetCareerRole(roadmap.getTargetCareerRole()).progress(roadmap.getProgress())
+                .readiness(roadmap.getReadiness()).readinessVerified(roadmap.getReadinessVerified())
+                .readinessRequiredCount(roadmap.getReadinessRequiredCount())
+                .readinessHeldCount(roadmap.getReadinessHeldCount())
+                .readinessVerifiedCount(roadmap.getReadinessVerifiedCount())
+                .coreSkills(coreSkills).stages(stages).build();
+    }
+
+    private CoreSkillSummaryResponse toCoreSkillSummary(CoreSkillResponse skill) {
+        Integer jobCount = skill.getMarketDemand() == null ? null : skill.getMarketDemand().getJobCount();
+        return CoreSkillSummaryResponse.builder()
+                .skillName(skill.getSkillName()).importance(skill.getImportance())
+                .proficiency(skill.getProficiency()).verifiedBy(skill.getVerifiedBy())
+                .marketJobCount(jobCount).build();
     }
 
     /**
@@ -117,16 +188,16 @@ public class PortfolioMapper {
      * repository or a transcript outranks the same skill merely declared by the student,
      * so the portfolio shows the strongest claim the student can actually support.
      */
-    private Map<String, EvidenceType> strongestSourceBySkillName(List<StudentSkillEvidence> evidence) {
+    private Map<UUID, EvidenceType> strongestSourceByStudentSkillId(List<StudentSkillEvidence> evidence) {
         if (evidence == null || evidence.isEmpty()) {
             return Map.of();
         }
-        Map<String, EvidenceType> strongest = new HashMap<>();
+        Map<UUID, EvidenceType> strongest = new HashMap<>();
         for (StudentSkillEvidence row : evidence) {
-            if (row.getSkillName() == null || row.getSourceType() == null) {
+            if (row.getStudentSkillId() == null || row.getSourceType() == null) {
                 continue;
             }
-            String key = row.getSkillName().toLowerCase();
+            UUID key = row.getStudentSkillId();
             EvidenceType current = strongest.get(key);
             if (current == null || (current == EvidenceType.MANUAL && row.getSourceType() != EvidenceType.MANUAL)) {
                 strongest.put(key, row.getSourceType());
@@ -135,7 +206,7 @@ public class PortfolioMapper {
         return strongest;
     }
 
-    public List<PortfolioProject> toPortfolioProjects(List<PortfolioUpsertRequest.PortfolioProjectRequest> projectRequests, User user) {
+    public List<PortfolioProject> toPortfolioProjects(List<PortfolioProjectRequest> projectRequests, User user) {
         if (projectRequests == null) {
             return Collections.emptyList();
         }
@@ -153,7 +224,7 @@ public class PortfolioMapper {
         ).collect(Collectors.toList());
     }
 
-    public List<StudentEducation> toStudentEducationList(List<PortfolioUpsertRequest.StudentEducationRequest> educationRequests, Student student) {
+    public List<StudentEducation> toStudentEducationList(List<StudentEducationRequest> educationRequests, Student student) {
         if (educationRequests == null) {
             return Collections.emptyList();
         }

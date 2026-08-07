@@ -177,8 +177,6 @@ public class StudentAssessmentServiceImpl implements StudentAssessmentService {
         SeniorityVerdict seniority = seniorityCalculator.compute(userId, career.getCareerId());
         SeniorityLevel finalLevel = SeniorityLevel.min(seniority.level(), parseLevel(verdict.level()));
 
-        Applied applied = applyToRoadmap(userId);
-
         assessment.setAiLevel(finalLevel);
         assessment.setAiRawLevel(parseLevel(verdict.level()));
         assessment.setAiRationale(verdict.rationale());
@@ -186,9 +184,16 @@ public class StudentAssessmentServiceImpl implements StudentAssessmentService {
         assessment.setRatioAll(seniority.ratioAll());
         assessment.setRatioVerified(seniority.ratioVerified());
         assessment.setRequiredCount(seniority.requiredCount());
+        // Personalization reads the latest persisted level to decide how far a
+        // proven skill may propagate into its basic descendants. Persist the
+        // verdict first; calling it while aiLevel is still null makes every
+        // assessment auto-complete zero nodes.
+        assessment.setComputedAt(LocalDateTime.now());
+        studentAssessmentRepository.save(assessment);
+
+        Applied applied = applyToRoadmap(userId);
         assessment.setAppliedNodeCount(applied.nodeCount());
         assessment.setRecommendationId(applied.recommendationId());
-        assessment.setComputedAt(LocalDateTime.now());
         studentAssessmentRepository.save(assessment);
 
         log.info("StudentAssessmentServiceImpl: graded user {} as {} (model said {}); "

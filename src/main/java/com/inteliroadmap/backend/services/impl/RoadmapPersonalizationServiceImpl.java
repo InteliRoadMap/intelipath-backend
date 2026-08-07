@@ -42,6 +42,7 @@ import org.springframework.transaction.annotation.Transactional;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -146,6 +147,9 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
      */
     private static final String CHOOSE_ONE_SELECTION = "CHOOSE_ONE";
 
+    @Value("${roadmap.parent-completion-threshold:0.6}")
+    private double parentCompletionThreshold;
+
     private final AuthenticatedStudentService authenticatedStudentService;
     private final RoadmapRecommendationRepository recommendationRepository;
     private final RoadmapRecommendationItemRepository recommendationItemRepository;
@@ -238,6 +242,7 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
         List<RoadmapRecommendationItem> items = recommendationItemRepository.findByRecommendationId(recommendationId);
 
         List<SkillNode> completedNodes = applyMarkCompleteItems(student, items);
+        syncCompletedTopics(student, completedNodes);
         syncCompletedSkillsToProfile(student, completedNodes);
         linkAndAcceptEvidence(student, items, completedNodes);
         // Runs last, once the rows above exist: stamps proficiency and the verifying
@@ -339,7 +344,9 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
             }
             BigDecimal confidence = profileConfidence(studentSkill);
             String reason = profileReason(studentSkill);
-            for (SkillNode node : nodesBySkillId.getOrDefault(studentSkill.getSkill().getSkillId(), List.of())) {
+            for (SkillNode node : nodesBySkillId.getOrDefault(studentSkill.getSkill().getSkillId(), List.of()).stream()
+                    .filter(candidate -> directlyRepresentsSkill(candidate, studentSkill.getSkill().getSkillName()))
+                    .toList()) {
                 offerCandidate(candidates, excludedNodeIds, node, confidence, reason, null, importanceBySkillId,
                         studentSkill.getVerifiedBy() != null && !studentSkill.getVerifiedBy().isBlank());
                 // A profile row propagates only when a source outside the student
@@ -365,10 +372,15 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
                         node, confidence, reason, evidence.getEvidenceId(), importanceBySkillId,
                         isExternallyAttested(evidence));
                 recordProven(provenConfidence, provenReason, provenEvidenceId,
-                        node, confidence, reason, evidence.getEvidenceId(), isExternallyAttested(evidence));
+                        node, confidence, reason, evidence.getEvidenceId(), canPropagateCapability(evidence));
             } else if (evidence.getSkillName() != null) {
                 String skillName = evidence.getSkillName().toLowerCase();
                 List<SkillNode> matched = nodesBySkillName.get(skillName);
+                if (matched != null) {
+                    matched = matched.stream()
+                            .filter(candidate -> directlyRepresentsSkill(candidate, evidence.getSkillName()))
+                            .toList();
+                }
                 if (matched == null) {
                     // No node carries this exact skill. Fall back to the node's own
                     // evidence_keywords, which is where a roadmap says "React counts as
@@ -388,7 +400,7 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
                 for (SkillNode node : matched) {
                     offerCandidate(candidates, excludedNodeIds, node, confidence, reason, evidence.getEvidenceId(), importanceBySkillId, isExternallyAttested(evidence));
                     recordProven(provenConfidence, provenReason, provenEvidenceId,
-                            node, confidence, reason, evidence.getEvidenceId(), isExternallyAttested(evidence));
+                            node, confidence, reason, evidence.getEvidenceId(), canPropagateCapability(evidence));
                 }
             }
         }
@@ -511,28 +523,50 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
                 && evidence.getSourceType() != EvidenceType.MANUAL;
     }
 
-    /** Minimum length either side of a fuzzy match must have, to avoid short generic words matching everything. */
-    private static final int MIN_FUZZY_MATCH_LENGTH = 3;
+    @Transactional
+    @Override
+    public void reconcileCompletedTopicsForCurrentStudent() {
+        Student student = authenticatedStudentService.getRequiredStudent();
+        List<SkillNode> completedNodes = studentProgressRepository.findByStudent_UserId(student.getUserId()).stream()
+                .filter(progress -> progress.getStatus() == RoadmapStepStatus.COMPLETED)
+                .map(StudentProgress::getSkillNode)
+                .filter(java.util.Objects::nonNull)
+                .toList();
+        syncCompletedTopics(student, completedNodes);
+    }
 
     /**
-     * Whole-word-ish substring fallback for when an evidence skill name doesn't exactly equal
-     * a roadmap skill name or evidence_keywords entry (e.g. "React.js" vs "React", "Node" vs
-     * "Node.js"). Matches in either direction so both a broader and a narrower name still hit.
+     * Evidence may establish a learning floor without becoming public verification.
+     * An AI-graded assessment is still MANUAL for portfolio/level verification,
+     * but its capability score is strong enough to skip basic descendants after
+     * the normal confidence, completion-policy and career-importance gates run.
      */
-    private static List<SkillNode> fuzzyMatchNodes(String skillName,
-                                                    Map<String, List<SkillNode>> nodesBySkillName,
-                                                    Map<String, List<SkillNode>> nodesByKeyword) {
-        if (skillName.length() < MIN_FUZZY_MATCH_LENGTH) {
+    private boolean canPropagateCapability(StudentSkillEvidence evidence) {
+        return isExternallyAttested(evidence)
+                || (evidence != null && "self-assessment".equalsIgnoreCase(evidence.getDetectedBy()));
+    }
+
+    /**
+     * Formatting-alias fallback for names such as {@code React.js}/{@code React} and
+     * {@code Node.js}/{@code Node}.
+     *
+     * <p>This deliberately is not a substring matcher. A verified broad skill such as
+     * {@code API} is not direct proof of {@code API Performance}, {@code API Security},
+     * or every other roadmap node containing that word. The old bidirectional substring
+     * rule did exactly that and could complete advanced nodes while their foundations
+     * remained untouched.
+     */
+    static List<SkillNode> fuzzyMatchNodes(String skillName,
+                                           Map<String, List<SkillNode>> nodesBySkillName,
+                                           Map<String, List<SkillNode>> nodesByKeyword) {
+        String normalizedEvidence = formattingAlias(skillName);
+        if (normalizedEvidence.isBlank()) {
             return List.of();
         }
         Map<UUID, SkillNode> matched = new LinkedHashMap<>();
         for (Map<String, List<SkillNode>> source : List.of(nodesBySkillName, nodesByKeyword)) {
             for (Map.Entry<String, List<SkillNode>> entry : source.entrySet()) {
-                String candidateKey = entry.getKey();
-                if (candidateKey.length() < MIN_FUZZY_MATCH_LENGTH) {
-                    continue;
-                }
-                if (skillName.contains(candidateKey) || candidateKey.contains(skillName)) {
+                if (normalizedEvidence.equals(formattingAlias(entry.getKey()))) {
                     for (SkillNode node : entry.getValue()) {
                         matched.put(node.getNodeId(), node);
                     }
@@ -540,6 +574,20 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
             }
         }
         return List.copyOf(matched.values());
+    }
+
+    private static String formattingAlias(String value) {
+        if (value == null) {
+            return "";
+        }
+        String normalized = value.trim().toLowerCase(Locale.ROOT)
+                .replaceAll("[._-]+", " ")
+                .replaceAll("\\s+", " ");
+        // In ecosystem names, the optional JS suffix is formatting rather than a
+        // broader/narrower capability claim: React.js and React name the same tool.
+        return normalized.endsWith(" js")
+                ? normalized.substring(0, normalized.length() - 3).trim()
+                : normalized;
     }
 
     /** Adds or merges a candidate, keeping the highest confidence and every supporting evidence id. */
@@ -746,6 +794,86 @@ public class RoadmapPersonalizationServiceImpl implements RoadmapPersonalization
             completedNodes.add(node);
         }
         return completedNodes;
+    }
+
+    /**
+     * Recommendation acceptance writes progress directly, so it must perform the
+     * same parent-topic reconciliation as a manual node completion. Without this,
+     * evidence could complete Java leaves while Java/Pick a Language on the main
+     * roadmap remained visually unfinished forever.
+     */
+    private void syncCompletedTopics(Student student, List<SkillNode> completedNodes) {
+        if (completedNodes == null || completedNodes.isEmpty()
+                || student.getCareerRole() == null || student.getCareerRole().getCareerId() == null) {
+            return;
+        }
+        List<SkillNode> careerNodes = skillNodeRepository
+                .findByCareerRole_CareerId(student.getCareerRole().getCareerId());
+        SelectionView selectionView = roadmapSelectionResolver.resolve(student.getUserId(), careerNodes);
+        Map<UUID, SkillNode> topics = new HashMap<>();
+        for (SkillNode completedNode : completedNodes) {
+            SkillNode topic = completedNode.getParentNode();
+            while (topic != null) {
+                topics.put(topic.getNodeId(), topic);
+                topic = topic.getParentNode();
+            }
+        }
+        // Children first. Processing an ancestor while sibling topics are still
+        // unreconciled freezes a 46/67 branch in grey even though it crossed 60%.
+        topics.values().stream()
+                .sorted(java.util.Comparator.comparingInt(
+                        RoadmapPersonalizationServiceImpl::nodeDepth).reversed())
+                .forEach(topic -> syncOneTopic(student, topic, selectionView));
+    }
+
+    private static int nodeDepth(SkillNode node) {
+        int depth = 0;
+        for (SkillNode current = node; current != null; current = current.getParentNode()) depth++;
+        return depth;
+    }
+
+    /** A shared category skill must not prove every leaf that happens to reuse its id. */
+    private static boolean directlyRepresentsSkill(SkillNode node, String skillName) {
+        if (node == null || skillName == null || skillName.isBlank()) return false;
+        String normalized = skillName.trim().toLowerCase(Locale.ROOT);
+        if (node.getNodeName() != null
+                && node.getNodeName().trim().toLowerCase(Locale.ROOT).equals(normalized)) {
+            return true;
+        }
+        return evidenceKeywords(node).contains(normalized);
+    }
+
+    private void syncOneTopic(Student student, SkillNode topic, SelectionView selectionView) {
+        long totalWeight = 0;
+        long doneWeight = 0;
+        for (SkillNode child : skillNodeRepository.findByParentNode_NodeId(topic.getNodeId())) {
+            if (selectionView.isExcludedFromProgress(child.getNodeId())) continue;
+            int weight = child.getType() != null && child.getType().getWeight() != null
+                    && child.getType().getWeight() > 0 ? child.getType().getWeight() : 1;
+            totalWeight += weight;
+            StudentProgress progress = studentProgressRepository
+                    .findByStudent_UserIdAndSkillNode_NodeId(student.getUserId(), child.getNodeId())
+                    .orElse(null);
+            if (progress != null && progress.getStatus() == RoadmapStepStatus.COMPLETED) {
+                doneWeight += weight;
+            }
+        }
+        if (totalWeight == 0 || (double) doneWeight / totalWeight < parentCompletionThreshold) return;
+
+        StudentProgress topicProgress = studentProgressRepository
+                .findByStudent_UserIdAndSkillNode_NodeId(student.getUserId(), topic.getNodeId())
+                .orElseGet(() -> StudentProgress.builder()
+                        .student(Student.builder().userId(student.getUserId()).build())
+                        .skillNode(topic)
+                        .createdAt(LocalDateTime.now())
+                        .build());
+        if (topicProgress.getStatus() != RoadmapStepStatus.COMPLETED) {
+            topicProgress.setStatus(RoadmapStepStatus.COMPLETED);
+            topicProgress.setCompletedAt(LocalDateTime.now());
+            studentProgressRepository.save(topicProgress);
+            log.info("RoadmapPersonalizationServiceImpl: auto-completed parent topic '{}' ({}/{})",
+                    topic.getNodeName(), doneWeight, totalWeight);
+        }
     }
 
     /**

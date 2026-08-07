@@ -8,11 +8,13 @@ import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 @Repository
 public interface StudentSkillRepository extends JpaRepository<StudentSkill, UUID> {
     List<StudentSkill> findByStudent_UserId(UUID studentId);
+    Optional<StudentSkill> findByStudent_UserIdAndSkill_SkillId(UUID studentId, UUID skillId);
     List<StudentSkill> findByStudent_UserIdAndSkill_SkillIdIn(UUID studentId, List<UUID> skillIds);
     boolean existsByStudent_UserIdAndSkill_SkillId(UUID studentId, UUID skillId);
 

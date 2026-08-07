@@ -1,5 +1,9 @@
 package com.inteliroadmap.backend.services.impl;
 
+import com.inteliroadmap.backend.domain.dto.response.mentor.Metric;
+import com.inteliroadmap.backend.domain.dto.response.mentor.NeedsAttention;
+import com.inteliroadmap.backend.domain.dto.response.mentor.SkillGap;
+
 import com.inteliroadmap.backend.domain.dto.request.CreateFeedbackRequest;
 import com.inteliroadmap.backend.domain.dto.request.UpdateMentorProfileRequest;
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorResponse;
@@ -11,6 +15,7 @@ import com.inteliroadmap.backend.domain.dto.response.mentor.MentorPendingReviewR
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorProfileResponse;
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorProgressReportResponse;
 import com.inteliroadmap.backend.domain.dto.response.mentor.MentorStudentResponse;
+import com.inteliroadmap.backend.domain.dto.response.portfolio.GithubImportAuditResponse;
 import com.inteliroadmap.backend.domain.entity.Feedback;
 import com.inteliroadmap.backend.domain.entity.IndustryMentor;
 import com.inteliroadmap.backend.domain.entity.PortfolioReviewRequest;
@@ -32,6 +37,7 @@ import com.inteliroadmap.backend.repositories.StudentRepository;
 import com.inteliroadmap.backend.repositories.StudentSkillRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.services.MentorService;
+import com.inteliroadmap.backend.services.GithubPortfolioService;
 import com.inteliroadmap.backend.services.EmailService;
 import com.inteliroadmap.backend.services.RoadmapService;
 import org.springframework.transaction.annotation.Transactional;
@@ -71,6 +77,7 @@ public class MentorServiceImpl implements MentorService {
     private final IndustryMentorRepository industryMentorRepository;
     private final RoadmapService roadmapService;
     private final EmailService emailService;
+    private final GithubPortfolioService githubPortfolioService;
 
     private User getAuthenticatedMentor() {
         String email = SecurityContextHolder.getContext().getAuthentication().getName();
@@ -79,6 +86,18 @@ public class MentorServiceImpl implements MentorService {
             throw new ForbiddenException("Mentor not found from token or invalid role");
         }
         return user;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public GithubImportAuditResponse getStudentImportAudit(UUID studentId, String repoUrl) {
+        User mentor = getAuthenticatedMentor();
+        if (!reviewRequestRepository.existsByStudent_UserIdAndMentor_UserId(studentId, mentor.getUserId())) {
+            // Do not turn the mentor directory into a way to probe another student's
+            // private projects.  A review request is the student's explicit grant.
+            throw new ForbiddenException("This student has not shared a portfolio review with you");
+        }
+        return githubPortfolioService.getImportAuditForStudent(studentId, repoUrl);
     }
 
     @Transactional
@@ -351,8 +370,8 @@ public class MentorServiceImpl implements MentorService {
                 .findDistinctStudentsByMentorId(mentor.getUserId(), Pageable.unpaged())
                 .getContent();
 
-        List<MentorProgressReportResponse.StudentProgress> studentsProgress = new ArrayList<>();
-        List<MentorProgressReportResponse.NeedsAttention> needsAttention = new ArrayList<>();
+        List<com.inteliroadmap.backend.domain.dto.response.mentor.StudentProgress> studentsProgress = new ArrayList<>();
+        List<NeedsAttention> needsAttention = new ArrayList<>();
         Map<String, Integer> missingSkillCounts = new HashMap<>();
         int totalCompletedNodes = 0;
         int totalInProgressNodes = 0;
@@ -378,7 +397,7 @@ public class MentorServiceImpl implements MentorService {
             totalCompletedNodes += completed;
             totalInProgressNodes += inProgress;
 
-            studentsProgress.add(MentorProgressReportResponse.StudentProgress.builder()
+            studentsProgress.add(com.inteliroadmap.backend.domain.dto.response.mentor.StudentProgress.builder()
                     .name(studentUser.getFullName())
                     .role(student.getCareerRole().getCareerName())
                     .completed(completed)
@@ -392,7 +411,7 @@ public class MentorServiceImpl implements MentorService {
                     .ifPresent(oldest -> {
                         long daysStuck = Duration.between(oldest.getCreatedAt(), LocalDateTime.now()).toDays();
                         if (daysStuck >= STUCK_THRESHOLD_DAYS) {
-                            needsAttention.add(MentorProgressReportResponse.NeedsAttention.builder()
+                            needsAttention.add(NeedsAttention.builder()
                                     .name(studentUser.getFullName())
                                     .issue("Stuck on " + oldest.getSkillNode().getNodeName() + " for " + daysStuck + " days")
                                     .days(daysStuck + "d")
@@ -404,15 +423,15 @@ public class MentorServiceImpl implements MentorService {
                     .forEach(skillName -> missingSkillCounts.merge(skillName, 1, Integer::sum));
         }
 
-        List<MentorProgressReportResponse.Metric> metrics = List.of(
-                new MentorProgressReportResponse.Metric("COMPLETED NODES", String.valueOf(totalCompletedNodes), "text-[#00838f]"),
-                new MentorProgressReportResponse.Metric("IN PROGRESS", String.valueOf(totalInProgressNodes), "text-[#0ea5e9]")
+        List<Metric> metrics = List.of(
+                new Metric("COMPLETED NODES", String.valueOf(totalCompletedNodes), "text-[#00838f]"),
+                new Metric("IN PROGRESS", String.valueOf(totalInProgressNodes), "text-[#0ea5e9]")
         );
 
-        List<MentorProgressReportResponse.SkillGap> skillGaps = missingSkillCounts.entrySet().stream()
+        List<SkillGap> skillGaps = missingSkillCounts.entrySet().stream()
                 .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
                 .limit(5)
-                .map(entry -> new MentorProgressReportResponse.SkillGap(
+                .map(entry -> new SkillGap(
                         entry.getKey(),
                         entry.getValue(),
                         entry.getValue() >= SKILL_GAP_HIGH_THRESHOLD ? "High" : "Medium"))

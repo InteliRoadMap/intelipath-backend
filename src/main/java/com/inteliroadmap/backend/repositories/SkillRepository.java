@@ -12,7 +12,9 @@ import java.util.UUID;
 @Repository
 public interface SkillRepository extends JpaRepository<Skill, UUID> {
 
-    List<Skill> findBySkillNameContainingIgnoreCase(String skillName);
+    @Query("SELECT s FROM Skill s WHERE upper(s.catalogStatus) = 'ACTIVE' "
+            + "AND lower(s.skillName) LIKE lower(concat('%', :skillName, '%'))")
+    List<Skill> findBySkillNameContainingIgnoreCase(@org.springframework.data.repository.query.Param("skillName") String skillName);
 
     Skill findBySkillName(String skillName);
 
@@ -58,10 +60,11 @@ public interface SkillRepository extends JpaRepository<Skill, UUID> {
      */
     @Query(value = """
             SELECT s.* FROM skills s
-            WHERE EXISTS (SELECT 1 FROM recruitment_skills rs WHERE rs.skill_id = s.skill_id)
+            WHERE upper(coalesce(s.catalog_status, 'ACTIVE')) = 'ACTIVE'
+              AND (EXISTS (SELECT 1 FROM recruitment_skills rs WHERE rs.skill_id = s.skill_id)
                OR EXISTS (SELECT 1 FROM career_required_skills c
                            WHERE c.skill_id = s.skill_id
-                             AND upper(coalesce(c.importance_level, '')) IN ('HIGH', 'AVG'))
+                             AND upper(coalesce(c.importance_level, '')) IN ('HIGH', 'AVG')))
             ORDER BY s.skill_name
             """, nativeQuery = true)
     List<Skill> findDeclarableCandidates();

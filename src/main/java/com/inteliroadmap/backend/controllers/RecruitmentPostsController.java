@@ -55,9 +55,10 @@ public class RecruitmentPostsController {
             )
     })
     public ResponseEntity<List<RecruitmentPostResponse>> getRecruitmentPosts(
-            @RequestParam(required = false) String seniority) {
+            @RequestParam(required = false) String seniority,
+            @RequestParam(required = false) java.util.UUID careerId) {
         log.info("RecruitmentPostsController: Getting all recruitment posts");
-        return ResponseEntity.ok(scraperService.getRecruitmentPosts(seniority));
+        return ResponseEntity.ok(scraperService.getRecruitmentPosts(seniority, careerId));
     }
 
     @GetMapping("/company/{companyId}")

@@ -68,15 +68,5 @@ public class ChoiceOptionResponse {
     private Boolean autoSelected;
 
     /** One skill of the student's that counted towards this option. */
-    @Data
-    @Builder
-    @NoArgsConstructor
-    @AllArgsConstructor
-    public static class MatchedSkillResponse {
-        private String skillName;
-        /** 1 AWARE · 2 PRACTICED · 3 APPLIED · 4 PROFESSIONAL. */
-        private Integer proficiency;
-        /** True when objective evidence backs it, not only a self-report. */
-        private Boolean verified;
-    }
+
 }

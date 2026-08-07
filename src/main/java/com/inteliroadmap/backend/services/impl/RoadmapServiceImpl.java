@@ -1,5 +1,7 @@
 package com.inteliroadmap.backend.services.impl;
 
+import com.inteliroadmap.backend.domain.dto.response.roadmap.FptSubjectRefResponse;
+
 import com.inteliroadmap.backend.components.ResolvedOrder;
 import com.inteliroadmap.backend.components.RoadmapEdgeResolver;
 import com.inteliroadmap.backend.components.RoadmapProgressCalculator;
@@ -22,6 +24,9 @@ import com.inteliroadmap.backend.domain.dto.request.UpdateNodeProgressRequest;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.FptNodeCoverageResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.FptNodeResourceResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapNodeResponse;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapNodeEvidenceResponse;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapTopicResponse;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapSkillResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.StudentRoadmapResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapCrumbResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapRootResponse;
@@ -37,6 +42,7 @@ import com.inteliroadmap.backend.domain.entity.SkillNode;
 import com.inteliroadmap.backend.domain.entity.Student;
 import com.inteliroadmap.backend.domain.entity.StudentProgress;
 import com.inteliroadmap.backend.domain.entity.StudentSkill;
+import com.inteliroadmap.backend.domain.entity.StudentSkillEvidence;
 import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.domain.enums.AccountType;
 import com.inteliroadmap.backend.domain.enums.RoadmapStepStatus;
@@ -51,6 +57,7 @@ import com.inteliroadmap.backend.repositories.SkillRepository;
 import com.inteliroadmap.backend.repositories.StudentProgressRepository;
 import com.inteliroadmap.backend.repositories.StudentRepository;
 import com.inteliroadmap.backend.repositories.StudentSkillRepository;
+import com.inteliroadmap.backend.repositories.StudentSkillEvidenceRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.exceptions.ForbiddenException;
@@ -99,6 +106,7 @@ public class RoadmapServiceImpl implements RoadmapService {
     private final SkillNodeRepository skillNodeRepository;
     private final StudentProgressRepository studentProgressRepository;
     private final StudentSkillRepository studentSkillRepository;
+    private final StudentSkillEvidenceRepository studentSkillEvidenceRepository;
     private final CareerRequiredSkillRepository careerRequiredSkillRepository;
     private final SkillRepository skillRepository;
     private final FptSubjectRepository fptSubjectRepository;
@@ -167,16 +175,7 @@ public class RoadmapServiceImpl implements RoadmapService {
     public StudentRoadmapResponse getStudentRoadmap(Set<UUID> expandedNodeIds) {
         log.info("RoadmapServiceImpl: Fetching authenticated student roadmap");
 
-        // Fetch authenticated student
         Student student = getAuthenticatedStudent();
-        // If the student hasn't selected a career, return an empty roadmap
-        if (student.getCareerRole() == null || student.getCareerRole().getCareerId() == null) {
-            return StudentRoadmapResponse.builder()
-                    .progress(0)
-                    .nodes(List.of())
-                    .build();
-        }
-
         // Seed any obvious CHOOSE_ONE picks from the student's skill profile before
         // reading the roadmap, so a Java student sees Java pre-selected on first load.
         // Runs in its own transaction; a failure here must not break the read.
@@ -184,6 +183,24 @@ public class RoadmapServiceImpl implements RoadmapService {
             roadmapSelectionService.autoDefaultSelections();
         } catch (RuntimeException e) {
             log.warn("RoadmapServiceImpl: auto-default selections skipped: {}", e.getMessage());
+        }
+
+        return buildStudentRoadmap(student, expandedNodeIds);
+    }
+
+    @Transactional(readOnly = true)
+    @Override
+    public StudentRoadmapResponse getStudentRoadmapForPortfolio(Student student) {
+        return buildStudentRoadmap(student, Set.of());
+    }
+
+    /** Builds without authentication side effects so public portfolio reads stay read-only. */
+    private StudentRoadmapResponse buildStudentRoadmap(Student student, Set<UUID> expandedNodeIds) {
+        if (student.getCareerRole() == null || student.getCareerRole().getCareerId() == null) {
+            return StudentRoadmapResponse.builder()
+                    .progress(0)
+                    .nodes(List.of())
+                    .build();
         }
 
         // Look up the career role and associated skill nodes
@@ -264,7 +281,7 @@ public class RoadmapServiceImpl implements RoadmapService {
                 .nodes(buildRoadmapTree(visibleNodes, statusByNodeId, progressByNodeId, selectionView,
                         fptAccount, order, demandBySkill, hiddenChildren, nodes,
                         heldSkillsBySkillId(student.getUserId()), subtreeSizes, enterableIds,
-                        context))
+                        context, student.getUserId()))
                 // Only edges whose BOTH ends survived the filter: an edge pointing at
                 // a node that was not sent would draw into empty space.
                 .edges(roadmapEdgeMapper.toResponses(order.edges().stream()
@@ -369,7 +386,7 @@ public class RoadmapServiceImpl implements RoadmapService {
         // making the roadmap look shorter than it is.
         Set<UUID> visibleIds = new HashSet<>(roadmapVisibilityFilter.visibleNodeIds(
                 subtree, statusByNodeId, context.level(), expandedNodeIds,
-                RoadmapVisibilityFilter.DEFAULT_MAX_DEPTH, false));
+                RoadmapVisibilityFilter.DEFAULT_MAX_DEPTH, true));
         // A rejected alternative's descendants are not this student's roadmap; the
         // alternatives themselves stay, so the choice remains visible and
         // reversible. Same rule as the career view.
@@ -393,7 +410,7 @@ public class RoadmapServiceImpl implements RoadmapService {
                 .nodes(buildRoadmapTree(visibleNodes, statusByNodeId, progressByNodeId, selectionView,
                         fptAccount, order, demandBySkill, hiddenChildren, subtree,
                         heldSkillsBySkillId(student.getUserId()),
-                        subtreeSizes, enterableIds, context))
+                        subtreeSizes, enterableIds, context, student.getUserId()))
                 // Only edges with both ends still on screen: an edge into a folded
                 // branch would draw into empty space.
                 .edges(roadmapEdgeMapper.toResponses(order.edges().stream()
@@ -726,6 +743,41 @@ public class RoadmapServiceImpl implements RoadmapService {
                 : List.of();
         SelectionView selectionView = roadmapSelectionResolver.resolve(student.getUserId(), careerNodes);
 
+        // The read path resolves order inside the currently open sub-roadmap. A
+        // write checked against the whole career can otherwise reject a node the
+        // same API just labelled CURRENT. Rebuild exactly that view, after proving
+        // that the supplied root belongs to this career and contains the node.
+        List<SkillNode> gateNodes = careerNodes;
+        if (request.getContextRootNodeId() != null && !careerNodes.isEmpty()) {
+            SkillNode contextRoot = careerNodes.stream()
+                    .filter(candidate -> request.getContextRootNodeId().equals(candidate.getNodeId()))
+                    .findFirst()
+                    .orElseThrow(() -> new ForbiddenException("Invalid roadmap progress context."));
+            Map<UUID, List<SkillNode>> contextChildren = new HashMap<>();
+            for (SkillNode candidate : careerNodes) {
+                if (candidate.getParentNode() != null) {
+                    contextChildren.computeIfAbsent(candidate.getParentNode().getNodeId(), ignored -> new ArrayList<>())
+                            .add(candidate);
+                }
+            }
+            Set<UUID> contextIds = new HashSet<>();
+            Deque<SkillNode> contextPending = new ArrayDeque<>();
+            contextPending.push(contextRoot);
+            while (!contextPending.isEmpty()) {
+                SkillNode current = contextPending.pop();
+                if (!contextIds.add(current.getNodeId())) continue;
+                contextChildren.getOrDefault(current.getNodeId(), List.of()).forEach(contextPending::push);
+            }
+            if (!contextIds.contains(node.getNodeId())) {
+                throw new ForbiddenException("Node does not belong to the supplied roadmap context.");
+            }
+            gateNodes = careerNodes.stream()
+                    .filter(candidate -> contextIds.contains(candidate.getNodeId()))
+                    .filter(candidate -> !candidate.getNodeId().equals(contextRoot.getNodeId()))
+                    .map(candidate -> relativeDepth(candidate, contextRoot))
+                    .toList();
+        }
+
         // An alternative the student has not chosen (or any alternative while the
         // CHOOSE_ONE group is still undecided) is off the active path: the student
         // must pick it first before tracking progress on it.
@@ -762,16 +814,17 @@ public class RoadmapServiceImpl implements RoadmapService {
             Map<UUID, StudentProgress> progressByNode = mapProgressByNodeId(
                     studentProgressRepository.findByStudent_UserIdAndSkillNode_NodeIdIn(
                             student.getUserId(),
-                            careerNodes.stream().map(SkillNode::getNodeId).toList()));
+                            gateNodes.stream().map(SkillNode::getNodeId).toList()));
             // Same resolver as the read path, or the student could be refused a node
             // the roadmap had just shown them as unlocked.
-            ResolvedOrder order = roadmapEdgeResolver.resolve(careerNodes,
+            SelectionView gateSelectionView = roadmapSelectionResolver.resolve(student.getUserId(), gateNodes);
+            ResolvedOrder order = roadmapEdgeResolver.resolve(gateNodes,
                     studentRoadmapContext(student, node.getCareerRole(),
                             marketDemandSafe(node.getCareerRole() == null
                                     ? null : node.getCareerRole().getCareerId())),
-                    selectionView);
+                    gateSelectionView);
             String computedStatus =
-                    buildFrontendStatusMap(careerNodes, progressByNode, selectionView, order).get(node.getNodeId());
+                    buildFrontendStatusMap(gateNodes, progressByNode, gateSelectionView, order).get(node.getNodeId());
             if (FRONTEND_LOCKED_STATUS.equals(computedStatus)) {
                 throw new ForbiddenException("This node is locked; complete its prerequisites first.");
             }
@@ -977,6 +1030,10 @@ public class RoadmapServiceImpl implements RoadmapService {
         Set<String> passedStages = findPassedStages(nodes, progressByNodeId);
         Set<UUID> topicIds = topicParentIds(nodes);
         Map<UUID, List<SkillNode>> childrenByParent = childrenByParent(nodes);
+        // A completed node can come from assessment/evidence and may sit ahead
+        // of unfinished prerequisites. It remains visibly completed, but it may
+        // advance the learning path only when the path actually reached it.
+        Set<UUID> reachedByPath = new HashSet<>();
 
         // Parents/previous nodes must be classified before their dependants. The
         // resolver's visitOrder already guarantees that for the computed chain;
@@ -991,29 +1048,45 @@ public class RoadmapServiceImpl implements RoadmapService {
                 continue;
             }
 
+            boolean topic = topicIds.contains(node.getNodeId());
+            SkillNode previous = previousOf(node, order, nodes);
+            boolean sequentialLocked = isSequentialGateLocked(previous, statusByNodeId)
+                    || (previous != null && !reachedByPath.contains(previous.getNodeId()));
+            boolean gateLocked = isStageLocked(node, passedStages)
+                    || sequentialLocked
+                    || (!topic && isParentReachedGateLocked(node.getParentNode(), statusByNodeId))
+                    || (!topic && node.getParentNode() != null
+                        && !reachedByPath.contains(node.getParentNode().getNodeId()));
+
             StudentProgress progress = progressByNodeId.get(node.getNodeId());
             if (progress != null && RoadmapStepStatus.COMPLETED == progress.getStatus()) {
                 statusByNodeId.put(node.getNodeId(), FRONTEND_COMPLETED_STATUS);
+                if (!gateLocked) {
+                    reachedByPath.add(node.getNodeId());
+                }
                 continue;
             }
             if (progress != null && RoadmapStepStatus.IN_PROGRESS == progress.getStatus()) {
                 statusByNodeId.put(node.getNodeId(), FRONTEND_IN_PROGRESS_STATUS);
+                if (!gateLocked) {
+                    reachedByPath.add(node.getNodeId());
+                }
                 continue;
             }
 
-            if (topicIds.contains(node.getNodeId())) {
+            if (topic) {
                 // A topic (spine) node is gated only by its own sequential order
                 // (previousNode) and stage — never by its own children. Once
                 // reachable it auto-completes as soon as enough child weight is done,
                 // otherwise it stays the current focus while its sub-skills are learned.
-                boolean gateLocked = isStageLocked(node, passedStages)
-                        || isSequentialGateLocked(previousOf(node, order, nodes), statusByNodeId);
                 if (gateLocked) {
                     statusByNodeId.put(node.getNodeId(), FRONTEND_LOCKED_STATUS);
                 } else if (childCompletionRatio(node, childrenByParent, progressByNodeId, selectionView) >= parentCompletionThreshold) {
                     statusByNodeId.put(node.getNodeId(), FRONTEND_COMPLETED_STATUS);
+                    reachedByPath.add(node.getNodeId());
                 } else {
                     statusByNodeId.put(node.getNodeId(), FRONTEND_CURRENT_STATUS);
+                    reachedByPath.add(node.getNodeId());
                 }
                 continue;
             }
@@ -1021,10 +1094,10 @@ public class RoadmapServiceImpl implements RoadmapService {
             // Leaf / child node: unlocks as soon as its parent topic is REACHED
             // (i.e. no longer locked) rather than fully completed, plus any
             // sequential previousNode ordering among siblings/spine leaves.
-            boolean locked = isStageLocked(node, passedStages)
-                    || isParentReachedGateLocked(node.getParentNode(), statusByNodeId)
-                    || isSequentialGateLocked(previousOf(node, order, nodes), statusByNodeId);
-            statusByNodeId.put(node.getNodeId(), locked ? FRONTEND_LOCKED_STATUS : FRONTEND_CURRENT_STATUS);
+            statusByNodeId.put(node.getNodeId(), gateLocked ? FRONTEND_LOCKED_STATUS : FRONTEND_CURRENT_STATUS);
+            if (!gateLocked) {
+                reachedByPath.add(node.getNodeId());
+            }
         }
 
         return statusByNodeId;
@@ -1429,7 +1502,8 @@ public class RoadmapServiceImpl implements RoadmapService {
             Map<UUID, StudentSkill> heldSkillsBySkillId,
             Map<UUID, Integer> subtreeSizes,
             Set<UUID> enterableIds,
-            StudentRoadmapContext context
+            StudentRoadmapContext context,
+            UUID studentId
     ) {
         // Presentation-only placement, joined in from the layout table.
         Map<UUID, RoadmapNodeLayout> layoutsByNodeId = new HashMap<>();
@@ -1470,6 +1544,11 @@ public class RoadmapServiceImpl implements RoadmapService {
         // caller and shared with the ordering pass so the number the student reads on
         // a node is the same one that decided where the node sits.
         final Map<UUID, SkillDemandResponse> demand = demandBySkill != null ? demandBySkill : Map.of();
+        List<StudentSkillEvidence> activeEvidence = studentId == null ? List.of()
+                : studentSkillEvidenceRepository.findByUserIdAndStatusIn(studentId,
+                        List.of(com.inteliroadmap.backend.domain.enums.EvidenceStatus.ACCEPTED,
+                                com.inteliroadmap.backend.domain.enums.EvidenceStatus.PENDING));
+        final int relativeDepthBase = nodes.stream().mapToInt(this::depthOf).min().orElse(0);
 
         // Emit in the student's own order, not the database's. The client lays each
         // topic's children out in the order this array gives them, so sending them
@@ -1515,7 +1594,7 @@ public class RoadmapServiceImpl implements RoadmapService {
                                     .selfStudy(selfStudy)
                                     .subjects(coverSubjects.stream()
                                             // Term is per-curriculum now; omit it on the shared node view.
-                                            .map(s -> FptNodeCoverageResponse.FptSubjectRefResponse.builder()
+                                            .map(s -> FptSubjectRefResponse.builder()
                                                     .code(s.getCode()).name(s.getName()).build())
                                             .toList())
                                     .build()
@@ -1526,11 +1605,48 @@ public class RoadmapServiceImpl implements RoadmapService {
 
                     StudentSkill heldSkill = (node.getSkill() == null || heldSkillsBySkillId == null)
                             ? null : heldSkillsBySkillId.get(node.getSkill().getSkillId());
+                    List<StudentSkillEvidence> matchingEvidence = activeEvidence.stream()
+                            .filter(e -> evidenceSupportsNode(e, node))
+                            .sorted(Comparator.comparing(StudentSkillEvidence::getConfidence,
+                                    Comparator.nullsLast(Comparator.reverseOrder())))
+                            .toList();
+                    double evidenceThreshold = effectiveEvidenceThreshold(node, context);
+                    List<RoadmapNodeEvidenceResponse> evidenceDto = matchingEvidence.stream()
+                            .map(e -> RoadmapNodeEvidenceResponse.builder()
+                                    .evidenceId(e.getEvidenceId())
+                                    .skillName(e.getSkillName())
+                                    .sourceType(e.getSourceType() == null ? null : e.getSourceType().name())
+                                    .sourceUrl(e.getSourceUrl())
+                                    .confidence(e.getConfidence() == null ? null : e.getConfidence().doubleValue())
+                                    .status(e.getStatus() == null ? null : e.getStatus().name())
+                                    .detectedBy(e.getDetectedBy())
+                                    .build())
+                            .toList();
                     RoadmapEdgeResolver.NodePriority priority =
                             roadmapEdgeResolver.priorityOf(node, context);
+                    String semanticType = node.getSemanticType() == null
+                            ? (isTopic ? "TOPIC" : node.getSkill() != null ? "SKILL" : "CAPABILITY")
+                            : node.getSemanticType();
+                    RoadmapTopicResponse topicDto = "TOPIC".equals(semanticType)
+                            || "CHECKPOINT".equals(semanticType)
+                            ? new RoadmapTopicResponse(countedChildren.size(), childCompleted,
+                                    hiddenChildren == null ? null : hiddenChildren.get(node.getNodeId()),
+                                    completionRuleFor(node, isTopic, countedChildren.size(), childCompleted))
+                            : null;
+                    RoadmapSkillResponse skillDto = "SKILL".equals(semanticType) && node.getSkill() != null
+                            ? new RoadmapSkillResponse(node.getSkill().getSkillId(), node.getSkill().getSkillName(),
+                                    node.getSkill().getCategory(), node.getRequiredProficiency(),
+                                    heldSkill == null ? null : heldSkill.getProficiency(),
+                                    heldSkill == null ? null : heldSkill.getVerifiedBy(),
+                                    demand.get(node.getSkill().getSkillId()))
+                            : null;
                     return RoadmapNodeResponse.builder()
                             .nodeId(node.getNodeId())
                             .nodeName(node.getNodeName())
+                            .semanticType(semanticType)
+                            .relativeDepth(Math.max(0, depthOf(node) - relativeDepthBase))
+                            .topic(topicDto)
+                            .skill(skillDto)
                             .parentNode(node.getParentNode() != null ? node.getParentNode().getNodeId().toString() : null)
                             // From the resolver, not the column: a client that still
                             // derives its own edges from this field gets the
@@ -1550,6 +1666,11 @@ public class RoadmapServiceImpl implements RoadmapService {
                             // show the difference rather than flatten it.
                             .proficiencyVerifiedBy(heldSkill == null ? null : heldSkill.getVerifiedBy())
                             .completionRule(completionRuleFor(node, isTopic, countedChildren.size(), childCompleted))
+                            .evidence(evidenceDto)
+                            .evidenceRequiredConfidence(isTopic ? null : evidenceThreshold)
+                            .evidenceDecision(evidenceDecision(node, isTopic, countedChildren.size(), childCompleted,
+                                    matchingEvidence, evidenceThreshold,
+                                    statusByNodeId.getOrDefault(node.getNodeId(), FRONTEND_LOCKED_STATUS)))
                             .subtreeSize(subtreeSizes == null ? null : subtreeSizes.get(node.getNodeId()))
                             .entersRoadmap(enterableIds != null && enterableIds.contains(node.getNodeId()))
                             .parentTopic(isTopic)
@@ -1597,6 +1718,52 @@ public class RoadmapServiceImpl implements RoadmapService {
                             .build();
                 })
                 .toList();
+    }
+
+    private static boolean evidenceSupportsNode(StudentSkillEvidence evidence, SkillNode node) {
+        if (evidence.getNodeId() != null && evidence.getNodeId().equals(node.getNodeId())) return true;
+        if (evidence.getSkillName() == null) return false;
+        String name = evidence.getSkillName().trim().toLowerCase(java.util.Locale.ROOT);
+        if (node.getSkill() != null && node.getSkill().getSkillName() != null
+                && node.getSkill().getSkillName().trim().toLowerCase(java.util.Locale.ROOT).equals(name)) return true;
+        if (node.getNodeName() != null
+                && node.getNodeName().trim().toLowerCase(java.util.Locale.ROOT).equals(name)) return true;
+        return node.getEvidenceKeywords() != null && node.getEvidenceKeywords().isArray()
+                && java.util.stream.StreamSupport.stream(node.getEvidenceKeywords().spliterator(), false)
+                .map(value -> value.asText("").trim().toLowerCase(java.util.Locale.ROOT))
+                .anyMatch(name::equals);
+    }
+
+    private static double effectiveEvidenceThreshold(SkillNode node, StudentRoadmapContext context) {
+        double nodeBar = node.getRequiredProficiency() != null && node.getRequiredProficiency() > 0
+                ? node.getRequiredProficiency() / 100.0 : 0.70;
+        ImportanceLevel importance = node.getSkill() == null || context == null
+                ? null : context.importanceBySkillId().get(node.getSkill().getSkillId());
+        double importanceBar = importance == ImportanceLevel.HIGH ? 0.85
+                : importance == ImportanceLevel.LOW ? 0.60 : 0.70;
+        return Math.max(nodeBar, importanceBar);
+    }
+
+    private static String evidenceDecision(SkillNode node, boolean topic, int total, int done,
+                                           List<StudentSkillEvidence> evidence, double threshold,
+                                           String status) {
+        if (topic) {
+            int needed = total == 0 ? 0 : (int) Math.ceil(total * 0.6);
+            return "Topic progress: " + done + "/" + total + " direct sub-skills complete"
+                    + (total > 0 ? "; needs at least " + needed + "." : ".");
+        }
+        if (FRONTEND_COMPLETED_STATUS.equals(status)) return "Completed; the accepted evidence met this node's rule.";
+        if (!"EVIDENCE_ALLOWED".equalsIgnoreCase(node.getCompletionPolicy())) {
+            return "This node is completed through its learning rule, not automatically from imported evidence.";
+        }
+        if (evidence.isEmpty()) return "No accepted evidence directly matches this node yet.";
+        double best = evidence.stream().filter(e -> e.getConfidence() != null)
+                .mapToDouble(e -> e.getConfidence().doubleValue()).max().orElse(0);
+        if (best < threshold) {
+            return String.format(java.util.Locale.ROOT,
+                    "Best matching evidence is %.0f%%; this node requires %.0f%%.", best * 100, threshold * 100);
+        }
+        return "Evidence meets the confidence bar; complete prerequisites to unlock this node.";
     }
 
     // Session topics that are class logistics, not learning content — never worth

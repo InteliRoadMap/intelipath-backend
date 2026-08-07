@@ -2,6 +2,7 @@ package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.clients.GithubApiClient.GithubRepoSummary;
 import com.inteliroadmap.backend.domain.dto.response.portfolio.GithubRepoRankResponse;
+import com.inteliroadmap.backend.domain.dto.response.portfolio.ScoreLine;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
@@ -61,13 +62,13 @@ public class GithubRepoRankingService {
         List<String> highlights = new ArrayList<>();
         // Recorded alongside the running total so the two can never disagree: every line
         // added here is the same number added to `total` on the line above it.
-        List<GithubRepoRankResponse.ScoreLine> breakdown = new ArrayList<>();
+        List<ScoreLine> breakdown = new ArrayList<>();
         int total = 0;
 
         // Stars — log-scaled so a handful of stars still counts but a viral repo doesn't dominate.
         int starScore = (int) Math.min(SCORE_STARS_MAX, Math.round(log2(repo.stars() + 1) * 8.0));
         total += starScore;
-        breakdown.add(new GithubRepoRankResponse.ScoreLine("Stars", starScore, SCORE_STARS_MAX,
+        breakdown.add(new ScoreLine("Stars", starScore, SCORE_STARS_MAX,
                 repo.stars() + " star(s), log-scaled so one popular repo cannot dominate"));
         if (repo.stars() > 0) {
             highlights.add(repo.stars() + "★");
@@ -76,7 +77,7 @@ public class GithubRepoRankingService {
         // Recency of the last push.
         int recencyScore = recencyScore(repo.pushedAt());
         total += recencyScore;
-        breakdown.add(new GithubRepoRankResponse.ScoreLine("Recent activity", recencyScore, SCORE_RECENCY_MAX,
+        breakdown.add(new ScoreLine("Recent activity", recencyScore, SCORE_RECENCY_MAX,
                 describeRecency(repo.pushedAt())));
         if (recencyScore >= 20) {
             highlights.add("recently active");
@@ -89,7 +90,7 @@ public class GithubRepoRankingService {
         } else {
             highlights.add("no description");
         }
-        breakdown.add(new GithubRepoRankResponse.ScoreLine("Description",
+        breakdown.add(new ScoreLine("Description",
                 described ? SCORE_DESCRIPTION : 0, SCORE_DESCRIPTION,
                 described ? "has a description on GitHub" : "no description on GitHub — add one to gain these points"));
 
@@ -104,16 +105,16 @@ public class GithubRepoRankingService {
         if (!repo.fork()) {
             total += SCORE_ORIGINAL;
             highlights.add("original");
-            breakdown.add(new GithubRepoRankResponse.ScoreLine("Your own work", SCORE_ORIGINAL, SCORE_ORIGINAL,
+            breakdown.add(new ScoreLine("Your own work", SCORE_ORIGINAL, SCORE_ORIGINAL,
                     "not a fork"));
         } else if (repo.isWorkedInFork()) {
             total += SCORE_ORIGINAL;
             highlights.add("your work in a fork");
-            breakdown.add(new GithubRepoRankResponse.ScoreLine("Your own work", SCORE_ORIGINAL, SCORE_ORIGINAL,
+            breakdown.add(new ScoreLine("Your own work", SCORE_ORIGINAL, SCORE_ORIGINAL,
                     "a fork, but pushed to after you forked it — that is your work"));
         } else {
             highlights.add("fork");
-            breakdown.add(new GithubRepoRankResponse.ScoreLine("Your own work", 0, SCORE_ORIGINAL,
+            breakdown.add(new ScoreLine("Your own work", 0, SCORE_ORIGINAL,
                     "a fork with no pushes since you forked it, so it reads as a bookmark"));
         }
 
@@ -123,14 +124,14 @@ public class GithubRepoRankingService {
             total += SCORE_LANGUAGE_MATCH;
             highlights.add("matches " + repo.language());
         }
-        breakdown.add(new GithubRepoRankResponse.ScoreLine("Career language",
+        breakdown.add(new ScoreLine("Career language",
                 languageMatches ? SCORE_LANGUAGE_MATCH : 0, SCORE_LANGUAGE_MATCH,
                 describeLanguageMatch(repo.language(), catalog, languageMatches)));
 
         // A few forks by others is a mild quality signal.
         int forkScore = Math.min(SCORE_FORKS_MAX, repo.forks() * 2);
         total += forkScore;
-        breakdown.add(new GithubRepoRankResponse.ScoreLine("Forked by others", forkScore, SCORE_FORKS_MAX,
+        breakdown.add(new ScoreLine("Forked by others", forkScore, SCORE_FORKS_MAX,
                 repo.forks() + " fork(s) of this repository"));
 
         total = Math.max(0, Math.min(100, total));

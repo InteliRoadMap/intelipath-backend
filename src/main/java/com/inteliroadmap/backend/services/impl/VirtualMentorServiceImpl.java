@@ -1,6 +1,7 @@
 package com.inteliroadmap.backend.services.impl;
 
 import com.inteliroadmap.backend.ai.client.AiServiceClient;
+import com.inteliroadmap.backend.ai.tool.JobMarketTool;
 import com.inteliroadmap.backend.domain.dto.request.VirtualMentorChatRequest;
 import com.inteliroadmap.backend.domain.entity.ChatMessage;
 import com.inteliroadmap.backend.domain.entity.ChatSession;
@@ -42,6 +43,7 @@ import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.Locale;
 
 /**
  * Implementation of the {@link VirtualMentorService}.
@@ -60,6 +62,7 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
     private final AiServiceClient aiServiceClient;
     /** Supplies the student's assessed level, or nothing when they skipped it. */
     private final StudentLevelService studentLevelService;
+    private final JobMarketTool jobMarketTool;
     private final String systemPromptTemplate;
     private final String ragPromptTemplate;
 
@@ -89,6 +92,7 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
                                 VectorStore vectorStore,
                                 AiServiceClient aiServiceClient,
                                 StudentLevelService studentLevelService,
+                                JobMarketTool jobMarketTool,
                                 @Value("classpath:prompts/virtual-mentor-system.st") Resource systemPrompt,
                                 @Value("classpath:prompts/virtual-mentor-rag.st") Resource ragPrompt) {
         this.chatSessionRepository = chatSessionRepository;
@@ -99,6 +103,7 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
         this.chatClient = chatClient;
         this.aiServiceClient = aiServiceClient;
         this.studentLevelService = studentLevelService;
+        this.jobMarketTool = jobMarketTool;
         try {
             this.systemPromptTemplate = systemPrompt.getContentAsString(StandardCharsets.UTF_8);
             this.ragPromptTemplate = ragPrompt.getContentAsString(StandardCharsets.UTF_8);
@@ -235,6 +240,21 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
                 .build();
         chatMessageRepository.save(userMessage);
 
+        // Job-listing answers are rendered from database rows, not composed by the
+        // language model. A prompt can ask a model to call a tool, but cannot prove
+        // that it did; this boundary makes career, seniority and URLs enforceable.
+        if (isJobListingRequest(request.getMessage())) {
+            JobMarketTool.Response market = jobMarketTool.apply(new JobMarketTool.Request(""));
+            String answer = renderJobListings(market);
+            chatMessageRepository.save(ChatMessage.builder()
+                    .chatSession(ChatSession.builder().sessionId(session.getSessionId()).build())
+                    .role("ASSISTANT")
+                    .content(answer)
+                    .createdAt(LocalDateTime.now())
+                    .build());
+            return Flux.just(answer);
+        }
+
         // Prepare context for AI
         // 1. System Prompt (Context)
         Student student = studentRepository.findById(user.getUserId()).orElse(null);
@@ -365,6 +385,37 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
                         .orElse("not assessed");
         return String.format(systemPromptTemplate,
                 user.getFullName(), user.getUserId(), university, major, career, github, transcript, level);
+    }
+
+    static boolean isJobListingRequest(String message) {
+        if (message == null) return false;
+        String value = message.toLowerCase(Locale.ROOT);
+        return value.contains("việc làm") || value.contains("tuyển dụng")
+                || value.contains("job opening") || value.contains("open position")
+                || value.matches(".*\\b(jobs?|vacanc(?:y|ies))\\b.*");
+    }
+
+    private String renderJobListings(JobMarketTool.Response market) {
+        if (market.jobs().isEmpty()) {
+            return market.summary() + "\n\n**Sources:** Market Pulse";
+        }
+        StringBuilder out = new StringBuilder("Các vị trí dưới đây đã được lọc theo đúng career và level hiện tại của bạn.\n\n")
+                .append("| Vị trí | Level | Mức lương | Địa điểm | Kinh nghiệm |\n")
+                .append("|---|---|---|---|---|\n");
+        for (JobMarketTool.JobData job : market.jobs()) {
+            if (job.url() == null || job.url().isBlank()) continue;
+            out.append("| [").append(cell(job.title())).append("](").append(job.url()).append(") | ")
+                    .append(cell(job.seniority())).append(" | ")
+                    .append(cell(job.salary())).append(" | ")
+                    .append(cell(job.location())).append(" | ")
+                    .append(cell(job.experience())).append(" |\n");
+        }
+        out.append("\n").append(market.summary()).append("\n\n**Sources:** Market Pulse");
+        return out.toString();
+    }
+
+    private String cell(String value) {
+        return value == null || value.isBlank() ? "—" : value.replace("|", "\\|");
     }
 
     /**

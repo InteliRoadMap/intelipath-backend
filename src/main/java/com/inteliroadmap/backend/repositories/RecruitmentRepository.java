@@ -66,6 +66,15 @@ public interface RecruitmentRepository extends JpaRepository<Recruitment, String
      */
     long countByPostedDateGreaterThanEqual(java.time.LocalDate from);
 
+    /** Career-specific denominator for career demand percentages. */
+    @Query(value = """
+            SELECT count(DISTINCT recruitment_id)
+            FROM recruitments
+            WHERE career_id = :careerId AND posted_date >= :from
+            """, nativeQuery = true)
+    long countCareerPostingsSince(@Param("careerId") UUID careerId,
+                                  @Param("from") java.time.LocalDate from);
+
     /**
      * Postings inside the trend window.
      *
@@ -116,6 +125,87 @@ public interface RecruitmentRepository extends JpaRepository<Recruitment, String
             """, nativeQuery = true)
     List<Object[]> findTopHiringCompanyIdsSince(@Param("from") java.time.LocalDate from,
                                                 @Param("limit") int limit);
+
+    @Query(value = """
+            SELECT rp.company_id, COUNT(DISTINCT COALESCE(r.dedup_key, r.recruitment_id)) AS job_count
+            FROM recruitment_posts rp JOIN recruitments r ON r.recruitment_id = rp.recruitment_id
+            WHERE r.posted_date >= :from
+              AND r.career_id = :careerId
+              AND (:seniority = '' OR r.seniority = :seniority)
+            GROUP BY rp.company_id ORDER BY job_count DESC LIMIT :limit
+            """, nativeQuery = true)
+    List<Object[]> findTopHiringCompanyIdsScoped(@Param("from") java.time.LocalDate from,
+                                                  @Param("careerId") UUID careerId,
+                                                  @Param("seniority") String seniority,
+                                                  @Param("limit") int limit);
+
+    @Query(value = """
+            SELECT recruitment_infos->>'salary'
+            FROM (
+                SELECT DISTINCT ON (COALESCE(dedup_key, recruitment_id))
+                       recruitment_infos, posted_date
+                FROM recruitments
+                WHERE posted_date >= :from AND career_id = :careerId
+                  AND (:seniority = '' OR seniority = :seniority)
+                ORDER BY COALESCE(dedup_key, recruitment_id), posted_date DESC
+            ) latest
+            WHERE recruitment_infos->>'salary' IS NOT NULL AND recruitment_infos->>'salary' != ''
+            """, nativeQuery = true)
+    List<String> findSalariesScoped(@Param("from") java.time.LocalDate from,
+                                    @Param("careerId") UUID careerId,
+                                    @Param("seniority") String seniority);
+
+    @Query(value = """
+            SELECT s.skill_name, date_trunc('week', r.posted_date)::date AS week,
+                   count(DISTINCT rs.recruitment_id) AS jobs
+            FROM recruitment_skills rs
+            JOIN recruitments r ON r.recruitment_id = rs.recruitment_id
+            JOIN skills s ON s.skill_id = rs.skill_id
+            WHERE r.posted_date >= :from AND r.career_id = :careerId
+              AND (:seniority = '' OR r.seniority = :seniority)
+            GROUP BY s.skill_name, week ORDER BY week, jobs DESC
+            """, nativeQuery = true)
+    List<Object[]> findSkillTrendsScoped(@Param("from") java.time.LocalDate from,
+                                         @Param("careerId") UUID careerId,
+                                         @Param("seniority") String seniority);
+
+    @Query(value = """
+            SELECT COUNT(DISTINCT COALESCE(dedup_key, recruitment_id))
+            FROM recruitments WHERE posted_date >= :from AND career_id = :careerId
+              AND (:seniority = '' OR seniority = :seniority)
+            """, nativeQuery = true)
+    long countDistinctJobsScoped(@Param("from") java.time.LocalDate from,
+                                 @Param("careerId") UUID careerId,
+                                 @Param("seniority") String seniority);
+
+    @Query(value = """
+            SELECT COUNT(*) FROM recruitments r
+            WHERE r.posted_date >= :from AND r.career_id = :careerId
+              AND (:seniority = '' OR r.seniority = :seniority)
+              AND NOT EXISTS (SELECT 1 FROM recruitments p WHERE p.dedup_key=r.dedup_key
+                  AND p.dedup_key IS NOT NULL AND p.posted_date < r.posted_date)
+            """, nativeQuery = true)
+    long countGenuinelyNewScoped(@Param("from") java.time.LocalDate from,
+                                 @Param("careerId") UUID careerId,
+                                 @Param("seniority") String seniority);
+
+    @Query(value = """
+            SELECT MAX(posted_date) FROM recruitments
+            WHERE career_id = :careerId AND (:seniority = '' OR seniority = :seniority)
+            """, nativeQuery = true)
+    java.time.LocalDate findLatestPostedDateScoped(@Param("careerId") UUID careerId,
+                                                    @Param("seniority") String seniority);
+
+    @Query(value = """
+            SELECT * FROM recruitments
+            WHERE career_id = :careerId
+              AND (:seniority = '' OR seniority = :seniority)
+              AND recruitment_infos->>'title' ILIKE concat('%', :keyword, '%')
+            ORDER BY posted_date DESC NULLS LAST LIMIT 10
+            """, nativeQuery = true)
+    List<Recruitment> findScopedJobs(@Param("keyword") String keyword,
+                                     @Param("careerId") UUID careerId,
+                                     @Param("seniority") String seniority);
 
     /**
      * Genuinely new postings: on or after {@code from}, and never advertised

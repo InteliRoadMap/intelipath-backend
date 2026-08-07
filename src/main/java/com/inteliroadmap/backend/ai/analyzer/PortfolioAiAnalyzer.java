@@ -28,17 +28,45 @@ public class PortfolioAiAnalyzer {
 
     private final ChatClient chatClient;
     private final String analyzePromptTemplate;
+    private final String discoveryPromptTemplate;
     private final String modelName;
 
     public PortfolioAiAnalyzer(ChatClient chatClient,
                                @Value("classpath:prompts/github-portfolio-analysis.st") Resource analyzePrompt,
+                               @Value("classpath:prompts/github-capability-discovery.st") Resource discoveryPrompt,
                                @Value("${spring.ai.openai.chat.options.model:unknown}") String modelName) {
         this.chatClient = chatClient;
         this.modelName = modelName;
         try {
             this.analyzePromptTemplate = analyzePrompt.getContentAsString(StandardCharsets.UTF_8);
+            this.discoveryPromptTemplate = discoveryPrompt.getContentAsString(StandardCharsets.UTF_8);
         } catch (IOException e) {
             throw new UncheckedIOException("Failed to load github-portfolio-analysis prompt", e);
+        }
+    }
+
+    /**
+     * Reads implementation evidence before any catalog is shown. The result is used only
+     * for retrieval; the catalog-constrained analysis remains the authority that creates
+     * evidence. Separating retrieval from verification removes the need for an expanding
+     * Java/Python/.NET regex registry and lets a newly seeded framework work immediately.
+     */
+    public CapabilityDiscovery discoverCapabilities(String repoName, String description,
+                                                      String readmeContent, String extraContext,
+                                                      RepoEvidence evidence) {
+        RepoEvidence facts = evidence == null ? RepoEvidence.none() : evidence;
+        try {
+            CapabilityDiscovery result = chatClient.prompt()
+                    .user(String.format(discoveryPromptTemplate, repoName, description,
+                            facts.contributionText(), facts.languageText(), facts.commitText(),
+                            readmeContent, extraContext))
+                    .call()
+                    .entity(CapabilityDiscovery.class);
+            return result == null || result.capabilities() == null
+                    ? CapabilityDiscovery.empty() : result;
+        } catch (Exception e) {
+            log.warn("PortfolioAiAnalyzer: capability discovery failed for {}: {}", repoName, e.getMessage());
+            return CapabilityDiscovery.empty();
         }
     }
 
@@ -114,6 +142,14 @@ public class PortfolioAiAnalyzer {
     }
 
     public record AiGithubSummary(String summary, Map<String, Object> techStack, List<SkillMatch> matchedSkills) {}
+
+    public record CapabilitySignal(String name, String evidence) {}
+
+    public record CapabilityDiscovery(List<CapabilitySignal> capabilities) {
+        public static CapabilityDiscovery empty() {
+            return new CapabilityDiscovery(List.of());
+        }
+    }
 
     /**
      * What is known about the student's own work, rendered for the prompt.

@@ -17,6 +17,7 @@ import com.inteliroadmap.backend.repositories.PortfolioReviewRequestRepository;
 import com.inteliroadmap.backend.repositories.SkillNodeRepository;
 import com.inteliroadmap.backend.repositories.SkillRepository;
 import com.inteliroadmap.backend.repositories.StudentProgressRepository;
+import com.inteliroadmap.backend.repositories.StudentAssessmentRepository;
 import com.inteliroadmap.backend.repositories.StudentRepository;
 import com.inteliroadmap.backend.repositories.StudentSkillRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
@@ -40,6 +41,7 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.util.*;
 
 import org.springframework.transaction.annotation.Transactional;
@@ -70,6 +72,7 @@ public class DatabaseSeeder implements CommandLineRunner {
     private final StudentSkillRepository studentSkillRepository;
     private final FeedbackRepository feedbackRepository;
     private final StudentProgressRepository studentProgressRepository;
+    private final StudentAssessmentRepository studentAssessmentRepository;
     private final NodeTypeRepository nodeTypeRepository;
     private final FptSubjectRepository fptSubjectRepository;
     private final FptSubjectSkillRepository fptSubjectSkillRepository;
@@ -478,6 +481,8 @@ public class DatabaseSeeder implements CommandLineRunner {
 
                 String skillName = cell(line, R_SKILL_GROUP);
                 Skill skill = skillName.isEmpty() ? null : skillNameCanonicalizer.resolve(skillName);
+                boolean careerSkill = skill != null && careerRequiredSkillRepository
+                        .existsByCareerRole_CareerIdAndSkill_SkillId(career.getCareerId(), skill.getSkillId());
 
                 // Stage/weight still live on NodeType. The v2 schema no longer carries
                 // stage-unlock keys, so gating is driven purely by parent/previous edges.
@@ -490,14 +495,15 @@ public class DatabaseSeeder implements CommandLineRunner {
 
                 SkillNode skillNode = skillNodeRepository.save(SkillNode.builder()
                         .careerRole(career)
-                        .skill(skill)
+                        .skill(careerSkill ? skill : null)
+                        .semanticType(careerSkill ? "SKILL" : "CAPABILITY")
                         .type(nodeType)
                         .nodeName(cell(line, R_NAME))
                         .nodeLevel(parseInt(cell(line, R_NODE_LEVEL), 0))
                         .description(cell(line, R_DESCRIPTION))
                         .resource(links)
                         .completionPolicy(blankToNull(cell(line, R_COMPLETION_POLICY)))
-                        .requiredProficiency(parseInt(cell(line, R_REQUIRED_PROFICIENCY), 0))
+                        .requiredProficiency(parseNullableInt(cell(line, R_REQUIRED_PROFICIENCY)))
                         .evidenceKeywords(evidenceKeywords)
                         .prerequisite(prerequisite)
                         .selection(defaultTo(cell(line, R_SELECTION), "ALL"))
@@ -512,15 +518,29 @@ public class DatabaseSeeder implements CommandLineRunner {
                 edgeRows.add(line);
             }
 
-            // Pass 2: resolve parent/previous slug references to persisted nodes.
+            Set<String> topicSlugs = edgeRows.stream()
+                    .map(row -> cell(row, R_PARENT_ID))
+                    .filter(value -> !value.isEmpty())
+                    .collect(java.util.stream.Collectors.toSet());
+
+            // Pass 2: resolve edges and persist the semantic contract. Topic status
+            // comes from actual parent references, never name/depth heuristics.
             for (String[] row : edgeRows) {
                 SkillNode node = nodesBySlug.get(cell(row, R_NODE_ID));
                 if (node == null) continue;
                 SkillNode parent = nodesBySlug.get(cell(row, R_PARENT_ID));
                 SkillNode previous = nodesBySlug.get(cell(row, R_PREVIOUS_ID));
-                if (parent == null && previous == null) continue;
                 node.setParentNode(parent);
                 node.setPreviousNode(previous);
+                if (Boolean.TRUE.equals(node.getIsCheckpoint())) {
+                    node.setSemanticType("CHECKPOINT");
+                    node.setSkill(null);
+                    node.setRequiredProficiency(null);
+                } else if (topicSlugs.contains(cell(row, R_NODE_ID))) {
+                    node.setSemanticType("TOPIC");
+                    node.setSkill(null);
+                    node.setRequiredProficiency(null);
+                }
                 skillNodeRepository.save(node);
             }
 
@@ -770,6 +790,8 @@ public class DatabaseSeeder implements CommandLineRunner {
         st.setPortfolioSlug(portfolioSlugService.allocateFor(userSt));
         studentRepository.save(st);
 
+        seedSeniorDemoStudent();
+
         // ------------------- Random Student Accounts ------------------ //
         int limit = 100;
         if (studentRepository.count() >= limit) {
@@ -881,5 +903,138 @@ public class DatabaseSeeder implements CommandLineRunner {
             }
         }
         log.info("DatabaseSeeder: Mock data seeding completed successfully.");
+    }
+
+    /**
+     * A reproducible end-state account for demos and visual QA.
+     *
+     * <p>This is deliberately separate from the ordinary credentialed student:
+     * restarting a dev database may reset this fixture to its documented state,
+     * but must never overwrite a developer's own progress. Every write is an
+     * upsert, so application restarts do not multiply rows.
+     */
+    private void seedSeniorDemoStudent() {
+        CareerRole backend = careerRoleRepository.findByCareerName("Backend");
+        if (backend == null) {
+            log.warn("DatabaseSeeder: Cannot seed senior demo student: Backend career not found.");
+            return;
+        }
+
+        User demoUser = userRepository.findByEmail("senior.demo@intelipath.local");
+        if (demoUser == null) {
+            demoUser = User.builder().email("senior.demo@intelipath.local").build();
+        }
+        demoUser.setFullName("Senior Backend Demo");
+        demoUser.setYob(LocalDate.now().minusYears(23));
+        demoUser.setRole(UserRole.STUDENT);
+        demoUser.setAccountType(AccountType.FPT);
+        SeedAccountsProperties.Account demoCredentials = seedAccounts.getDemoStudent();
+        if (!demoCredentials.isUsable() && seedAccounts.getStudent().isUsable()) {
+            // Local convenience without committing a password: the demo gets its
+            // own username and reuses the environment-supplied student password.
+            demoCredentials = new SeedAccountsProperties.Account();
+            demoCredentials.setUsername("senior_demo");
+            demoCredentials.setPassword(seedAccounts.getStudent().getPassword());
+        }
+        applySeedCredentials(demoUser, demoCredentials, "demo student");
+        demoUser = userRepository.save(demoUser);
+
+        Student demo = studentRepository.findByUserId(demoUser.getUserId());
+        if (demo == null) {
+            demo = Student.builder().userId(demoUser.getUserId()).build();
+        }
+        demo.setUniversityName(FPT_UNIVERSITY_NAME);
+        demo.setMajor("Software Engineer");
+        demo.setCareerRole(backend);
+        demo.setAdmissionDate(LocalDate.now().minusYears(4).withMonth(9).withDayOfMonth(1));
+        demo.setPortfolioSlug(portfolioSlugService.allocateFor(demoUser));
+        demo = studentRepository.save(demo);
+
+        List<CareerRequiredSkill> core = careerRequiredSkillRepository
+                .findByCareerRole_CareerIdAndImportanceLevelIn(
+                        backend.getCareerId(), Set.of(ImportanceLevel.HIGH));
+        LinkedHashMap<UUID, Skill> distinctCore = new LinkedHashMap<>();
+        for (CareerRequiredSkill row : core) {
+            if (row.getSkill() != null && row.getSkill().getSkillId() != null) {
+                distinctCore.putIfAbsent(row.getSkill().getSkillId(), row.getSkill());
+            }
+        }
+
+        int heldTarget = distinctCore.isEmpty()
+                ? 0
+                : Math.min(distinctCore.size() - 1,
+                        Math.max(1, (int) Math.ceil(distinctCore.size() * 0.90)));
+        Map<UUID, StudentSkill> existingSkills = studentSkillRepository
+                .findByStudent_UserId(demo.getUserId()).stream()
+                .filter(row -> row.getSkill() != null)
+                .collect(java.util.stream.Collectors.toMap(
+                        row -> row.getSkill().getSkillId(), row -> row, (left, right) -> left));
+        List<StudentSkill> skillRows = new ArrayList<>();
+        List<Map<String, Object>> questions = new ArrayList<>();
+        List<Map<String, Object>> answers = new ArrayList<>();
+        int index = 0;
+        for (Skill skill : distinctCore.values()) {
+            boolean held = index++ < heldTarget;
+            StudentSkill studentSkill = existingSkills.getOrDefault(skill.getSkillId(),
+                    StudentSkill.builder().student(demo).skill(skill).build());
+            studentSkill.setProficiency((short) (held ? 4 : 2));
+            studentSkill.setSelfDeclared(!held);
+            studentSkill.setVerifiedBy(held ? "MENTOR" : null);
+            skillRows.add(studentSkill);
+            questions.add(Map.of(
+                    "skillId", skill.getSkillId().toString(),
+                    "skillName", skill.getSkillName(),
+                    "prompt", "Rate your practical proficiency in " + skill.getSkillName()));
+            answers.add(Map.of(
+                    "skillId", skill.getSkillId().toString(),
+                    "skillName", skill.getSkillName(),
+                    "level", held ? 4 : 2,
+                    "note", "Completed demo assessment answer"));
+        }
+        studentSkillRepository.saveAll(skillRows);
+
+        BigDecimal ratio = distinctCore.isEmpty() ? BigDecimal.ZERO
+                : BigDecimal.valueOf((double) heldTarget / distinctCore.size()).setScale(2, java.math.RoundingMode.HALF_UP);
+        StudentAssessment assessment = studentAssessmentRepository.findByUserIdOrderByCreatedAtDesc(demo.getUserId())
+                .stream()
+                .filter(row -> "DEMO_SEED".equals(row.getModelUsed()))
+                .findFirst()
+                .orElseGet(StudentAssessment::new);
+        assessment.setUserId(demo.getUserId());
+        assessment.setCareerId(backend.getCareerId());
+        assessment.setQuestions(questions);
+        assessment.setAnswers(answers);
+        assessment.setAiLevel(SeniorityLevel.SENIOR);
+        assessment.setAiRawLevel(SeniorityLevel.SENIOR);
+        assessment.setAiRationale("Seeded demo: answered every core-skill question; 90% objectively verified at professional proficiency.");
+        assessment.setAiConfidence(BigDecimal.ONE);
+        assessment.setRatioAll(ratio);
+        assessment.setRatioVerified(ratio);
+        assessment.setRequiredCount(distinctCore.size());
+        assessment.setModelUsed("DEMO_SEED");
+        assessment.setStatus("COMPLETED");
+        assessment.setComputedAt(LocalDateTime.now());
+
+        List<SkillNode> publishedNodes = skillNodeRepository
+                .findPublishedForCareerLegacyOrder(backend.getCareerId());
+        assessment.setAppliedNodeCount(publishedNodes.size());
+        studentAssessmentRepository.save(assessment);
+
+        Map<UUID, StudentProgress> existingProgress = studentProgressRepository
+                .findByStudent_UserId(demo.getUserId()).stream()
+                .collect(java.util.stream.Collectors.toMap(
+                        row -> row.getSkillNode().getNodeId(), row -> row, (left, right) -> left));
+        LocalDateTime completedAt = LocalDateTime.now().minusDays(1);
+        List<StudentProgress> progressRows = new ArrayList<>(publishedNodes.size());
+        for (SkillNode node : publishedNodes) {
+            StudentProgress progress = existingProgress.getOrDefault(node.getNodeId(),
+                    StudentProgress.builder().student(demo).skillNode(node).createdAt(completedAt).build());
+            progress.setStatus(RoadmapStepStatus.COMPLETED);
+            progress.setCompletedAt(completedAt);
+            progressRows.add(progress);
+        }
+        studentProgressRepository.saveAll(progressRows);
+        log.info("DatabaseSeeder: Senior demo student ready: {} assessment answers, {} completed roadmap nodes.",
+                answers.size(), progressRows.size());
     }
 }
