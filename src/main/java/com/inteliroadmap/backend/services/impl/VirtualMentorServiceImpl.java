@@ -240,6 +240,14 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
                 .build();
         chatMessageRepository.save(userMessage);
 
+        if (isCurrentLevelRequest(request.getMessage())) {
+            String answer = renderCurrentLevel(user.getUserId());
+            chatMessageRepository.save(ChatMessage.builder()
+                    .chatSession(ChatSession.builder().sessionId(session.getSessionId()).build())
+                    .role("ASSISTANT").content(answer).createdAt(LocalDateTime.now()).build());
+            return Flux.just(answer);
+        }
+
         // Job-listing answers are rendered from database rows, not composed by the
         // language model. A prompt can ask a model to call a tool, but cannot prove
         // that it did; this boundary makes career, seniority and URLs enforceable.
@@ -393,6 +401,25 @@ public class VirtualMentorServiceImpl implements VirtualMentorService {
         return value.contains("việc làm") || value.contains("tuyển dụng")
                 || value.contains("job opening") || value.contains("open position")
                 || value.matches(".*\\b(jobs?|vacanc(?:y|ies))\\b.*");
+    }
+
+    static boolean isCurrentLevelRequest(String message) {
+        if (message == null) return false;
+        String value = message.toLowerCase(Locale.ROOT).trim();
+        return value.contains("level hiện tại") || value.contains("trình độ hiện tại")
+                || value.matches(".*\\bwhat('s| is)? my (current )?level\\b.*");
+    }
+
+    private String renderCurrentLevel(UUID userId) {
+        return studentLevelService.levelOf(userId).map(level -> {
+            String evidence = level.getVerifiedCount() == null || level.getRequiredCount() == null
+                    ? "" : String.format(" Dữ liệu hiện có %d/%d kỹ năng bắt buộc đã có bằng chứng khách quan.",
+                    level.getVerifiedCount(), level.getRequiredCount());
+            String rationale = level.getRationale() == null || level.getRationale().isBlank()
+                    ? "" : " " + level.getRationale();
+            return String.format("## Level hiện tại: %s\n\n%s%s\n\n**Sources:** Assessment · Skill evidence",
+                    level.getLevel(), rationale, evidence);
+        }).orElse("Bạn chưa có level được xác nhận. Hãy hoàn thành assessment trước.\n\n**Sources:** Assessment");
     }
 
     private String renderJobListings(JobMarketTool.Response market) {
