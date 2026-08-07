@@ -15,12 +15,4 @@ public class ImportStudentAccountsRequest {
     @NotEmpty
     private List<StudentAccounts> accounts;
 
-    @Data @Builder @NoArgsConstructor @AllArgsConstructor
-    public static class StudentAccounts{
-        @NotNull private String fullName;
-        @NotNull private String email;
-        @NotNull private LocalDate admissionDate;
-        @NotNull private String major;
-        @NotNull private String curriculum;
-    }
 }

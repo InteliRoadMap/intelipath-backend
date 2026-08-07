@@ -4,12 +4,16 @@ import com.inteliroadmap.backend.domain.dto.response.student.DashboardRoadmapPro
 import com.inteliroadmap.backend.domain.dto.response.student.SkillGapItemResponse;
 import com.inteliroadmap.backend.domain.entity.Student;
 import com.inteliroadmap.backend.repositories.StudentRepository;
+import com.inteliroadmap.backend.repositories.StudentNodeSelectionRepository;
+import com.inteliroadmap.backend.repositories.SkillNodeRepository;
 import com.inteliroadmap.backend.services.StudentDashboardService;
 import org.springframework.context.annotation.Description;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 import java.util.UUID;
+import java.util.Set;
+import java.util.HashSet;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -19,10 +23,16 @@ public class StudentProgressTool implements Function<StudentProgressTool.Request
 
     private final StudentDashboardService studentDashboardService;
     private final StudentRepository studentRepository;
+    private final StudentNodeSelectionRepository selectionRepository;
+    private final SkillNodeRepository skillNodeRepository;
 
-    public StudentProgressTool(StudentDashboardService studentDashboardService, StudentRepository studentRepository) {
+    public StudentProgressTool(StudentDashboardService studentDashboardService, StudentRepository studentRepository,
+                               StudentNodeSelectionRepository selectionRepository,
+                               SkillNodeRepository skillNodeRepository) {
         this.studentDashboardService = studentDashboardService;
         this.studentRepository = studentRepository;
+        this.selectionRepository = selectionRepository;
+        this.skillNodeRepository = skillNodeRepository;
     }
 
     public record Request(UUID userId) {}
@@ -53,7 +63,18 @@ public class StudentProgressTool implements Function<StudentProgressTool.Request
                 progressText += "No roadmap assigned.";
             }
 
+            // Career requirements contain every technology alternative. Once a
+            // student picks Java, sibling choices such as Python and Node.js are
+            // not personal gaps and must never be presented as mandatory work.
+            Set<String> unselectedAlternatives = new HashSet<>();
+            selectionRepository.findByStudent_UserId(student.getUserId()).forEach(selection ->
+                    skillNodeRepository.findByParentNode_NodeId(selection.getGroupNode().getNodeId()).stream()
+                            .filter(node -> !node.getNodeId().equals(selection.getChosenNode().getNodeId()))
+                            .forEach(node -> unselectedAlternatives.add(node.getNodeName().toLowerCase())));
+
             List<String> missingSkillNames = gaps.stream()
+                    .filter(gap -> gap.getTitle() == null
+                            || !unselectedAlternatives.contains(gap.getTitle().toLowerCase()))
                     .map(gap -> gap.getTitle() + " (Severity: " + gap.getSeverity() + ")")
                     .toList();
 

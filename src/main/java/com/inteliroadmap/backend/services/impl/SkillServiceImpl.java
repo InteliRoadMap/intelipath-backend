@@ -8,6 +8,7 @@ import com.inteliroadmap.backend.domain.entity.CareerRole;
 import com.inteliroadmap.backend.domain.entity.Skill;
 import com.inteliroadmap.backend.domain.entity.Student;
 import com.inteliroadmap.backend.domain.entity.StudentSkill;
+import com.inteliroadmap.backend.components.CoreSkillEligibility;
 import com.inteliroadmap.backend.exceptions.ResourceNotFoundException;
 import com.inteliroadmap.backend.services.AuthenticatedStudentService;
 import com.inteliroadmap.backend.mappers.SkillMapper;
@@ -24,6 +25,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
+import java.util.Locale;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -45,6 +47,7 @@ public class SkillServiceImpl implements SkillService {
     private final AuthenticatedStudentService authenticatedStudentService;
     private final SkillEvidenceService skillEvidenceService;
     private final SkillMapper skillMapper;
+    private final CoreSkillEligibility coreSkillEligibility;
 
     /**
      * Retrieves the authenticated student's selected skills and all skills available in the system.
@@ -59,9 +62,9 @@ public class SkillServiceImpl implements SkillService {
         // Step 1: Get or create the authenticated student
         Student student = authenticatedStudentService.getOrCreateStudent();
 
-        // Step 2: Load the student's selected skills and all available skills
+        // Step 2: Load the student's selected skills and the ones they could declare
         List<StudentSkill> selectedSkills = studentSkillRepository.findByStudent_UserId(student.getUserId());
-        List<Skill> allSkills = skillRepository.findAll();
+        List<Skill> allSkills = declarableSkills();
 
         // Step 3: Return selected and available skills when no target career is set
         if (student.getCareerRole() == null || student.getCareerRole().getCareerId() == null) {
@@ -98,13 +101,40 @@ public class SkillServiceImpl implements SkillService {
     public SkillResponse searchSkills(String search) {
         log.info("SkillServiceImpl: Skill search request received. search: {}", search);
 
-        // Step 1: Search only by skill name without case sensitivity
-        List<Skill> skills = skillRepository.findBySkillNameContainingIgnoreCase(search);
+        // Step 1: Search only by skill name without case sensitivity, over the same
+        // population the picker lists. Searching the raw catalog here would put back
+        // exactly what step 2 of getStudentSkills takes out — a student typing "ma"
+        // would be offered `$match` again.
+        String needle = search == null ? "" : search.trim().toLowerCase(Locale.ROOT);
+        List<Skill> skills = declarableSkills().stream()
+                .filter(skill -> skill.getSkillName() != null
+                        && skill.getSkillName().toLowerCase(Locale.ROOT).contains(needle))
+                .toList();
 
         // Step 2: Return search results in the skills field
         return SkillResponse.builder()
                 .skills(skillMapper.toSkillItemResponses(skills))
                 .build();
+    }
+
+    /**
+     * The skills a student is offered to declare.
+     *
+     * <p>Two gates, and both are needed. {@link SkillRepository#findDeclarableCandidates()}
+     * asks whether anything outside the catalog vouches for the row — a posting, or a
+     * career grade. {@link CoreSkillEligibility} asks whether the string is the name of one
+     * learnable thing at all. Measured on the live database: 3.895 rows in the catalog,
+     * 720 pass the evidence gate, and the name gate takes that to the list a person can
+     * actually read.
+     *
+     * <p>Nothing is deleted and nothing is hidden from the roadmap — {@code $elemMatch} is
+     * still a node inside the MongoDB track, and still something to learn. It is simply
+     * not something a student says they can do.
+     */
+    private List<Skill> declarableSkills() {
+        return skillRepository.findDeclarableCandidates().stream()
+                .filter(skill -> coreSkillEligibility.isNameable(skill.getSkillName()))
+                .toList();
     }
 
     /**

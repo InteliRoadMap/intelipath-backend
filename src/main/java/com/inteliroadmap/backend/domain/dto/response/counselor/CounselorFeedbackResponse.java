@@ -26,19 +26,4 @@ public class CounselorFeedbackResponse {
     private int totalPages;
     private int currentPage;
 
-
-    @Data @NoArgsConstructor @AllArgsConstructor @Builder
-    public static class FeedbackResponse {
-        private UUID feedbackId;
-        private UUID senderId;
-        private UUID receiverId;
-        private String senderName;
-        private String receiverName;
-        private String content;
-        private FeedbackType type;
-        private FeedbackStatus status;
-        private List<FeedbackAttachmentResponse> attachments;
-        private LocalDateTime createdAt;
-        private LocalDateTime updatedAt;
-    }
 }

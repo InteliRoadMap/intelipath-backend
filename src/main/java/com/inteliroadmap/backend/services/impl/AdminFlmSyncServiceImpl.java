@@ -1,5 +1,7 @@
 package com.inteliroadmap.backend.services.impl;
 
+import com.inteliroadmap.backend.domain.dto.response.admin.Summary;
+
 import com.fasterxml.jackson.databind.JsonNode;
 import com.inteliroadmap.backend.ai.client.AiServiceClient;
 import com.inteliroadmap.backend.domain.dto.request.AdminFlmSyncRequest;
@@ -40,7 +42,7 @@ public class AdminFlmSyncServiceImpl implements AdminFlmSyncService {
 
     // Import each finished job's overlay exactly once; subsequent polls read the cached
     // summary. In-memory and single-instance, which matches this admin-only tool.
-    private final Map<String, FlmSyncStatusResponse.Summary> importedJobs = new ConcurrentHashMap<>();
+    private final Map<String, Summary> importedJobs = new ConcurrentHashMap<>();
     // Which curriculum each running job belongs to, so its overlay imports under the right
     // code/curid whether the foreground poll or the server-side watcher completes it.
     private final Map<String, FptOverlayImportService.CurriculumRef> jobCurricula = new ConcurrentHashMap<>();
@@ -144,7 +146,7 @@ public class AdminFlmSyncServiceImpl implements AdminFlmSyncService {
                 .build();
 
         if ("done".equals(state)) {
-            FlmSyncStatusResponse.Summary summary = ensureImported(jobId, status.path("overlay"));
+            Summary summary = ensureImported(jobId, status.path("overlay"));
             response.setState("imported");
             response.setSummary(summary);
             if (summary != null && summary.isSuspect()) {
@@ -166,8 +168,8 @@ public class AdminFlmSyncServiceImpl implements AdminFlmSyncService {
     }
 
     /** Runs the overlay import once per job id; later polls return the cached summary. */
-    private synchronized FlmSyncStatusResponse.Summary ensureImported(String jobId, JsonNode overlay) {
-        FlmSyncStatusResponse.Summary cached = importedJobs.get(jobId);
+    private synchronized Summary ensureImported(String jobId, JsonNode overlay) {
+        Summary cached = importedJobs.get(jobId);
         if (cached != null) return cached;
 
         if (overlay == null || !overlay.isObject()) {
@@ -177,7 +179,7 @@ public class AdminFlmSyncServiceImpl implements AdminFlmSyncService {
         FptOverlayImportService.CurriculumRef ref = jobCurricula.getOrDefault(
                 jobId, new FptOverlayImportService.CurriculumRef("UNKNOWN", null, false));
         FptOverlayImportService.ImportSummary result = fptOverlayImportService.importOverlay(overlay, ref);
-        FlmSyncStatusResponse.Summary summary = FlmSyncStatusResponse.Summary.builder()
+        Summary summary = Summary.builder()
                 .subjects(result.subjects())
                 .skillLinks(result.skillLinks())
                 .unmatchedSkills(result.unmatchedSkills())

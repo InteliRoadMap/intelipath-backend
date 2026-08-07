@@ -2,11 +2,14 @@ package com.inteliroadmap.backend.controllers;
 
 import com.inteliroadmap.backend.domain.dto.request.SelectAlternativeRequest;
 import com.inteliroadmap.backend.domain.dto.request.UpdateNodeProgressRequest;
+import com.inteliroadmap.backend.domain.dto.response.roadmap.ChoiceOptionsResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.NodeSelectionResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.RoadmapNodeResponse;
+import com.inteliroadmap.backend.domain.dto.response.plan.LearningPlanResponse;
 import com.inteliroadmap.backend.domain.dto.response.roadmap.StudentRoadmapResponse;
 import com.inteliroadmap.backend.services.RoadmapSelectionService;
 import com.inteliroadmap.backend.services.RoadmapService;
+import com.inteliroadmap.backend.services.RoadmapPersonalizationService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -25,6 +28,9 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import java.util.HashSet;
+import java.util.Set;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -44,6 +50,7 @@ public class RoadmapController {
 
     private final RoadmapService roadmapService;
     private final RoadmapSelectionService roadmapSelectionService;
+    private final RoadmapPersonalizationService roadmapPersonalizationService;
 
     @GetMapping("/student")
     @Operation(summary = "Get student's roadmap", description = "Fetch the entire roadmap (Flat Array) of the logged-in student, combined with progress status to render the Map.")
@@ -53,8 +60,49 @@ public class RoadmapController {
             @ApiResponse(responseCode = "401", description = "Unauthorized - Not logged in or invalid token"),
             @ApiResponse(responseCode = "404", description = "Not Found - Student not found or student does not have a Career")
     })
-    public ResponseEntity<StudentRoadmapResponse> getStudentRoadmap() {
-        return ResponseEntity.ok(roadmapService.getStudentRoadmap());
+    public ResponseEntity<StudentRoadmapResponse> getStudentRoadmap(
+            @RequestParam(name = "expand", required = false) List<UUID> expand) {
+        // Repairs parent-topic state left by older evidence imports before serving
+        // the graph. The reconciliation is idempotent and runs in its own transaction.
+        roadmapPersonalizationService.reconcileCompletedTopicsForCurrentStudent();
+        // ?expand=<nodeId>&expand=<nodeId> opens those topics all the way down.
+        // Absent means the default slice, so every existing caller is unaffected.
+        return ResponseEntity.ok(roadmapService.getStudentRoadmap(
+                expand == null ? Set.of() : new HashSet<>(expand)));
+    }
+
+    @GetMapping("/student/sub/{nodeId}")
+    @Operation(summary = "Open one standalone roadmap under the career",
+            description = "Languages, frameworks and database tracks are whole roadmaps in their "
+                    + "own right. This serves that subtree, with a breadcrumb back out. Sliced to "
+                    + "the same depth as the career roadmap and opened the same way, via "
+                    + "?expand=<nodeId>.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Successful",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = StudentRoadmapResponse.class))),
+            @ApiResponse(responseCode = "401", description = "Unauthorized - Not logged in or invalid token"),
+            @ApiResponse(responseCode = "404", description = "Not Found - No such roadmap node")
+    })
+    public ResponseEntity<StudentRoadmapResponse> getStudentSubRoadmap(
+            @PathVariable UUID nodeId,
+            @RequestParam(name = "expand", required = false) List<UUID> expand) {
+        roadmapPersonalizationService.reconcileCompletedTopicsForCurrentStudent();
+        return ResponseEntity.ok(roadmapService.getStudentSubRoadmap(
+                nodeId, expand == null ? Set.of() : new HashSet<>(expand)));
+    }
+
+    @GetMapping("/student/plan")
+    @Operation(summary = "Get the student's personalised learning plan",
+            description = "What to learn next, derived from the student's own evidence and live "
+                    + "market demand rather than from the career's node catalog. Each step carries "
+                    + "the sentence that justifies it.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Successful",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = LearningPlanResponse.class))),
+            @ApiResponse(responseCode = "401", description = "Unauthorized - Not logged in or invalid token")
+    })
+    public ResponseEntity<LearningPlanResponse> getStudentPlan() {
+        return ResponseEntity.ok(roadmapService.getStudentPlan());
     }
 
     @GetMapping("/{careerId}")
@@ -144,6 +192,23 @@ public class RoadmapController {
     })
     public ResponseEntity<List<NodeSelectionResponse>> getSelections() {
         return ResponseEntity.ok(roadmapSelectionService.getSelections());
+    }
+
+    @GetMapping("/selections/{groupNodeId}/options")
+    @Operation(summary = "Rank the options of one choose-one group",
+            description = "Every alternative of the group, ranked by how well it fits the student's "
+                    + "skills, with the market figures beside each. Read-only: opening the chooser "
+                    + "never stores a selection. `verdict` is DECISIVE, TOO_CLOSE or NO_SIGNAL — the "
+                    + "last two mean no option may be presented as recommended.")
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Successful",
+                    content = @Content(mediaType = "application/json", schema = @Schema(implementation = ChoiceOptionsResponse.class))),
+            @ApiResponse(responseCode = "400", description = "Bad Request - Not a CHOOSE_ONE group"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized"),
+            @ApiResponse(responseCode = "404", description = "Not Found - Group does not exist in this career")
+    })
+    public ResponseEntity<ChoiceOptionsResponse> getChoiceOptions(@PathVariable UUID groupNodeId) {
+        return ResponseEntity.ok(roadmapSelectionService.getOptions(groupNodeId));
     }
 
     @DeleteMapping("/selections/{groupNodeId}")

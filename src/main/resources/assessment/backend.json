@@ -1,0 +1,231 @@
+{
+  "scope": "BACKEND",
+  "careerNames": ["Backend"],
+  "version": 1,
+  "items": [
+    {
+      "id": "be-oop-01",
+      "kind": "SINGLE_CHOICE",
+      "tier": 1,
+      "topic": "OOP",
+      "skills": ["OOP", "Java"],
+      "prompt": "A `Rectangle` class has `setWidth` and `setHeight`. A `Square` extends it and overrides both setters to keep all sides equal. Existing code that resizes a `Rectangle` then asserts area == width * height now fails when handed a `Square`.\n\nWhich principle does this break?",
+      "choices": [
+        { "key": "a", "text": "Single responsibility — Square now has two reasons to change" },
+        { "key": "b", "text": "Liskov substitution — a Square cannot stand in for a Rectangle without breaking callers" },
+        { "key": "c", "text": "Encapsulation — the setters expose internal state" },
+        { "key": "d", "text": "Nothing is broken; the caller's assertion was wrong to begin with" }
+      ],
+      "answer": ["b"],
+      "explanation": "Inheritance promises substitutability. Square passes the 'is-a' test in English and fails it in behaviour, which is exactly what Liskov substitution is about. The usual fix is composition, or not modelling Square as a subtype of a mutable Rectangle at all."
+    },
+    {
+      "id": "be-oop-02",
+      "kind": "SINGLE_CHOICE",
+      "tier": 2,
+      "topic": "OOP",
+      "skills": ["OOP", "Dependency Injection"],
+      "prompt": "An `OrderService` constructs `new EmailSender()` inside its own constructor. What is the concrete cost of this, as opposed to taking a sender as a constructor argument?",
+      "choices": [
+        { "key": "a", "text": "It allocates more memory, because a new sender exists per service" },
+        { "key": "b", "text": "It cannot be unit-tested without actually sending mail, and the sender cannot be swapped without editing OrderService" },
+        { "key": "c", "text": "It breaks encapsulation, because the sender is now internal state" },
+        { "key": "d", "text": "Nothing — this is what constructors are for" }
+      ],
+      "answer": ["b"],
+      "explanation": "The cost is coupling, and it shows up first in the tests. A dependency you cannot replace is a dependency you cannot fake, so every test of OrderService drags in a real SMTP client."
+    },
+    {
+      "id": "be-cache-01",
+      "kind": "SINGLE_CHOICE",
+      "tier": 2,
+      "topic": "Caching",
+      "skills": ["Caching", "Redis"],
+      "prompt": "A read-heavy endpoint uses a cache-aside pattern with Redis. On a write, the code updates the database and then deletes the cache key. A colleague suggests updating the cache key with the new value instead of deleting it.\n\nWhat is the main risk of the change?",
+      "choices": [
+        { "key": "a", "text": "It is slower, because a write to Redis costs more than a delete" },
+        { "key": "b", "text": "Two concurrent writes can land in the cache in the opposite order from the database, leaving a stale value cached indefinitely" },
+        { "key": "c", "text": "Redis cannot store the object without a serializer" },
+        { "key": "d", "text": "The TTL is lost, so the key never expires" }
+      ],
+      "answer": ["b"],
+      "explanation": "Delete-on-write is self-healing: the next read repopulates from the source of truth. Write-through from application code introduces an ordering race between two writers, and the loser's value can sit in the cache long after the database has moved on."
+    },
+    {
+      "id": "be-cache-02",
+      "kind": "SINGLE_CHOICE",
+      "tier": 3,
+      "topic": "Caching",
+      "skills": ["Caching", "Redis"],
+      "prompt": "A popular cache key expires at a moment of peak traffic. Within a second, several thousand requests miss, all query the database for the same row, and the database saturates.\n\nWhat is this called, and what is the standard fix?",
+      "choices": [
+        { "key": "a", "text": "Cache penetration — fixed by caching negative results" },
+        { "key": "b", "text": "Cache avalanche — fixed by giving every key the same TTL" },
+        { "key": "c", "text": "Cache stampede — fixed by letting one request rebuild the key while the others wait or serve the stale value" },
+        { "key": "d", "text": "Thundering herd on the connection pool — fixed by raising the pool size" }
+      ],
+      "answer": ["c"],
+      "explanation": "A stampede is many readers racing to rebuild one expired key. The fix is to make rebuilding single-flight — a short lock, or serving the stale value while one worker refreshes. Raising the pool size just lets more requests hit the database at once."
+    },
+    {
+      "id": "be-err-01",
+      "kind": "SINGLE_CHOICE",
+      "tier": 1,
+      "topic": "Error handling",
+      "skills": ["Error Handling", "Java"],
+      "prompt": "Which of these is the clearest sign of a `catch` block that makes a bug harder to find?",
+      "choices": [
+        { "key": "a", "text": "It logs the exception and rethrows it wrapped in a domain exception" },
+        { "key": "b", "text": "It catches the exception, logs `e.getMessage()`, and returns null" },
+        { "key": "c", "text": "It catches a narrow exception type and applies a documented fallback" },
+        { "key": "d", "text": "It catches, logs the full stack trace, and lets the request fail with a 500" }
+      ],
+      "answer": ["b"],
+      "explanation": "Returning null on failure moves the crash somewhere else and drops the stack trace on the way, so the NullPointerException you eventually see points at code that did nothing wrong. Losing the stack trace is the part that costs the most debugging time."
+    },
+    {
+      "id": "be-err-02",
+      "kind": "SINGLE_CHOICE",
+      "tier": 3,
+      "topic": "Error handling",
+      "skills": ["Error Handling", "REST"],
+      "prompt": "A payment endpoint times out after the charge has been made but before the response reaches the client. The client retries. What must be true for the retry to be safe?",
+      "choices": [
+        { "key": "a", "text": "The endpoint returns 500 rather than 504, so the client knows to retry" },
+        { "key": "b", "text": "The request carries an idempotency key the server records, so a repeat of the same key returns the original result instead of charging again" },
+        { "key": "c", "text": "The client waits with exponential backoff before retrying" },
+        { "key": "d", "text": "The charge runs inside a database transaction" }
+      ],
+      "answer": ["b"],
+      "explanation": "Backoff changes when the duplicate arrives, not whether it double-charges. A transaction protects the server's own consistency and says nothing about a second request. Only a key the server remembers can make the retry a no-op."
+    },
+    {
+      "id": "be-algo-01",
+      "kind": "SINGLE_CHOICE",
+      "tier": 1,
+      "topic": "Algorithms",
+      "skills": ["Data Structures", "Algorithms"],
+      "prompt": "You have a list of 100,000 user ids and, for each of 100,000 incoming events, you must check whether the event's user id is in the list.\n\nThe list is stored as an `ArrayList` and checked with `contains`. What changes, and by how much, if it becomes a `HashSet`?",
+      "choices": [
+        { "key": "a", "text": "Nothing measurable — both are O(n) lookups" },
+        { "key": "b", "text": "Each lookup goes from O(n) to O(1), so the total goes from about 10^10 comparisons to about 10^5" },
+        { "key": "c", "text": "Each lookup goes from O(n) to O(log n), the same as a sorted array" },
+        { "key": "d", "text": "It gets slower, because hashing each id costs more than comparing it" }
+      ],
+      "answer": ["b"],
+      "explanation": "`ArrayList.contains` scans. 100,000 events x 100,000 elements is 10^10 comparisons — minutes of CPU. A hash lookup is constant on average, which takes the whole job to 100,000 hashes. This is the single most common performance bug in application code."
+    },
+    {
+      "id": "be-db-01",
+      "kind": "SINGLE_CHOICE",
+      "tier": 2,
+      "topic": "Databases",
+      "skills": ["SQL", "PostgreSQL"],
+      "prompt": "An endpoint loads 50 orders, then loads each order's customer inside the loop. The logs show 51 queries.\n\nWhich of these actually fixes it?",
+      "choices": [
+        { "key": "a", "text": "Add an index on `orders.customer_id`" },
+        { "key": "b", "text": "Fetch the customers in one query — a join, or one `WHERE id IN (...)` — and match them in memory" },
+        { "key": "c", "text": "Increase the connection pool size so the 51 queries run concurrently" },
+        { "key": "d", "text": "Cache each customer after loading it" }
+      ],
+      "answer": ["b"],
+      "explanation": "This is the N+1 problem. The index makes each of the 51 queries faster and leaves 51 round-trips in place; the pool lets you do the wrong thing in parallel; the cache helps on the second request and not the first. Only collapsing the queries removes the cause."
+    },
+    {
+      "id": "be-concur-01",
+      "kind": "SINGLE_CHOICE",
+      "tier": 3,
+      "topic": "Concurrency",
+      "skills": ["Concurrency", "SQL"],
+      "prompt": "Two requests both read `stock = 1`, both decide the item is available, and both write `stock = 0`. One unit was sold twice.\n\nWhich approach removes the race, rather than narrowing it?",
+      "choices": [
+        { "key": "a", "text": "Wrapping both the read and the write in one transaction at READ COMMITTED" },
+        { "key": "b", "text": "Re-reading the stock immediately before writing" },
+        { "key": "c", "text": "`UPDATE items SET stock = stock - 1 WHERE id = ? AND stock > 0` and treating zero updated rows as sold out" },
+        { "key": "d", "text": "Retrying the request when the write fails" }
+      ],
+      "answer": ["c"],
+      "explanation": "Options a, b and d all shrink the window between the check and the write without closing it. Making the database do the check and the decrement in one statement means the condition is evaluated under the row lock the update already takes."
+    },
+    {
+      "id": "be-api-01",
+      "kind": "SINGLE_CHOICE",
+      "tier": 1,
+      "topic": "HTTP and APIs",
+      "skills": ["REST", "HTTP"],
+      "prompt": "A client sends a request to create an order and the body is missing a required field. Which status code is right?",
+      "choices": [
+        { "key": "a", "text": "400 Bad Request" },
+        { "key": "b", "text": "404 Not Found" },
+        { "key": "c", "text": "500 Internal Server Error" },
+        { "key": "d", "text": "200 OK with an `error` field in the body" }
+      ],
+      "answer": ["a"],
+      "explanation": "The request is malformed, so the fault is the client's — 400. Returning 200 with an error inside means every caller has to parse a body to find out whether something worked, and no proxy, retry policy or monitor can tell success from failure."
+    },
+    {
+      "id": "be-short-01",
+      "kind": "SHORT_ANSWER",
+      "tier": 2,
+      "topic": "Debugging and performance",
+      "skills": ["Performance", "SQL"],
+      "prompt": "An endpoint that used to respond in 100 ms now takes 4 seconds. Nothing about the code changed this week; the table it reads has grown from 10,000 to 3 million rows.\n\nDescribe how you would find the cause — the specific things you would look at, in order — and what you would expect to find.",
+      "rubric": [
+        { "criterion": "Starts by measuring rather than guessing: reads the slow query log, APM trace, or times the parts of the request", "points": 3 },
+        { "criterion": "Names EXPLAIN / EXPLAIN ANALYZE, or an equivalent query plan tool, to see how the query is executed", "points": 3 },
+        { "criterion": "Identifies a missing index causing a sequential scan as the likely cause, given the row-count growth", "points": 2 },
+        { "criterion": "Mentions verifying the fix by measuring again, or considers a second cause (N+1, missing pagination, lock contention)", "points": 2 }
+      ],
+      "explanation": "The answer worth full marks measures before it guesses. Growth from 10k to 3M rows makes a sequential scan that was invisible at 10k dominate the response, and EXPLAIN is what turns that from a hypothesis into a fact."
+    },
+    {
+      "id": "be-short-02",
+      "kind": "SHORT_ANSWER",
+      "tier": 3,
+      "topic": "System design",
+      "skills": ["Microservices", "Error Handling"],
+      "prompt": "Your service calls a third-party API that is usually fast but occasionally hangs for 30 seconds. When it hangs, your own service stops answering any request at all.\n\nExplain why one slow dependency takes down the whole service, and what you would put in place.",
+      "rubric": [
+        { "criterion": "Explains resource exhaustion: threads or connections are held waiting, so the pool empties and unrelated requests queue", "points": 4 },
+        { "criterion": "Names a timeout on the outbound call as the first and most important fix", "points": 3 },
+        { "criterion": "Names a circuit breaker, bulkhead, or isolated thread pool so the failing dependency cannot consume the whole service", "points": 2 },
+        { "criterion": "Says what the service should return while the dependency is down — a degraded response or a clear error rather than a hang", "points": 1 }
+      ],
+      "explanation": "The failure is not the dependency being slow, it is your service having no bound on how long it will wait. A timeout turns an outage into an error; a circuit breaker stops you from making the same doomed call a thousand times a second."
+    },
+    {
+      "id": "be-code-01",
+      "kind": "CODE",
+      "tier": 2,
+      "topic": "Concurrency",
+      "language": "java",
+      "skills": ["Java", "Concurrency"],
+      "prompt": "This counter is called from many threads at once and its total comes out too low. Fix it, and add a one-line comment saying why the original was wrong.\n\nYou may change the field type, the method, or both.",
+      "starterCode": "public class HitCounter {\n\n    private int count = 0;\n\n    public void record() {\n        count++;\n    }\n\n    public int total() {\n        return count;\n    }\n}",
+      "rubric": [
+        { "criterion": "The fix makes the increment atomic — AtomicInteger/LongAdder, or synchronized/lock on both record() and total()", "points": 4 },
+        { "criterion": "The explanation identifies that count++ is a read-modify-write, not a single operation, so updates are lost", "points": 3 },
+        { "criterion": "total() is also safe: it either reads the atomic, or is synchronized on the same monitor as record()", "points": 2 },
+        { "criterion": "Does not reach for `volatile` alone as the fix (volatile fixes visibility, not atomicity)", "points": 1 }
+      ],
+      "explanation": "`count++` is three operations: read, add, write. Two threads can read the same value and both write back the same result, so one increment vanishes. `volatile` makes the value visible across threads and does nothing about the lost update — AtomicInteger's compareAndSet, or a lock, is what makes it atomic."
+    },
+    {
+      "id": "be-code-02",
+      "kind": "CODE",
+      "tier": 3,
+      "topic": "Algorithms",
+      "language": "java",
+      "skills": ["Algorithms", "Caching"],
+      "prompt": "Implement a sliding-window rate limiter: `allow(userId, nowMillis)` returns true if this user has made fewer than `limit` requests in the last `windowMillis`, and false otherwise. A rejected request does not count towards the window.\n\nSingle-process, single-threaded is fine. State the time complexity of `allow` in a comment.",
+      "starterCode": "public class RateLimiter {\n\n    private final int limit;\n    private final long windowMillis;\n\n    public RateLimiter(int limit, long windowMillis) {\n        this.limit = limit;\n        this.windowMillis = windowMillis;\n    }\n\n    public boolean allow(String userId, long nowMillis) {\n        // TODO\n        return true;\n    }\n}",
+      "rubric": [
+        { "criterion": "Keeps per-user timestamps in a structure that can drop the old end cheaply — a Deque/queue per user, not a full scan of a list", "points": 3 },
+        { "criterion": "Evicts timestamps older than nowMillis - windowMillis before counting", "points": 3 },
+        { "criterion": "Rejected requests are not recorded, so a blocked user is not kept blocked by their own retries", "points": 2 },
+        { "criterion": "States the complexity, and it is amortised O(1) per call rather than O(n) per call", "points": 2 }
+      ],
+      "explanation": "The shape that earns full marks is a deque of timestamps per user: evict from the head while the oldest is outside the window, compare size to the limit, and only push when allowing. Each timestamp is added once and removed once, so the cost is amortised constant — a fixed-size counter per minute is the other good answer, trading precision at the window edge for memory."
+    }
+  ]
+}

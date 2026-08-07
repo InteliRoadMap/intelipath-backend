@@ -1,8 +1,15 @@
 package com.inteliroadmap.backend.services.impl;
 
+import com.inteliroadmap.backend.domain.dto.request.PortfolioConfigRequest;
+import com.inteliroadmap.backend.domain.dto.request.PortfolioProjectRequest;
+import com.inteliroadmap.backend.domain.dto.request.StudentEducationRequest;
+
 import com.inteliroadmap.backend.domain.dto.request.PortfolioUpsertRequest;
 import com.inteliroadmap.backend.domain.dto.request.RequestReviewRequest;
 import com.inteliroadmap.backend.domain.dto.response.portfolio.PortfolioResponse;
+import com.inteliroadmap.backend.domain.dto.response.portfolio.PortfolioAboutDraftResponse;
+import com.inteliroadmap.backend.domain.dto.internal.portfolio.PortfolioAboutSkillFact;
+import com.inteliroadmap.backend.ai.analyzer.PortfolioAboutAiAnalyzer;
 import com.inteliroadmap.backend.domain.entity.PortfolioConfig;
 import com.inteliroadmap.backend.domain.entity.PortfolioProject;
 import com.inteliroadmap.backend.domain.entity.PortfolioReviewRequest;
@@ -10,6 +17,7 @@ import com.inteliroadmap.backend.domain.entity.Student;
 import com.inteliroadmap.backend.domain.entity.StudentEducation;
 import com.inteliroadmap.backend.domain.entity.StudentSkill;
 import com.inteliroadmap.backend.domain.entity.StudentSkillEvidence;
+import com.inteliroadmap.backend.domain.entity.CareerRequiredSkill;
 import com.inteliroadmap.backend.domain.entity.User;
 import com.inteliroadmap.backend.domain.enums.EvidenceStatus;
 import com.inteliroadmap.backend.domain.enums.ReviewStatus;
@@ -25,14 +33,22 @@ import com.inteliroadmap.backend.repositories.StudentRepository;
 import com.inteliroadmap.backend.repositories.StudentSkillEvidenceRepository;
 import com.inteliroadmap.backend.repositories.StudentSkillRepository;
 import com.inteliroadmap.backend.repositories.UserRepository;
+import com.inteliroadmap.backend.repositories.CareerRequiredSkillRepository;
+import com.inteliroadmap.backend.repositories.RecruitmentSkillRepository;
 import com.inteliroadmap.backend.mappers.PortfolioMapper;
 import com.inteliroadmap.backend.services.PortfolioService;
+import com.inteliroadmap.backend.services.RoadmapService;
+import com.inteliroadmap.backend.services.StudentLevelService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -56,6 +72,84 @@ public class PortfolioServiceImpl implements PortfolioService {
     private final PortfolioReviewRequestRepository portfolioReviewRequestRepository;
     private final StudentRepository studentRepository;
     private final UserRepository userRepository;
+    private final RoadmapService roadmapService;
+    private final StudentLevelService studentLevelService;
+    private final PortfolioAboutAiAnalyzer portfolioAboutAiAnalyzer;
+    private final CareerRequiredSkillRepository careerRequiredSkillRepository;
+    private final RecruitmentSkillRepository recruitmentSkillRepository;
+
+    @Override
+    @Transactional(readOnly = true)
+    public PortfolioAboutDraftResponse generateAboutDraft() {
+        Student student = authenticatedStudentService.getRequiredStudent();
+        PortfolioResponse portfolio = getPortfolio();
+        String career = portfolio.getLearningJourney() == null ? null
+                : portfolio.getLearningJourney().getTargetCareerRole();
+        String level = portfolio.getStudentLevel() == null ? null : portfolio.getStudentLevel().getLevel();
+        List<PortfolioAboutSkillFact> facts = rankedSkillFacts(student);
+        String primarySkills = facts.stream()
+                .filter(fact -> fact.careerImportance() != null)
+                .limit(12)
+                .map(PortfolioAboutSkillFact::promptLine)
+                .reduce((left, right) -> left + "\n" + right)
+                .orElse("(not provided)");
+        String secondarySkills = facts.stream()
+                .filter(fact -> fact.careerImportance() == null)
+                .limit(12)
+                .map(PortfolioAboutSkillFact::promptLine)
+                .reduce((left, right) -> left + "\n" + right)
+                .orElse("(not provided)");
+        String projects = portfolio.getProjects().stream()
+                .limit(8)
+                .map(project -> project.getProjectName() + ": " + project.getDescription())
+                .reduce((left, right) -> left + " | " + right)
+                .orElse("(not provided)");
+        return portfolioAboutAiAnalyzer.draft(career, level, portfolio.getUserInfo().getBio(),
+                primarySkills, secondarySkills, projects);
+    }
+
+    private List<PortfolioAboutSkillFact> rankedSkillFacts(Student student) {
+        if (student.getCareerRole() == null) return List.of();
+        UUID careerId = student.getCareerRole().getCareerId();
+        Map<UUID, CareerRequiredSkill> requiredBySkill = new HashMap<>();
+        for (CareerRequiredSkill required : careerRequiredSkillRepository.findByCareerRole_CareerId(careerId)) {
+            requiredBySkill.put(required.getSkill().getSkillId(), required);
+        }
+        Map<UUID, Long> demandBySkill = new HashMap<>();
+        for (Object[] row : recruitmentSkillRepository.demandByCareer()) {
+            if (careerId.equals(row[0])) {
+                demandBySkill.put((UUID) row[1], ((Number) row[3]).longValue());
+            }
+        }
+
+        List<PortfolioAboutSkillFact> facts = new ArrayList<>();
+        for (StudentSkill held : studentSkillRepository.findByStudent_UserId(student.getUserId())) {
+            UUID skillId = held.getSkill().getSkillId();
+            CareerRequiredSkill required = requiredBySkill.get(skillId);
+            facts.add(new PortfolioAboutSkillFact(
+                    held.getSkill().getSkillName(),
+                    required == null ? null : required.getImportanceLevel(),
+                    held.getProficiency(),
+                    held.getVerifiedBy(),
+                    demandBySkill.getOrDefault(skillId, 0L)));
+        }
+        facts.sort(Comparator
+                .comparingInt((PortfolioAboutSkillFact fact) -> importanceRank(fact.careerImportance())).reversed()
+                .thenComparing(PortfolioAboutSkillFact::verified, Comparator.reverseOrder())
+                .thenComparing(Comparator.comparingLong(PortfolioAboutSkillFact::careerPostingCount).reversed())
+                .thenComparing(fact -> fact.proficiency() == null ? 0 : fact.proficiency(), Comparator.reverseOrder())
+                .thenComparing(PortfolioAboutSkillFact::skillName));
+        return facts;
+    }
+
+    private int importanceRank(com.inteliroadmap.backend.domain.enums.ImportanceLevel importance) {
+        if (importance == null) return 0;
+        return switch (importance) {
+            case HIGH -> 3;
+            case AVG -> 2;
+            case LOW -> 1;
+        };
+    }
 
     /**
      * Evidence that still stands behind the student's skills. REJECTED rows are left out:
@@ -94,7 +188,9 @@ public class PortfolioServiceImpl implements PortfolioService {
         // Map the collected data into a PortfolioResponse object
         List<StudentSkillEvidence> evidence = liveEvidence(student.getUserId());
 
-        return portfolioMapper.toPortfolioResponse(user, student, config, skills, projects, education, evidence);
+        return portfolioMapper.toPortfolioResponse(user, student, config, skills, projects, education, evidence,
+                roadmapService.getStudentRoadmapForPortfolio(student),
+                studentLevelService.levelOf(student.getUserId()).orElse(null));
     }
 
     /**
@@ -128,7 +224,9 @@ public class PortfolioServiceImpl implements PortfolioService {
 
         List<StudentSkillEvidence> evidence = liveEvidence(student.getUserId());
 
-        return portfolioMapper.toPortfolioResponse(user, student, config, skills, projects, education, evidence);
+        return portfolioMapper.toPortfolioResponse(user, student, config, skills, projects, education, evidence,
+                roadmapService.getStudentRoadmapForPortfolio(student),
+                studentLevelService.levelOf(student.getUserId()).orElse(null));
     }
 
     /**
@@ -194,7 +292,7 @@ public class PortfolioServiceImpl implements PortfolioService {
      * @param configRequest the configuration request containing theme and section preferences
      * @param student the {@link Student} whose configuration is being updated
      */
-    private void syncPortfolioConfig(PortfolioUpsertRequest.PortfolioConfigRequest configRequest, Student student) {
+    private void syncPortfolioConfig(PortfolioConfigRequest configRequest, Student student) {
         if (configRequest == null) return;
         PortfolioConfig config = portfolioConfigRepository.findByUser_UserId(student.getUserId());
         if (config == null) {
@@ -215,7 +313,7 @@ public class PortfolioServiceImpl implements PortfolioService {
      * @param projectRequests the list of project requests to save
      * @param user the {@link User} whose projects are being updated
      */
-    private void syncPortfolioProjects(List<PortfolioUpsertRequest.PortfolioProjectRequest> projectRequests, User user) {
+    private void syncPortfolioProjects(List<PortfolioProjectRequest> projectRequests, User user) {
         if (projectRequests == null) return;
         portfolioProjectRepository.deleteByUser_UserId(user.getUserId());
         List<PortfolioProject> newProjects = portfolioMapper.toPortfolioProjects(projectRequests, user);
@@ -229,7 +327,7 @@ public class PortfolioServiceImpl implements PortfolioService {
      * @param educationRequests the list of education requests to save
      * @param student the {@link Student} whose education records are being updated
      */
-    private void syncPortfolioEducation(List<PortfolioUpsertRequest.StudentEducationRequest> educationRequests, Student student) {
+    private void syncPortfolioEducation(List<StudentEducationRequest> educationRequests, Student student) {
         if (educationRequests == null) return;
         studentEducationRepository.deleteByUser_UserId(student.getUserId());
         List<StudentEducation> newEducation = portfolioMapper.toStudentEducationList(educationRequests, student);

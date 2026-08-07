@@ -66,7 +66,8 @@ public class AiRateLimitFilter extends OncePerRequestFilter {
         }
         // AI GitHub-import analysis (single repo and the batch multiplier).
         return uri.equals("/api/v1/student/portfolio/projects/github-import")
-                || uri.equals("/api/v1/student/portfolio/projects/github-import-batch");
+                || uri.equals("/api/v1/student/portfolio/projects/github-import-batch")
+                || uri.equals("/api/v1/student/portfolio/about/ai-draft");
     }
 
     @Override

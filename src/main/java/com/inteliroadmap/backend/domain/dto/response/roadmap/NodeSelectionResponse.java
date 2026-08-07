@@ -22,4 +22,16 @@ public class NodeSelectionResponse {
     private UUID chosenNodeId;
     private String chosenNodeName;
     private LocalDateTime createdAt;
+
+    /**
+     * True when the system picked this branch rather than the student.
+     *
+     * <p>The client has to be able to tell them apart: an auto-pick is a
+     * suggestion the student is entitled to overrule, and presenting it as their
+     * own past decision removes the invitation to disagree.
+     */
+    private Boolean autoSelected;
+
+    /** Why it was picked, in the student's own numbers. Null for a manual choice. */
+    private String autoReason;
 }

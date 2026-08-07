@@ -313,3 +313,19 @@ docs
 src/main/java/com/inteliroadmap/backend/config/MockDataSeeder.java
 
 # End of https://www.toptal.com/developers/gitignore/api/intellij,netbeans,visualstudiocode,maven,node
+
+# --- Local-only, never committed ---
+# Catalog build cache: blobs downloaded by scripts/build_skill_catalog.py
+# (devicon, linguist languages.yml, StackOverflow synonyms). Regenerated on run.
+scripts/.catalog-cache/
+scripts/__pycache__/
+
+# Postgres init SQL — the canonical copy lives in the `infrastructure` repo at
+# docker/postgres/init/. This is a local mirror for running compose from here;
+# committing it in two places is how the two schemas drift apart.
+docker/postgres/init/
+
+# Agent/assistant working directories
+.claude/
+.ua/
+.understand-anything/

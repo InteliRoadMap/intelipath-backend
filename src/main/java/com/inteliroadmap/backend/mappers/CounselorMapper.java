@@ -1,5 +1,7 @@
 package com.inteliroadmap.backend.mappers;
 
+import com.inteliroadmap.backend.domain.dto.response.counselor.FeedbackResponse;
+
 import com.inteliroadmap.backend.domain.dto.response.counselor.CounselorDashboardResponse;
 import com.inteliroadmap.backend.domain.dto.response.counselor.CurriculumResponse;
 import com.inteliroadmap.backend.domain.dto.response.counselor.CounselorFeedbackResponse;
@@ -42,7 +44,7 @@ public class CounselorMapper {
     }
 
     public CounselorDashboardResponse toGetFeedbacksResponse(List<Feedback> feedbacks, int total) {
-        List<CounselorFeedbackResponse.FeedbackResponse> dtos = feedbacks.stream()
+        List<FeedbackResponse> dtos = feedbacks.stream()
                 .map(this::mapFeedbackToResponse)
                 .toList();
         return CounselorDashboardResponse.builder()
@@ -52,7 +54,7 @@ public class CounselorMapper {
     }
 
     public CounselorFeedbackResponse toGetStudentStatisticAndFeedback(int progress, List<String> missingSkills, List<Feedback> feedbacks) {
-        List<CounselorFeedbackResponse.FeedbackResponse> dtos = feedbacks.stream()
+        List<FeedbackResponse> dtos = feedbacks.stream()
                 .map(this::mapFeedbackToResponse)
                 .toList();
         return CounselorFeedbackResponse.builder()
@@ -62,8 +64,8 @@ public class CounselorMapper {
                 .build();
     }
 
-    private CounselorFeedbackResponse.FeedbackResponse mapFeedbackToResponse(Feedback f) {
-        return CounselorFeedbackResponse.FeedbackResponse.builder()
+    private FeedbackResponse mapFeedbackToResponse(Feedback f) {
+        return FeedbackResponse.builder()
                 .feedbackId(f.getFeedbackId())
                 .senderId(f.getSender().getUserId())
                 .receiverId(f.getReceiver().getUserId())

@@ -18,6 +18,7 @@ import com.inteliroadmap.backend.domain.entity.Company;
 import com.inteliroadmap.backend.domain.entity.Recruitment;
 import com.inteliroadmap.backend.domain.entity.RecruitmentPost;
 import com.inteliroadmap.backend.repositories.CompanyRepository;
+import com.inteliroadmap.backend.components.SeniorityClassifier;
 import com.inteliroadmap.backend.repositories.RecruitmentRepository;
 import com.inteliroadmap.backend.repositories.RecruitmentPostRepository;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -47,6 +48,7 @@ public class JobScrapingScheduler {
     private final CompanyRepository companyRepository;
     private final RecruitmentRepository recruitmentRepository;
     private final RecruitmentPostRepository recruitmentPostRepository;
+    private final SeniorityClassifier seniorityClassifier;
     private final TransactionTemplate transactionTemplate;
 
     /** Job board the scrape should target. Both feed the same source-agnostic tables. */
@@ -181,6 +183,14 @@ public class JobScrapingScheduler {
                 recruitment.setTopCvRecruitmentId(rDto.getRecruitmentId());
                 recruitment.setRecruitmentInfos(rDto.getRecruitmentInfos());
                 recruitment.setDescriptions(rDto.getDescriptions());
+                recruitment.setDedupKey(rDto.getDedupKey());
+                // Labelled on the way in rather than by a later sweep: a posting that
+                // arrives unclassified is invisible to every level filter until the
+                // next backfill runs, which is a silent gap rather than a visible one.
+                recruitment.setSeniority(seniorityClassifier.classify(
+                        str(rDto.getRecruitmentInfos(), "title"),
+                        str(rDto.getRecruitmentInfos(), "experience")).name());
+                recruitment.setClassifiedAt(java.time.LocalDateTime.now());
 
                 if (rDto.getPostedDate() != null) {
                     recruitment.setPostedDate(LocalDate.parse(rDto.getPostedDate(), formatter));
@@ -216,5 +226,11 @@ public class JobScrapingScheduler {
                     }
                 }
             }
+    }
+
+    /** Reads a string out of a scraped jsonb map, tolerating a missing key. */
+    private static String str(java.util.Map<String, Object> map, String key) {
+        Object value = map == null ? null : map.get(key);
+        return value == null ? "" : value.toString();
     }
 }

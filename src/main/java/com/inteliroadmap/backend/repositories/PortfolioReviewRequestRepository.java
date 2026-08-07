@@ -21,6 +21,9 @@ public interface PortfolioReviewRequestRepository extends JpaRepository<Portfoli
 
     boolean existsByStudent_UserIdAndMentor_UserIdAndStatus(UUID studentId, UUID mentorId, ReviewStatus status);
 
+    /** A submitted review creates the only mentor-to-student audit-read grant. */
+    boolean existsByStudent_UserIdAndMentor_UserId(UUID studentId, UUID mentorId);
+
     @Query(value = "SELECT AVG(EXTRACT(EPOCH FROM (r.resolved_at - r.create_at))) FROM portfolio_review_requests r " +
             "WHERE r.mentor_id = :mentorId AND r.status = 'REVIEWED'", nativeQuery = true)
     Double getAverageResponseTimeInSecondsByMentorId(@Param("mentorId") UUID mentorId);

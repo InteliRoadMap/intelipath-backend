@@ -26,32 +26,4 @@ public class AdminSystemHealthResponse {
     private DbPool db;
     private Memory memory;
 
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @Builder
-    public static class ServiceStatus {
-        private String name;
-        private boolean up;
-    }
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @Builder
-    public static class DbPool {
-        private int active;
-        private int idle;
-        private int total;
-        private int max;
-    }
-
-    @Data
-    @NoArgsConstructor
-    @AllArgsConstructor
-    @Builder
-    public static class Memory {
-        private long usedMb;
-        private long maxMb;
-    }
 }

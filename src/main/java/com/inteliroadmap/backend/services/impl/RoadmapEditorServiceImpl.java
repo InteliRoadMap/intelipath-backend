@@ -1,5 +1,7 @@
 package com.inteliroadmap.backend.services.impl;
 
+import com.inteliroadmap.backend.domain.dto.request.NodePosition;
+
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.node.ArrayNode;
 import com.inteliroadmap.backend.domain.dto.request.SaveNodePositionsRequest;
@@ -78,7 +80,7 @@ public class RoadmapEditorServiceImpl implements RoadmapEditorService {
         log.info("RoadmapEditorServiceImpl: Saving {} node layout(s)", request.getPositions().size());
         UUID editorId = currentUserId();
 
-        for (SaveNodePositionsRequest.NodePosition position : request.getPositions()) {
+        for (NodePosition position : request.getPositions()) {
             SkillNode node = requireNode(position.getNodeId());
             RoadmapNodeLayout layout = layoutRepository.findByNodeId(node.getNodeId()).orElse(null);
 

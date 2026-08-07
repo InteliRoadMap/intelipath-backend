@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.UUID;
 
 /**
@@ -24,4 +25,28 @@ public class RoadmapRecommendationDecisionResponse {
     private RecommendationStatus status;
     private LocalDateTime decidedAt;
     private Integer roadmapProgress;
+
+    /**
+     * Nodes this acceptance actually marked complete.
+     *
+     * <p>Not the item count: only MARK_COMPLETE items write progress, and only
+     * those that survived gating. The assessment stored the item count as
+     * `applied_node_count` and told the student "12 nodes marked" when the real
+     * answer could be zero.
+     */
+    private Integer completedNodeCount;
+
+    /**
+     * Which nodes those were.
+     *
+     * <p>The count alone tells the student a number; the ids let the roadmap show
+     * them the marking happen. Without this the canvas can only refetch and
+     * silently render a different set of ticks, which is indistinguishable from
+     * nothing having occurred — the student supplied their skills and the page
+     * looked the same.
+     *
+     * <p>Additive and nullable: a client that does not read it behaves exactly as
+     * before.
+     */
+    private List<UUID> completedNodeIds;
 }

@@ -46,6 +46,12 @@ spring:
       hibernate:
         format_sql: true
 
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: "20260806"
+    locations: classpath:db/migration
+
   security:
     oauth2:
       client:
@@ -132,6 +138,9 @@ seed:
   student:
     username: ${SEED_STUDENT_USERNAME:}
     password: ${SEED_STUDENT_PASSWORD:}
+  demo-student:
+    username: ${SEED_DEMO_STUDENT_USERNAME:}
+    password: ${SEED_DEMO_STUDENT_PASSWORD:}
   mentor:
     password: ${SEED_MENTOR_PASSWORD:}
     username: ${SEED_MENTOR_USERNAME:}

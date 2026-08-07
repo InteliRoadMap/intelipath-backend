@@ -1,5 +1,6 @@
 package com.inteliroadmap.backend.services;
 
+import com.inteliroadmap.backend.components.CoreSkillEligibility;
 import com.inteliroadmap.backend.domain.dto.request.ImportSkillsRequest;
 import com.inteliroadmap.backend.domain.entity.CareerRole;
 import com.inteliroadmap.backend.domain.entity.Skill;
@@ -60,7 +61,11 @@ class SkillServiceTest {
                 careerRequiredSkillRepository,
                 authenticatedStudentService,
                 skillEvidenceService,
-                new SkillMapper(skillRepository)
+                new SkillMapper(skillRepository),
+                // Real, not mocked: the picker's name gate is the thing that keeps
+                // `$elemMatch` out of the list a student declares from, and a mock would
+                // let a regression in it pass unnoticed here.
+                new CoreSkillEligibility()
         );
     }
 
@@ -130,7 +135,7 @@ class SkillServiceTest {
 
         when(authenticatedStudentService.getOrCreateStudent()).thenReturn(student);
         when(studentSkillRepository.findByStudent_UserId(student.getUserId())).thenReturn(List.of(selected));
-        when(skillRepository.findAll()).thenReturn(List.of(selectedSkill, availableSkill));
+        when(skillRepository.findDeclarableCandidates()).thenReturn(List.of(selectedSkill, availableSkill));
         when(skillRepository.findById(selectedSkill.getSkillId())).thenReturn(Optional.of(selectedSkill));
 
         var response = skillService.getStudentSkills();
@@ -147,7 +152,7 @@ class SkillServiceTest {
 
         when(authenticatedStudentService.getOrCreateStudent()).thenReturn(student);
         when(studentSkillRepository.findByStudent_UserId(student.getUserId())).thenReturn(List.of());
-        when(skillRepository.findAll()).thenReturn(List.of(availableSkill));
+        when(skillRepository.findDeclarableCandidates()).thenReturn(List.of(availableSkill));
 
         var response = skillService.getStudentSkills();
 
@@ -158,23 +163,53 @@ class SkillServiceTest {
 
     @Test
     void searchSkillsSearchesBySkillName() {
-        Skill java = skill("Java");
-        when(skillRepository.findBySkillNameContainingIgnoreCase("ja")).thenReturn(List.of(java));
+        // Search runs over the declarable population, not the raw catalog: `$match`
+        // matches the substring "ma" and must not come back from a search either.
+        when(skillRepository.findDeclarableCandidates())
+                .thenReturn(List.of(skill("Java"), skill("Python")));
 
         var response = skillService.searchSkills("ja");
 
+        assertEquals(1, response.getSkills().size());
         assertEquals("Java", response.getSkills().getFirst().getSkillName());
         assertAllListsNotNull(response);
     }
 
     @Test
     void searchSkillsReturnsEmptyListsWhenNoSkillMatches() {
-        when(skillRepository.findBySkillNameContainingIgnoreCase("missing")).thenReturn(List.of());
+        when(skillRepository.findDeclarableCandidates()).thenReturn(List.of(skill("Java")));
 
         var response = skillService.searchSkills("missing");
 
         assertEquals(0, response.getSkills().size());
         assertAllListsNotNull(response);
+    }
+
+    /**
+     * The bug the student saw: the picker asked for the whole catalog, and the catalog is
+     * also every node title of every imported roadmap — so a student was offered
+     * {@code $elemMatch}, {@code --watch} and {@code @else if} to declare, sorted above
+     * {@code Android}.
+     *
+     * <p>Nothing here is deleted from the catalog. These rows are still nodes inside the
+     * MongoDB and Sass tracks, and still things to learn. They are just not things a
+     * person says they can do.
+     */
+    @Test
+    void thePickerDoesNotOfferRoadmapNodeTitlesToDeclare() {
+        Student student = Student.builder().userId(UUID.randomUUID()).build();
+
+        when(authenticatedStudentService.getOrCreateStudent()).thenReturn(student);
+        when(studentSkillRepository.findByStudent_UserId(student.getUserId())).thenReturn(List.of());
+        when(skillRepository.findDeclarableCandidates()).thenReturn(List.of(
+                skill("Android"), skill("$elemMatch"), skill("--watch"), skill("@else if"),
+                skill("Testing Methodologies & Techniques"), skill("Cloud"), skill(".NET")));
+
+        var names = skillService.getStudentSkills().getSkills().stream()
+                .map(com.inteliroadmap.backend.domain.dto.response.roadmap.SkillItemResponse::getSkillName)
+                .toList();
+
+        assertEquals(List.of("Android", ".NET"), names);
     }
 
     private void assertAllListsNotNull(com.inteliroadmap.backend.domain.dto.response.roadmap.SkillResponse response) {

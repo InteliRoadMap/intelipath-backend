@@ -17,5 +17,5 @@ public class CounselorDashboardResponse {
     private Map<String, Integer> totalCareerStatistics;
     private Map<String, Integer> totalMissingSkills;
     private String careerName;
-    private List<CounselorFeedbackResponse.FeedbackResponse> feedbacks;
+    private List<FeedbackResponse> feedbacks;
 }

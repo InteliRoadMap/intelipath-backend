@@ -31,6 +31,10 @@ public class Skill {
 
     private String category;
 
+    @Column(name = "catalog_status", nullable = false)
+    @Builder.Default
+    private String catalogStatus = "ACTIVE";
+
     @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "careers", columnDefinition = "jsonb")
     private List<CareerRole> careers;

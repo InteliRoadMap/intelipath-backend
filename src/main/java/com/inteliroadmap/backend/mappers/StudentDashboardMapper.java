@@ -47,6 +47,8 @@ public class StudentDashboardMapper {
                 .id(node.getNodeId())
                 .title(node.getNodeName())
                 .status(status)
+                .parentTitle(node.getParentNode() == null ? null : node.getParentNode().getNodeName())
+                .depth(node.getDepth())
                 .build();
     }
 
@@ -90,11 +92,13 @@ public class StudentDashboardMapper {
                 .build();
     }
 
-    public MarketDemandResponse toMarketDemandResponse(CareerRole careerRole, double growth, List<Integer> chart) {
+    public MarketDemandResponse toMarketDemandResponse(CareerRole careerRole, double growth,
+                                                       List<Integer> chart, List<String> chartLabels) {
         return MarketDemandResponse.builder()
                 .growth(growth)
                 .role(careerRole.getCareerName())
                 .chart(chart)
+                .chartLabels(chartLabels)
                 .build();
     }
 
